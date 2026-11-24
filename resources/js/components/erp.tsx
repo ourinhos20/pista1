@@ -18,33 +18,39 @@ import { type ReactNode, useEffect, useState } from 'react';
 type MenuItem = { label: string; href: string; key?: string; code: string };
 type MenuGroup = { label: string; items: MenuItem[] };
 
+/** Caminho relativo da rota (o sistema fica num prefixo escondido, ex.: /sistema). */
+const path = (name: string) => route(name, undefined, false);
+const item = (label: string, name: string, code: string, key?: string): MenuItem => ({ label, href: path(name), code, key });
+
 export function menusFor(role: Role): MenuGroup[] {
-    const oficina: MenuGroup = { label: 'Oficina', items: [{ label: 'Agenda da oficina', href: '/mecanico', key: 'F9', code: 'OFI010' }] };
-    if (role === 'mecanico') return [oficina];
+    const oficina: MenuGroup = { label: 'Oficina', items: [item('Agenda da oficina', 'mecanico.index', 'OFI010', 'F9')] };
+    const conta: MenuGroup = { label: 'Sistema', items: [item('Minha conta', 'profile.edit', 'SIS020')] };
+    if (role === 'mecanico') return [oficina, conta];
 
     const groups: MenuGroup[] = [
         {
             label: 'Atendimento',
             items: [
-                { label: 'Painel de atendimento', href: '/dashboard', key: 'F1', code: 'ATD001' },
-                { label: 'Nova ordem de serviço', href: '/os/nova', key: 'F2', code: 'ATD010' },
-                { label: 'Ordens de serviço', href: '/os', key: 'F4', code: 'ATD020' },
+                item('Painel de atendimento', 'dashboard', 'ATD001', 'F1'),
+                item('Nova ordem de serviço', 'os.create', 'ATD010', 'F2'),
+                item('Ordens de serviço', 'os.index', 'ATD020', 'F4'),
             ],
         },
         oficina,
-        { label: 'Cadastros', items: [{ label: 'Clientes e veículos', href: '/clientes', key: 'F6', code: 'CAD010' }] },
+        { label: 'Cadastros', items: [item('Clientes e veículos', 'clientes.index', 'CAD010', 'F6')] },
     ];
     if (role === 'master') {
         groups.push({
             label: 'Financeiro',
             items: [
-                { label: 'Painel financeiro', href: '/financeiro', key: 'F7', code: 'FIN001' },
-                { label: 'Lançamentos e contas', href: '/financeiro/lancamentos', code: 'FIN010' },
-                { label: 'Sócios: aportes e retiradas', href: '/financeiro/socios', code: 'FIN020' },
+                item('Painel financeiro', 'financeiro.index', 'FIN001', 'F7'),
+                item('Lançamentos e contas', 'financeiro.entries', 'FIN010'),
+                item('Sócios: aportes e retiradas', 'financeiro.partners', 'FIN020'),
             ],
         });
-        groups.push({ label: 'Sistema', items: [{ label: 'Usuários e permissões', href: '/usuarios', code: 'SIS010' }] });
+        conta.items.unshift(item('Usuários e permissões', 'usuarios.index', 'SIS010'));
     }
+    groups.push(conta);
     return groups;
 }
 
@@ -87,7 +93,7 @@ function UserMenu() {
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
-                    <Link href="/settings/profile">
+                    <Link href={route('profile.edit')}>
                         <UserCog className="size-4" /> Minha conta
                     </Link>
                 </DropdownMenuItem>
@@ -104,9 +110,10 @@ function UserMenu() {
 function MenuBar() {
     const { auth } = usePage<SharedData>().props;
     const page = usePage();
-    const path = page.url.split('?')[0];
+    const current = page.url.split('?')[0];
     const groups = menusFor(auth.user.role);
-    const home = auth.user.role === 'mecanico' ? '/mecanico' : '/dashboard';
+    const home = path(auth.user.role === 'mecanico' ? 'mecanico.index' : 'dashboard');
+    const dash = path('dashboard');
     const [open, setOpen] = useState(false);
 
     return (
@@ -130,7 +137,7 @@ function MenuBar() {
                                         key={i.href}
                                         href={i.href}
                                         onClick={() => setOpen(false)}
-                                        className={cn('flex h-12 items-center rounded-[4px] px-3 text-[15px]', path === i.href ? 'bg-white/10 font-semibold' : 'text-zinc-300')}
+                                        className={cn('flex h-12 items-center rounded-[4px] px-3 text-[15px]', current === i.href ? 'bg-white/10 font-semibold' : 'text-zinc-300')}
                                     >
                                         {i.label}
                                     </Link>
@@ -147,7 +154,7 @@ function MenuBar() {
 
             <nav className="hidden items-stretch md:flex">
                 {groups.map((g) => {
-                    const active = g.items.some((i) => path === i.href || (i.href !== '/dashboard' && path.startsWith(i.href + '/')));
+                    const active = g.items.some((i) => current === i.href || (i.href !== dash && current.startsWith(i.href + '/')));
                     return (
                         <DropdownMenu key={g.label}>
                             <DropdownMenuTrigger

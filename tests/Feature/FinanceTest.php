@@ -34,20 +34,20 @@ class FinanceTest extends TestCase
     {
         foreach ([$this->balcao, $this->mecanico] as $u) {
             $this->actingAs($u);
-            $this->get('/financeiro')->assertForbidden();
-            $this->get('/financeiro/lancamentos')->assertForbidden();
-            $this->get('/financeiro/socios')->assertForbidden();
-            $this->post('/financeiro/lancamentos', [])->assertForbidden();
+            $this->get($this->p('/financeiro'))->assertForbidden();
+            $this->get($this->p('/financeiro/lancamentos'))->assertForbidden();
+            $this->get($this->p('/financeiro/socios'))->assertForbidden();
+            $this->post($this->p('/financeiro/lancamentos'), [])->assertForbidden();
         }
         $this->actingAs($this->master);
-        $this->get('/financeiro')->assertOk();
-        $this->get('/financeiro/lancamentos')->assertOk();
-        $this->get('/financeiro/socios')->assertOk();
+        $this->get($this->p('/financeiro'))->assertOk();
+        $this->get($this->p('/financeiro/lancamentos'))->assertOk();
+        $this->get($this->p('/financeiro/socios'))->assertOk();
     }
 
     public function test_despesa_parcelada_divide_o_valor_sem_perder_centavos(): void
     {
-        $this->actingAs($this->master)->post('/financeiro/lancamentos', [
+        $this->actingAs($this->master)->post($this->p('/financeiro/lancamentos'), [
             'type' => 'saida', 'category' => 'autopecas', 'description' => 'Kit embreagem', 'party' => 'Auto Peças X',
             'amount' => '1.000,00', 'due_date' => '2026-12-10', 'installments' => 3, 'paid' => true, 'paid_at' => '2026-12-10',
         ])->assertSessionHasNoErrors();
@@ -63,7 +63,7 @@ class FinanceTest extends TestCase
 
     public function test_categoria_precisa_ser_do_tipo_certo(): void
     {
-        $this->actingAs($this->master)->post('/financeiro/lancamentos', [
+        $this->actingAs($this->master)->post($this->p('/financeiro/lancamentos'), [
             'type' => 'entrada', 'category' => 'aluguel', 'description' => 'x', 'amount' => '10', 'due_date' => '2026-12-01',
         ])->assertSessionHasErrors('category');
     }
@@ -71,9 +71,9 @@ class FinanceTest extends TestCase
     public function test_baixa_e_estorno(): void
     {
         $open = FinanceEntry::whereNull('paid_at')->where('type', 'saida')->first();
-        $this->actingAs($this->master)->patch("/financeiro/lancamentos/{$open->id}/baixa")->assertSessionHasNoErrors();
+        $this->actingAs($this->master)->patch($this->p("/financeiro/lancamentos/{$open->id}/baixa"))->assertSessionHasNoErrors();
         $this->assertNotNull($open->fresh()->paid_at);
-        $this->patch("/financeiro/lancamentos/{$open->id}/estorno");
+        $this->patch($this->p("/financeiro/lancamentos/{$open->id}/estorno"));
         $this->assertNull($open->fresh()->paid_at);
     }
 
@@ -87,7 +87,7 @@ class FinanceTest extends TestCase
 
         // Sócio 2 aporta o que falta e fica em dia
         $p2 = Partner::where('name', 'Sócio 2')->first();
-        $this->actingAs($this->master)->post('/financeiro/socios/movimentos', [
+        $this->actingAs($this->master)->post($this->p('/financeiro/socios/movimentos'), [
             'partner_id' => $p2->id, 'type' => 'aporte', 'amount' => '1.300,00', 'date' => '2026-11-24',
         ])->assertSessionHasNoErrors();
         $after = collect(Finance::partnerBalance()['partners'])->keyBy('name');
@@ -98,7 +98,7 @@ class FinanceTest extends TestCase
     {
         $before = Finance::cashBalance();
         $p = Partner::first();
-        $this->actingAs($this->master)->post('/financeiro/socios/movimentos', ['partner_id' => $p->id, 'type' => 'aporte', 'amount' => '500', 'date' => today()->toDateString()]);
+        $this->actingAs($this->master)->post($this->p('/financeiro/socios/movimentos'), ['partner_id' => $p->id, 'type' => 'aporte', 'amount' => '500', 'date' => today()->toDateString()]);
         $this->assertSame(round($before + 500, 2), Finance::cashBalance());
     }
 
@@ -107,7 +107,7 @@ class FinanceTest extends TestCase
         $os = ServiceOrder::where('status', OsStatus::Pronto)->first();
         $total = $os->load('items')->total();
 
-        $this->actingAs($this->balcao)->post("/os/{$os->id}/pagamentos", [
+        $this->actingAs($this->balcao)->post($this->p("/os/{$os->id}/pagamentos"), [
             'amount' => number_format($total, 2, ',', '.'), 'payment_method' => 'credito', 'installments' => 2, 'received' => true,
         ])->assertSessionHasNoErrors();
 
@@ -116,13 +116,13 @@ class FinanceTest extends TestCase
         $this->assertEqualsWithDelta($total, $entries->sum('amount'), 0.001);
         $this->assertSame('servicos', $entries[0]->category);
 
-        $this->get("/os/{$os->id}")->assertInertia(fn (Assert $page) => $page
+        $this->get($this->p("/os/{$os->id}"))->assertInertia(fn (Assert $page) => $page
             ->where('os.billed_total', fn ($v) => abs((float) $v - $total) < 0.001)
             ->has('os.payments', 2)
         );
 
         // mecânico não vê pagamentos
-        $this->actingAs($this->mecanico)->get("/os/{$os->id}")->assertInertia(fn (Assert $page) => $page->missing('os.payments')->missing('os.paid_total'));
-        $this->post("/os/{$os->id}/pagamentos", ['amount' => '10', 'payment_method' => 'pix'])->assertForbidden();
+        $this->actingAs($this->mecanico)->get($this->p("/os/{$os->id}"))->assertInertia(fn (Assert $page) => $page->missing('os.payments')->missing('os.paid_total'));
+        $this->post($this->p("/os/{$os->id}/pagamentos"), ['amount' => '10', 'payment_method' => 'pix'])->assertForbidden();
     }
 }

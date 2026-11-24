@@ -37,16 +37,16 @@ class OficinaAccessTest extends TestCase
     public function test_mecanico_nao_acessa_clientes_lista_de_os_nem_usuarios(): void
     {
         $this->actingAs($this->carlos);
-        $this->get('/clientes')->assertForbidden();
-        $this->get('/os')->assertForbidden();
-        $this->get('/usuarios')->assertForbidden();
-        $this->get('/dashboard')->assertRedirect('/mecanico');
+        $this->get($this->p('/clientes'))->assertForbidden();
+        $this->get($this->p('/os'))->assertForbidden();
+        $this->get($this->p('/usuarios'))->assertForbidden();
+        $this->get($this->p('/dashboard'))->assertRedirect($this->p('/mecanico'));
     }
 
     public function test_mecanico_ve_a_os_dele_sem_dados_sensiveis_nem_valores(): void
     {
         $this->actingAs($this->carlos)
-            ->get("/os/{$this->osCarlos->id}")
+            ->get($this->p("/os/{$this->osCarlos->id}"))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('os/show')
@@ -61,10 +61,10 @@ class OficinaAccessTest extends TestCase
 
     public function test_mecanico_ve_agenda_inteira_sem_dados_sensiveis(): void
     {
-        $this->actingAs($this->carlos)->get("/os/{$this->osRafael->id}")->assertOk()
+        $this->actingAs($this->carlos)->get($this->p("/os/{$this->osRafael->id}"))->assertOk()
             ->assertInertia(fn (Assert $page) => $page->missing('os.client.phone')->missing('os.total'));
 
-        $this->get('/mecanico')->assertOk()
+        $this->get($this->p('/mecanico'))->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('mecanico/index')
                 ->has('agenda', 2)
@@ -75,38 +75,38 @@ class OficinaAccessTest extends TestCase
     public function test_mecanico_preenche_revisao_e_envia_para_o_balcao(): void
     {
         $this->actingAs($this->carlos);
-        $this->patch("/os/{$this->osRafael->id}/revisao", ['revision' => ['oleo_motor' => 'trocar', 'bateria' => 'ok', 'velas' => null]])
+        $this->patch($this->p("/os/{$this->osRafael->id}/revisao"), ['revision' => ['oleo_motor' => 'trocar', 'bateria' => 'ok', 'velas' => null]])
             ->assertSessionHasNoErrors();
         $this->assertSame(['oleo_motor' => 'trocar', 'bateria' => 'ok'], $this->osRafael->fresh()->revision);
 
-        $this->patch("/os/{$this->osRafael->id}/revisao", ['revision' => ['oleo_motor' => 'qualquer']])->assertSessionHasErrors();
+        $this->patch($this->p("/os/{$this->osRafael->id}/revisao"), ['revision' => ['oleo_motor' => 'qualquer']])->assertSessionHasErrors();
 
-        $this->patch("/os/{$this->osRafael->id}/status", ['status' => 'orcamento'])->assertSessionHasNoErrors();
+        $this->patch($this->p("/os/{$this->osRafael->id}/status"), ['status' => 'orcamento'])->assertSessionHasNoErrors();
         $this->assertSame(OsStatus::Orcamento, $this->osRafael->fresh()->status);
     }
 
     public function test_mecanico_so_imprime_fichas_sem_dados_sensiveis(): void
     {
         $this->actingAs($this->carlos);
-        $this->get("/os/{$this->osCarlos->id}/imprimir/diagnostico")->assertOk();
-        $this->get("/os/{$this->osCarlos->id}/imprimir/revisao")->assertOk();
-        $this->get("/os/{$this->osCarlos->id}/imprimir/cliente")->assertForbidden();
-        $this->get("/os/{$this->osCarlos->id}/imprimir/entrada")->assertForbidden();
+        $this->get($this->p("/os/{$this->osCarlos->id}/imprimir/diagnostico"))->assertOk();
+        $this->get($this->p("/os/{$this->osCarlos->id}/imprimir/revisao"))->assertOk();
+        $this->get($this->p("/os/{$this->osCarlos->id}/imprimir/cliente"))->assertForbidden();
+        $this->get($this->p("/os/{$this->osCarlos->id}/imprimir/entrada"))->assertForbidden();
     }
 
     public function test_mecanico_nao_define_preco_nem_marca_como_entregue(): void
     {
         $this->actingAs($this->carlos);
-        $this->post("/os/{$this->osCarlos->id}/itens", ['type' => 'peca', 'description' => 'Pastilha', 'quantity' => 1, 'unit_price' => 999])->assertRedirect();
+        $this->post($this->p("/os/{$this->osCarlos->id}/itens"), ['type' => 'peca', 'description' => 'Pastilha', 'quantity' => 1, 'unit_price' => 999])->assertRedirect();
         $this->assertSame(0.0, $this->osCarlos->items()->where('description', 'Pastilha')->first()->unit_price);
 
-        $this->patch("/os/{$this->osCarlos->id}/status", ['status' => 'entregue'])->assertSessionHasErrors('status');
+        $this->patch($this->p("/os/{$this->osCarlos->id}/status"), ['status' => 'entregue'])->assertSessionHasErrors('status');
     }
 
     public function test_balcao_ve_dados_completos_e_valores(): void
     {
         $this->actingAs($this->balcao)
-            ->get("/os/{$this->osCarlos->id}")
+            ->get($this->p("/os/{$this->osCarlos->id}"))
             ->assertInertia(fn (Assert $page) => $page
                 ->where('os.client.phone', '11987654321')
                 ->has('os.total')
@@ -115,7 +115,7 @@ class OficinaAccessTest extends TestCase
 
     public function test_balcao_abre_os_para_carro_novo_criando_cliente_e_veiculo(): void
     {
-        $this->actingAs($this->balcao)->post('/os', [
+        $this->actingAs($this->balcao)->post($this->p('/os'), [
             'plate' => 'xyz-9a87',
             'client' => ['name' => 'Cliente Novo', 'phone' => '(11) 91111-2222'],
             'vehicle' => ['brand' => 'Honda', 'model' => 'Civic'],
@@ -133,15 +133,15 @@ class OficinaAccessTest extends TestCase
 
     public function test_so_master_acessa_usuarios_e_exclui_os(): void
     {
-        $this->actingAs($this->balcao)->get('/usuarios')->assertForbidden();
-        $this->actingAs($this->balcao)->delete("/os/{$this->osCarlos->id}")->assertForbidden();
-        $this->actingAs($this->master)->get('/usuarios')->assertOk();
+        $this->actingAs($this->balcao)->get($this->p('/usuarios'))->assertForbidden();
+        $this->actingAs($this->balcao)->delete($this->p("/os/{$this->osCarlos->id}"))->assertForbidden();
+        $this->actingAs($this->master)->get($this->p('/usuarios'))->assertOk();
     }
 
     public function test_usuario_desativado_nao_consegue_entrar(): void
     {
         $this->balcao->update(['active' => false]);
-        $this->post('/login', ['email' => 'balcao@pista1.test', 'password' => 'pista1234']);
+        $this->post($this->p('/login'), ['email' => 'balcao@pista1.test', 'password' => 'pista1234']);
         $this->assertGuest();
     }
 }

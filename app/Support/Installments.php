@@ -35,7 +35,7 @@ class Installments
                 'paid_at' => $paid ? ($paidAt ?? $due)->toDateString() : null,
                 'installment' => $count > 1 ? $i : null,
                 'installments' => $count > 1 ? $count : null,
-                'group' => $group,
+                'batch' => $group,
             ]);
         }
 

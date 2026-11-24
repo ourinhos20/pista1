@@ -43,7 +43,7 @@ return new class extends Migration
             $table->string('payment_method', 20)->nullable();
             $table->unsignedSmallInteger('installment')->nullable();
             $table->unsignedSmallInteger('installments')->nullable();
-            $table->string('group', 40)->nullable()->index(); // agrupa parcelas
+            $table->string('batch', 40)->nullable()->index(); // agrupa parcelas
             $table->foreignId('service_order_id')->nullable()->constrained()->nullOnDelete();
             $table->text('notes')->nullable();
             $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();

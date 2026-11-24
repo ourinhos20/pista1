@@ -26,6 +26,11 @@ return [
     ],
     'password' => [
         'min' => 'A senha deve ter pelo menos :min caracteres.',
+        'letters' => 'A senha precisa ter pelo menos uma letra.',
+        'numbers' => 'A senha precisa ter pelo menos um número.',
+        'mixed' => 'A senha precisa ter letras maiúsculas e minúsculas.',
+        'symbols' => 'A senha precisa ter pelo menos um símbolo.',
+        'uncompromised' => 'Esta senha apareceu em vazamentos de dados. Escolha outra.',
     ],
     'confirmed' => 'A confirmação de :attribute não confere.',
     'current_password' => 'Senha atual incorreta.',

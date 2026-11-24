@@ -1,120 +1,112 @@
-import { type BreadcrumbItem, type SharedData } from '@/types';
-import { Transition } from '@headlessui/react';
-import { Head, Link, useForm, usePage } from '@inertiajs/react';
-import { FormEventHandler } from 'react';
-
-import DeleteUser from '@/components/delete-user';
-import HeadingSmall from '@/components/heading-small';
-import InputError from '@/components/input-error';
-import { Button } from '@/components/ui/button';
+import { Block, Field } from '@/components/erp';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { useAppearance } from '@/hooks/use-appearance';
 import AppLayout from '@/layouts/app-layout';
-import SettingsLayout from '@/layouts/settings/layout';
+import { cn } from '@/lib/utils';
+import { type SharedData } from '@/types';
+import { Head, useForm, usePage } from '@inertiajs/react';
+import { KeyRound, Monitor, Moon, Save, Sun } from 'lucide-react';
+import { useRef } from 'react';
 
-const breadcrumbs: BreadcrumbItem[] = [
-    {
-        title: 'Profile settings',
-        href: '/settings/profile',
-    },
-];
+const saveBtn =
+    'inline-flex h-11 items-center gap-1.5 rounded-[3px] border border-[#b51f1f] bg-[#d42a2a] px-4 text-[13px] font-semibold text-white disabled:opacity-60 md:h-8';
 
-export default function Profile({ mustVerifyEmail, status }: { mustVerifyEmail: boolean; status?: string }) {
+/** Minha conta: dados, senha e tema (claro/escuro). */
+export default function MinhaConta() {
     const { auth } = usePage<SharedData>().props;
+    const { appearance, updateAppearance } = useAppearance();
+    const passwordInput = useRef<HTMLInputElement>(null);
 
-    const { data, setData, patch, errors, processing, recentlySuccessful } = useForm({
-        name: auth.user.name,
-        email: auth.user.email,
-    });
-
-    const submit: FormEventHandler = (e) => {
-        e.preventDefault();
-
-        patch(route('profile.update'));
-    };
+    const profile = useForm({ name: auth.user.name, email: auth.user.email });
+    const pwd = useForm({ current_password: '', password: '', password_confirmation: '' });
 
     return (
-        <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Profile settings" />
-
-            <SettingsLayout>
-                <div className="space-y-6">
-                    <HeadingSmall title="Profile information" description="Update your name and email address" />
-
-                    <form onSubmit={submit} className="space-y-6">
-                        <div className="grid gap-2">
-                            <Label htmlFor="name">Name</Label>
-
-                            <Input
-                                id="name"
-                                className="mt-1 block w-full"
-                                value={data.name}
-                                onChange={(e) => setData('name', e.target.value)}
-                                required
-                                autoComplete="name"
-                                placeholder="Full name"
-                            />
-
-                            <InputError className="mt-2" message={errors.name} />
-                        </div>
-
-                        <div className="grid gap-2">
-                            <Label htmlFor="email">Email address</Label>
-
-                            <Input
-                                id="email"
-                                type="email"
-                                className="mt-1 block w-full"
-                                value={data.email}
-                                onChange={(e) => setData('email', e.target.value)}
-                                required
-                                autoComplete="username"
-                                placeholder="Email address"
-                            />
-
-                            <InputError className="mt-2" message={errors.email} />
-                        </div>
-
-                        {mustVerifyEmail && auth.user.email_verified_at === null && (
-                            <div>
-                                <p className="mt-2 text-sm text-neutral-800">
-                                    Your email address is unverified.
-                                    <Link
-                                        href={route('verification.send')}
-                                        method="post"
-                                        as="button"
-                                        className="rounded-md text-sm text-neutral-600 underline hover:text-neutral-900 focus:ring-2 focus:ring-offset-2 focus:outline-hidden"
-                                    >
-                                        Click here to re-send the verification email.
-                                    </Link>
-                                </p>
-
-                                {status === 'verification-link-sent' && (
-                                    <div className="mt-2 text-sm font-medium text-green-600">
-                                        A new verification link has been sent to your email address.
-                                    </div>
-                                )}
-                            </div>
-                        )}
-
-                        <div className="flex items-center gap-4">
-                            <Button disabled={processing}>Save</Button>
-
-                            <Transition
-                                show={recentlySuccessful}
-                                enter="transition ease-in-out"
-                                enterFrom="opacity-0"
-                                leave="transition ease-in-out"
-                                leaveTo="opacity-0"
-                            >
-                                <p className="text-sm text-neutral-600">Saved</p>
-                            </Transition>
+        <AppLayout title="Minha Conta" code="SIS020">
+            <Head title="Minha conta" />
+            <div className="grid max-w-3xl gap-2 md:gap-3">
+                <Block title="Dados de acesso">
+                    <form
+                        className="grid gap-3 sm:grid-cols-2"
+                        onSubmit={(e) => {
+                            e.preventDefault();
+                            profile.patch(route('profile.update'), { preserveScroll: true });
+                        }}
+                    >
+                        <Field label="Nome" error={profile.errors.name}>
+                            <Input value={profile.data.name} onChange={(e) => profile.setData('name', e.target.value)} autoComplete="name" />
+                        </Field>
+                        <Field label="E-mail (login)" error={profile.errors.email}>
+                            <Input type="email" value={profile.data.email} onChange={(e) => profile.setData('email', e.target.value)} autoComplete="username" />
+                        </Field>
+                        <div className="flex justify-end sm:col-span-2">
+                            <button type="submit" disabled={profile.processing || !profile.isDirty} className={saveBtn}>
+                                <Save className="size-4" /> Gravar
+                            </button>
                         </div>
                     </form>
-                </div>
+                </Block>
 
-                <DeleteUser />
-            </SettingsLayout>
+                <Block title="Trocar senha">
+                    <form
+                        className="grid gap-3 sm:grid-cols-3"
+                        onSubmit={(e) => {
+                            e.preventDefault();
+                            pwd.put(route('password.update'), {
+                                preserveScroll: true,
+                                onSuccess: () => pwd.reset(),
+                                onError: (errors) => {
+                                    if (errors.password) {
+                                        pwd.reset('password', 'password_confirmation');
+                                        passwordInput.current?.focus();
+                                    }
+                                    if (errors.current_password) pwd.reset('current_password');
+                                },
+                            });
+                        }}
+                    >
+                        <Field label="Senha atual" error={pwd.errors.current_password}>
+                            <Input type="password" value={pwd.data.current_password} onChange={(e) => pwd.setData('current_password', e.target.value)} autoComplete="current-password" />
+                        </Field>
+                        <Field label="Nova senha" error={pwd.errors.password}>
+                            <Input ref={passwordInput} type="password" value={pwd.data.password} onChange={(e) => pwd.setData('password', e.target.value)} autoComplete="new-password" />
+                        </Field>
+                        <Field label="Repita a nova senha" error={pwd.errors.password_confirmation}>
+                            <Input type="password" value={pwd.data.password_confirmation} onChange={(e) => pwd.setData('password_confirmation', e.target.value)} autoComplete="new-password" />
+                        </Field>
+                        <p className="text-muted-foreground text-[12px] sm:col-span-2">Mínimo de 8 caracteres, com letras e números.</p>
+                        <div className="flex justify-end">
+                            <button type="submit" disabled={pwd.processing} className={saveBtn}>
+                                <KeyRound className="size-4" /> Trocar senha
+                            </button>
+                        </div>
+                    </form>
+                </Block>
+
+                <Block title="Aparência">
+                    <div className="grid grid-cols-3 overflow-hidden rounded-[3px] border border-[#b9bec6] sm:w-96">
+                        {(
+                            [
+                                ['light', 'Claro', Sun],
+                                ['dark', 'Escuro', Moon],
+                                ['system', 'Do aparelho', Monitor],
+                            ] as const
+                        ).map(([v, label, Icon]) => (
+                            <button
+                                key={v}
+                                type="button"
+                                onClick={() => updateAppearance(v)}
+                                className={cn(
+                                    'flex h-11 items-center justify-center gap-1.5 border-r border-[#d7dade] text-[13px] font-semibold last:border-r-0 md:h-8',
+                                    appearance === v ? 'bg-zinc-900 text-white' : 'bg-card',
+                                )}
+                            >
+                                <Icon className="size-4" /> {label}
+                            </button>
+                        ))}
+                    </div>
+                    <p className="text-muted-foreground mt-2 text-[12px]">O modo escuro ajuda no celular da oficina. Vale só para este aparelho.</p>
+                </Block>
+            </div>
         </AppLayout>
     );
 }

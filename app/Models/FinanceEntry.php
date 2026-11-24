@@ -10,7 +10,7 @@ class FinanceEntry extends Model
 {
     protected $fillable = [
         'type', 'category', 'description', 'party', 'amount', 'due_date', 'paid_at', 'payment_method',
-        'installment', 'installments', 'group', 'service_order_id', 'notes', 'created_by',
+        'installment', 'installments', 'batch', 'service_order_id', 'notes', 'created_by',
     ];
 
     protected function casts(): array

@@ -11,41 +11,47 @@ class PasswordUpdateTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_password_can_be_updated()
+    public function test_senha_pode_ser_trocada(): void
     {
         $user = User::factory()->create();
 
-        $response = $this
-            ->actingAs($user)
-            ->from('/settings/password')
-            ->put('/settings/password', [
+        $this->actingAs($user)
+            ->from(route('profile.edit'))
+            ->put(route('password.update'), [
                 'current_password' => 'password',
-                'password' => 'new-password',
-                'password_confirmation' => 'new-password',
-            ]);
-
-        $response
+                'password' => 'nova-senha-123',
+                'password_confirmation' => 'nova-senha-123',
+            ])
             ->assertSessionHasNoErrors()
-            ->assertRedirect('/settings/password');
+            ->assertRedirect(route('profile.edit'));
 
-        $this->assertTrue(Hash::check('new-password', $user->refresh()->password));
+        $this->assertTrue(Hash::check('nova-senha-123', $user->refresh()->password));
     }
 
-    public function test_correct_password_must_be_provided_to_update_password()
+    public function test_senha_atual_errada_e_recusada(): void
     {
         $user = User::factory()->create();
 
-        $response = $this
-            ->actingAs($user)
-            ->from('/settings/password')
-            ->put('/settings/password', [
-                'current_password' => 'wrong-password',
-                'password' => 'new-password',
-                'password_confirmation' => 'new-password',
-            ]);
+        $this->actingAs($user)
+            ->from(route('profile.edit'))
+            ->put(route('password.update'), [
+                'current_password' => 'errada',
+                'password' => 'nova-senha-123',
+                'password_confirmation' => 'nova-senha-123',
+            ])
+            ->assertSessionHasErrors('current_password');
+    }
 
-        $response
-            ->assertSessionHasErrors('current_password')
-            ->assertRedirect('/settings/password');
+    public function test_senha_fraca_e_recusada(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->put(route('password.update'), [
+                'current_password' => 'password',
+                'password' => 'somenteletras',
+                'password_confirmation' => 'somenteletras',
+            ])
+            ->assertSessionHasErrors('password');
     }
 }

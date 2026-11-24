@@ -1,0 +1,14 @@
+/* CSS do site institucional (separado do sistema, só lê a página do site). */
+@import 'tailwindcss' source(none);
+@source '../views/site.blade.php';
+
+@theme {
+    --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --color-brand: #ee3c3a;
+    --color-brand-dark: #d42a2a;
+    --color-ink: #0b0b0d;
+}
+
+html {
+    scroll-behavior: smooth;
+}

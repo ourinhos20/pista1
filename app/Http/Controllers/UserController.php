@@ -26,7 +26,7 @@ class UserController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],
             'role' => ['required', Rule::in(array_keys(User::ROLES))],
-            'password' => ['required', Password::min(8)],
+            'password' => ['required', Password::defaults()],
         ]);
         User::create([...$data, 'active' => true]);
 
@@ -40,7 +40,7 @@ class UserController extends Controller
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
             'role' => ['required', Rule::in(array_keys(User::ROLES))],
             'active' => ['required', 'boolean'],
-            'password' => ['nullable', Password::min(8)],
+            'password' => ['nullable', Password::defaults()],
         ]);
 
         if ($user->id === $request->user()->id && ($data['role'] !== 'master' || ! $data['active'])) {

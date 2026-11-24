@@ -26,7 +26,14 @@ npm run build
 php artisan serve
 ```
 
-Abra http://127.0.0.1:8000. O `--seed` cria usuários e dados de demonstração (veja `database/seeders/DatabaseSeeder.php`). Não rode o seed em produção.
+- O **site institucional** abre em http://127.0.0.1:8000.
+- O **sistema** fica no endereço escondido definido em `PAINEL_PATH` (no computador é `sistema`): http://127.0.0.1:8000/sistema/login.
+
+O `--seed` cria usuários e dados de demonstração (veja `database/seeders/DatabaseSeeder.php`). Em produção ele é bloqueado; lá use `php artisan pista1:criar-master`.
+
+## Publicar na HostGator
+
+Siga o passo a passo em [deploy/PUBLICAR-HOSTGATOR.md](deploy/PUBLICAR-HOSTGATOR.md). O pacote é gerado com `deploy\empacotar.ps1`.
 
 ## Testes
 

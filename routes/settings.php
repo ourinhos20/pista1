@@ -3,19 +3,11 @@
 use App\Http\Controllers\Settings\PasswordController;
 use App\Http\Controllers\Settings\ProfileController;
 use Illuminate\Support\Facades\Route;
-use Inertia\Inertia;
 
-Route::middleware('auth')->group(function () {
-    Route::redirect('settings', 'settings/profile');
-
-    Route::get('settings/profile', [ProfileController::class, 'edit'])->name('profile.edit');
-    Route::patch('settings/profile', [ProfileController::class, 'update'])->name('profile.update');
-    Route::delete('settings/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
-
-    Route::get('settings/password', [PasswordController::class, 'edit'])->name('password.edit');
-    Route::put('settings/password', [PasswordController::class, 'update'])->name('password.update');
-
-    Route::get('settings/appearance', function () {
-        return Inertia::render('settings/appearance');
-    })->name('appearance');
+// "Minha conta": nome, e-mail, senha e tema. Excluir a própria conta foi
+// desativado de propósito (quem remove acesso é um sócio, em Usuários).
+Route::middleware(['auth', 'auth.session', 'role:master,balcao,mecanico'])->group(function () {
+    Route::get('minha-conta', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::patch('minha-conta', [ProfileController::class, 'update'])->name('profile.update');
+    Route::put('minha-conta/senha', [PasswordController::class, 'update'])->name('password.update')->middleware('throttle:6,1');
 });

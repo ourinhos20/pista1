@@ -22,6 +22,13 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
+        // Nunca criar usuários e dados de exemplo no servidor de produção
+        if (app()->isProduction()) {
+            $this->command?->error('Dados de demonstração não são criados em produção. Use: php artisan pista1:criar-master');
+
+            return;
+        }
+
         $pwd = 'pista1234';
         $users = [
             ['Sócio 1', 'socio1@pista1.test', 'master'],

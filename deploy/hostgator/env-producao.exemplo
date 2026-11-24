@@ -1,0 +1,58 @@
+# .env de PRODUÇÃO (HostGator). Copie para /home/SEU_USUARIO/pista1/.env
+# e preencha os campos marcados com <...>. Nunca envie este arquivo preenchido para o GitHub.
+
+APP_NAME="Pista 1"
+APP_ENV=production
+APP_KEY=
+APP_DEBUG=false
+APP_TIMEZONE=America/Sao_Paulo
+APP_URL=https://<seu-dominio.com.br>
+
+APP_LOCALE=pt_BR
+APP_FALLBACK_LOCALE=pt_BR
+APP_FAKER_LOCALE=pt_BR
+APP_MAINTENANCE_DRIVER=file
+
+BCRYPT_ROUNDS=12
+
+LOG_CHANNEL=daily
+LOG_LEVEL=warning
+LOG_DAILY_DAYS=14
+
+# Banco MySQL criado no cPanel (MySQL Databases). Na HostGator o host é localhost.
+DB_CONNECTION=mysql
+DB_HOST=localhost
+DB_PORT=3306
+DB_DATABASE=<usuario_pista1>
+DB_USERNAME=<usuario_pista1>
+DB_PASSWORD=<senha-forte-do-banco>
+
+# Sessão: 10 horas (um dia de oficina), cookie só em HTTPS e criptografado
+SESSION_DRIVER=database
+SESSION_LIFETIME=600
+SESSION_ENCRYPT=true
+SESSION_SECURE_COOKIE=true
+SESSION_SAME_SITE=lax
+SESSION_PATH=/
+SESSION_DOMAIN=null
+
+CACHE_STORE=database
+QUEUE_CONNECTION=sync
+FILESYSTEM_DISK=local
+BROADCAST_CONNECTION=log
+MAIL_MAILER=log
+
+# Endereço escondido do sistema. Troque por algo difícil de adivinhar, ex.: p1-gestao-7k2q
+# O sistema vai ficar em https://<seu-dominio>/<PAINEL_PATH>/login
+PAINEL_PATH=<endereco-secreto>
+
+# Dados da oficina (site e fichas impressas)
+OFICINA_TELEFONE="(11) 96029-1342"
+OFICINA_WHATSAPP=5511960291342
+OFICINA_INSTAGRAM=@mecanicapista1
+OFICINA_ENDERECO="<Rua, número - bairro>"
+OFICINA_CIDADE="São Paulo - SP"
+OFICINA_HORARIO="Segunda a sexta, 8h às 18h · Sábado, 8h às 12h"
+OFICINA_CNPJ=
+
+VITE_APP_NAME="${APP_NAME}"
