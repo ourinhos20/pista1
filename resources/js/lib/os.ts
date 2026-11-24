@@ -1,0 +1,148 @@
+import type { DamageType, OsStatus } from '@/types';
+
+export const STATUS: Record<OsStatus, { label: string; badge: string; dot: string }> = {
+    aguardando: {
+        label: 'Aguardando',
+        badge: 'bg-zinc-100 text-zinc-700 ring-zinc-300 dark:bg-zinc-800 dark:text-zinc-200 dark:ring-zinc-600',
+        dot: 'bg-zinc-400',
+    },
+    diagnostico: {
+        label: 'Em diagnóstico',
+        badge: 'bg-blue-50 text-blue-800 ring-blue-200 dark:bg-blue-950 dark:text-blue-200 dark:ring-blue-800',
+        dot: 'bg-blue-500',
+    },
+    aprovacao: {
+        label: 'Aguardando aprovação',
+        badge: 'bg-amber-50 text-amber-900 ring-amber-300 dark:bg-amber-950 dark:text-amber-200 dark:ring-amber-700',
+        dot: 'bg-amber-400',
+    },
+    execucao: {
+        label: 'Em execução',
+        badge: 'bg-orange-50 text-orange-900 ring-orange-300 dark:bg-orange-950 dark:text-orange-200 dark:ring-orange-700',
+        dot: 'bg-orange-500',
+    },
+    pronto: {
+        label: 'Pronto',
+        badge: 'bg-green-50 text-green-800 ring-green-300 dark:bg-green-950 dark:text-green-200 dark:ring-green-700',
+        dot: 'bg-green-500',
+    },
+    entregue: {
+        label: 'Entregue',
+        badge: 'bg-zinc-800 text-white ring-zinc-800 dark:bg-zinc-200 dark:text-zinc-900 dark:ring-zinc-200',
+        dot: 'bg-zinc-800 dark:bg-zinc-300',
+    },
+    cancelada: {
+        label: 'Cancelada',
+        badge: 'bg-red-50 text-red-800 ring-red-200 dark:bg-red-950 dark:text-red-200 dark:ring-red-800',
+        dot: 'bg-red-500',
+    },
+};
+
+/** Fluxo principal da OS (briefing): cada etapa vira um status. */
+export const FLOW: OsStatus[] = ['aguardando', 'diagnostico', 'aprovacao', 'execucao', 'pronto', 'entregue'];
+export const OPEN_STATUSES: OsStatus[] = ['aguardando', 'diagnostico', 'aprovacao', 'execucao', 'pronto'];
+
+/** Próximo passo sugerido (botão principal). */
+export const NEXT_STEP: Partial<Record<OsStatus, { to: OsStatus; label: string }>> = {
+    aguardando: { to: 'diagnostico', label: 'Iniciar diagnóstico' },
+    diagnostico: { to: 'aprovacao', label: 'Diagnóstico pronto' },
+    aprovacao: { to: 'execucao', label: 'Cliente aprovou' },
+    execucao: { to: 'pronto', label: 'Serviço concluído' },
+    pronto: { to: 'entregue', label: 'Entregar ao cliente' },
+};
+
+export const FUEL = ['Reserva', '1/4', '1/2', '3/4', 'Cheio'];
+
+export const DAMAGE: Record<DamageType, { label: string; letter: string; color: string }> = {
+    risco: { label: 'Risco', letter: 'R', color: '#2563eb' },
+    amassado: { label: 'Amassado', letter: 'A', color: '#ea580c' },
+    quebrado: { label: 'Quebrado / trincado', letter: 'Q', color: '#dc2626' },
+    falta: { label: 'Faltando peça', letter: 'F', color: '#7c3aed' },
+};
+
+export const ENTRY_CHECKLIST: { key: string; label: string }[] = [
+    { key: 'documento', label: 'Documento' },
+    { key: 'estepe', label: 'Estepe' },
+    { key: 'macaco', label: 'Macaco' },
+    { key: 'chave_roda', label: 'Chave de roda' },
+    { key: 'triangulo', label: 'Triângulo' },
+    { key: 'tapetes', label: 'Tapetes' },
+    { key: 'som', label: 'Som / multimídia' },
+    { key: 'calotas', label: 'Calotas' },
+    { key: 'antena', label: 'Antena' },
+    { key: 'objetos', label: 'Objetos de valor' },
+];
+
+export const PAYMENT: Record<string, string> = {
+    dinheiro: 'Dinheiro',
+    pix: 'Pix',
+    debito: 'Cartão de débito',
+    credito: 'Cartão de crédito',
+    parcelado: 'Parcelado',
+};
+
+const brl = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+export const money = (v?: number | null) => brl.format(v ?? 0);
+
+export const km = (v?: number | null) => (v || v === 0 ? `${new Intl.NumberFormat('pt-BR').format(v)} km` : '—');
+
+export function plate(p?: string | null) {
+    if (!p) return '';
+    // Placa antiga ABC1234 -> ABC-1234; Mercosul ABC1D23 fica sem hífen
+    return /^[A-Z]{3}\d{4}$/.test(p) ? `${p.slice(0, 3)}-${p.slice(3)}` : p;
+}
+
+export function phone(p?: string | null) {
+    if (!p) return '';
+    const d = p.replace(/\D/g, '');
+    if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+    if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+    return p;
+}
+
+export function documentFmt(p?: string | null) {
+    if (!p) return '';
+    const d = p.replace(/\D/g, '');
+    if (d.length === 11) return d.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+    if (d.length === 14) return d.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
+    return p;
+}
+
+export function date(iso?: string | null, withTime = false) {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    return d.toLocaleDateString(
+        'pt-BR',
+        withTime ? { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' } : { day: '2-digit', month: '2-digit', year: 'numeric' },
+    );
+}
+
+export function time(iso?: string | null) {
+    if (!iso) return '';
+    return new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+}
+
+export function relative(iso?: string | null) {
+    if (!iso) return '';
+    const diff = (Date.now() - new Date(iso).getTime()) / 60000;
+    if (diff < 1) return 'agora';
+    if (diff < 60) return `há ${Math.round(diff)} min`;
+    if (diff < 60 * 24) return `há ${Math.round(diff / 60)} h`;
+    return date(iso);
+}
+
+/** Link do WhatsApp (wa.me) com mensagem pronta. */
+export function whatsapp(phoneNumber: string | null | undefined, text: string) {
+    const d = (phoneNumber ?? '').replace(/\D/g, '');
+    if (!d) return null;
+    const full = d.length <= 11 ? `55${d}` : d;
+    return `https://wa.me/${full}?text=${encodeURIComponent(text)}`;
+}
+
+/** Para <input type="datetime-local"> */
+export function toLocalInput(iso?: string | null) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
