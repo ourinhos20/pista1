@@ -11,11 +11,12 @@ interface Props {
     today: OsCard[];
     open: OsCard[];
     month: { revenue: number; delivered: number; ticket: number } | null;
+    pre: { id: number; name: string; plate: string | null; vehicle: string | null; complaint: string; created_at: string }[];
 }
 
 const go = (os: OsCard) => router.visit(route('os.show', os.id));
 
-export default function Dashboard({ counts, today, open, month }: Props) {
+export default function Dashboard({ counts, today, open, month, pre }: Props) {
     const { auth } = usePage<SharedData>().props;
     const total = OPEN_STATUSES.reduce((s, k) => s + (counts[k] ?? 0), 0);
 
@@ -70,6 +71,28 @@ export default function Dashboard({ counts, today, open, month }: Props) {
                 </div>
 
                 <div className="grid content-start gap-2 md:gap-3">
+                    {pre.length > 0 && (
+                        <Block
+                            title={`Pedidos novos do site · ${pre.length}`}
+                            className="border-l-4 border-l-[#d42a2a]"
+                            bodyClassName="p-0"
+                            actions={<Link href={route('pre.index')} className="text-[12px] font-semibold text-[#b51f1f] hover:underline">Ver todos</Link>}
+                        >
+                            <ul>
+                                {pre.map((p) => (
+                                    <li key={p.id} className="border-b border-[#e3e5e8] last:border-b-0">
+                                        <Link href={route('pre.index')} className="block px-3 py-2 hover:bg-[#fdecec]">
+                                            <p className="flex items-center justify-between gap-2 text-[13px]">
+                                                <b className="truncate">{p.name}</b>
+                                                {p.plate && <Placa value={p.plate} />}
+                                            </p>
+                                            <p className="text-muted-foreground line-clamp-1 text-[12px]">{p.complaint}</p>
+                                        </Link>
+                                    </li>
+                                ))}
+                            </ul>
+                        </Block>
+                    )}
                     {pend.length > 0 && (
                         <Block title="Pendências do balcão" className="border-l-4 border-l-[#d42a2a]" bodyClassName="p-0">
                             <ul>

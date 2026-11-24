@@ -1,4 +1,5 @@
 import { CarDiagramSvg, DamageLegend } from '@/components/car-diagram';
+import { PhotoGallery, PhotoUpload } from '@/components/photo-gallery';
 import { Block, Field, Grid, Placa, ReadOnly, Situacao, Tabs, Tool, selectCls, textareaCls, type Col } from '@/components/erp';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
@@ -8,7 +9,7 @@ import { REVISION_GROUPS, REVISION_TOTAL, REVISION_VALUES, type RevisionValue } 
 import { cn } from '@/lib/utils';
 import type { OsEvent, OsFull, OsItem, OsStatus, SharedData } from '@/types';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
-import { ArrowRight, ChevronDown, CircleCheck, Hourglass, MessageCircle, Plus, Printer, Save, Trash2 } from 'lucide-react';
+import { ArrowRight, ChevronDown, CircleCheck, Hourglass, Link2, MessageCircle, Plus, Printer, Save, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 type Hist = { id: number; number: string; status: OsStatus; date: string; km_in: number | null; summary: string | null };
@@ -18,7 +19,7 @@ interface Props {
     mechanics: { id: number; name: string }[];
     statuses: { value: OsStatus; label: string }[];
 }
-type Tab = 'diag' | 'revisao' | 'itens' | 'vistoria' | 'historico';
+type Tab = 'diag' | 'revisao' | 'itens' | 'fotos' | 'vistoria' | 'historico';
 
 /* --------------------------------------------------------------- etapas */
 function Etapas({ status }: { status: OsStatus }) {
@@ -360,7 +361,7 @@ export default function OsShow({ os, history, mechanics, statuses }: Props) {
         '',
         `*Total: ${money(os.total)}*`,
         '',
-        'Podemos seguir com o serviço? Responda SIM para autorizar.',
+        os.public_url ? `Veja o orçamento completo, com fotos, e aprove por aqui:\n${os.public_url}` : 'Podemos seguir com o serviço? Responda SIM para autorizar.',
     ].join('\n');
     const readyText = `Olá, ${first}! Seu ${v?.title} (${plate(v?.plate)}) está pronto para retirada na Pista 1. Total: ${money(os.total)}.`;
     const wa = sensitive ? whatsapp(os.client?.phone, os.status === 'pronto' ? readyText : budgetText) : null;
@@ -416,7 +417,25 @@ export default function OsShow({ os, history, mechanics, statuses }: Props) {
                         </DropdownMenuContent>
                     </DropdownMenu>
                     {wa && ['orcamento', 'aprovacao', 'pronto'].includes(os.status) && os.items.length > 0 && (
-                        <Tool icon={<MessageCircle className="text-green-600" />} label={os.status === 'pronto' ? 'Avisar cliente' : 'Orçamento no WhatsApp'} href={wa} external />
+                        <Tool
+                            icon={<MessageCircle className="text-green-600" />}
+                            label={os.status === 'pronto' ? 'Avisar cliente' : 'Orçamento no WhatsApp'}
+                            href={wa}
+                            external
+                            // enviar o orçamento já marca a OS como "aguardando aprovação" (o link passa a aceitar a resposta)
+                            onClick={() => os.status === 'orcamento' && !os.items.some((i) => !i.unit_price) && setStatus('aprovacao')}
+                        />
+                    )}
+                    {sensitive && os.public_url && ['orcamento', 'aprovacao'].includes(os.status) && (
+                        <Tool
+                            icon={<Link2 />}
+                            label="Copiar link"
+                            onClick={() => {
+                                navigator.clipboard?.writeText(os.public_url!);
+                                alert('Link do orçamento copiado. Cole na conversa com o cliente.');
+                            }}
+                            className="hidden md:inline-flex"
+                        />
                     )}
                     {sensitive && (
                         <select aria-label="Alterar situação" className={cn(selectCls, 'w-auto md:w-44')} value="" onChange={(e) => e.target.value && setStatus(e.target.value as OsStatus)}>
@@ -445,7 +464,21 @@ export default function OsShow({ os, history, mechanics, statuses }: Props) {
                         <Hourglass className="size-4" /> {WAITING_FOR[os.status]}
                     </p>
                 )}
-                {sensitive && os.status === 'orcamento' && (
+                {os.approval_name && os.approved_at && !['orcamento', 'aprovacao'].includes(os.status) && (
+                    <p className="flex flex-wrap items-center gap-2 rounded-[3px] border border-green-300 bg-green-50 px-3 py-2 text-[13px] dark:border-green-800 dark:bg-green-950/40">
+                        <CircleCheck className="size-4 text-green-700" />
+                        <b>Cliente aprovou pelo link</b> em {date(os.approved_at, true)} ({os.approval_name})
+                        {os.approval_note && <span>· “{os.approval_note}”</span>}
+                    </p>
+                )}
+                {os.rejected_at && os.status === 'orcamento' && (
+                    <p className="flex flex-wrap items-center gap-2 rounded-[3px] border border-red-300 bg-red-50 px-3 py-2 text-[13px] dark:border-red-800 dark:bg-red-950/40">
+                        <b className="text-red-800">Cliente NÃO aprovou</b> em {date(os.rejected_at, true)} ({os.approval_name})
+                        {os.approval_note && <span>· “{os.approval_note}”</span>}
+                        {sensitive && <span>Ajuste o orçamento e envie de novo.</span>}
+                    </p>
+                )}
+                {sensitive && os.status === 'orcamento' && !os.rejected_at && (
                     <p className="flex items-center gap-2 rounded-[3px] border border-violet-300 bg-violet-50 px-3 py-2 text-[13px] dark:border-violet-800 dark:bg-violet-950/40">
                         O mecânico enviou o diagnóstico. Lance os valores na aba <b>Peças e serviços</b>, imprima a via do cliente e clique em <b>Orçamento enviado ao cliente</b>.
                     </p>
@@ -534,6 +567,11 @@ export default function OsShow({ os, history, mechanics, statuses }: Props) {
                                     value: 'itens',
                                     label: 'Peças e serviços',
                                     badge: os.items.length ? <span className={cn('rounded-[2px] px-1 text-[10px]', sensitive && pendingPrice ? 'bg-amber-400 text-black' : 'bg-zinc-200 dark:bg-zinc-700')}>{os.items.length}</span> : null,
+                                },
+                                {
+                                    value: 'fotos',
+                                    label: 'Fotos',
+                                    badge: os.photos.length ? <span className="rounded-[2px] bg-zinc-200 px-1 text-[10px] dark:bg-zinc-700">{os.photos.length}</span> : null,
                                 },
                                 { value: 'vistoria', label: 'Vistoria de entrada' },
                                 { value: 'historico', label: 'Histórico' },
@@ -627,6 +665,19 @@ export default function OsShow({ os, history, mechanics, statuses }: Props) {
                                         </Block>
                                     </div>
                                 )}
+                            </div>
+                        )}
+
+                        {tab === 'fotos' && (
+                            <div className="grid gap-3">
+                                <div className="flex flex-wrap items-center gap-3">
+                                    <PhotoUpload osId={os.id} className="w-full sm:w-auto" />
+                                    <p className="text-muted-foreground text-[12px]">
+                                        Peça danificada, vazamento, desgaste, painel com luz acesa…
+                                        {sensitive && ' As fotos marcadas para o cliente aparecem no link do orçamento.'}
+                                    </p>
+                                </div>
+                                <PhotoGallery photos={os.photos} osId={os.id} canManage={sensitive} canDeleteAll={sensitive} />
                             </div>
                         )}
 

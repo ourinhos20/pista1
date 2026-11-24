@@ -28,6 +28,7 @@ export interface SharedData {
     name: string;
     auth: Auth;
     flash: { success?: string | null; error?: string | null };
+    preNew: number;
     [key: string]: unknown;
 }
 
@@ -114,6 +115,11 @@ export interface OsFull extends OsCard {
     checklist: Record<string, boolean>;
     revision: Record<string, 'ok' | 'atencao' | 'trocar'>;
     approved_at: string | null;
+    rejected_at: string | null;
+    approval_name: string | null;
+    approval_note: string | null;
+    photos: Photo[];
+    public_url?: string | null;
     delivered_at: string | null;
     items: OsItem[];
     events: OsEvent[];
@@ -124,6 +130,17 @@ export interface OsFull extends OsCard {
     payments?: { id: number; amount: number; due_date: string; paid_at: string | null; payment_method: string | null; installment: number | null; installments: number | null }[];
     paid_total?: number;
     billed_total?: number;
+}
+
+export interface Photo {
+    id: number;
+    url: string;
+    thumb: string;
+    caption: string | null;
+    show_to_client: boolean;
+    uploaded_by: string | null;
+    created_at: string | null;
+    mine?: boolean;
 }
 
 export interface Shop {

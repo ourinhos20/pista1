@@ -1,6 +1,9 @@
 <?php
 
+use App\Http\Controllers\AttachmentController;
+use App\Http\Controllers\BudgetController;
 use App\Http\Controllers\ClientController;
+use App\Http\Controllers\PreServiceController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\FinanceController;
 use App\Http\Controllers\MechanicController;
@@ -17,6 +20,16 @@ use Illuminate\Support\Facades\Route;
 | Site institucional (público) na raiz do domínio.
 */
 Route::get('/', SiteController::class)->name('site');
+
+// Cliente: pedir agendamento pelo site (com fotos)
+Route::get('agendar', [PreServiceController::class, 'form'])->name('agendar');
+Route::post('agendar', [PreServiceController::class, 'submit'])->middleware('throttle:5,10')->name('agendar.submit');
+Route::get('agendar/enviado', [PreServiceController::class, 'thanks'])->name('agendar.ok');
+
+// Cliente: ver e aprovar o orçamento pelo link secreto enviado no WhatsApp
+Route::get('orcamento/{token}', [BudgetController::class, 'show'])->middleware('throttle:60,1')->name('orcamento.show');
+Route::post('orcamento/{token}', [BudgetController::class, 'decide'])->middleware('throttle:10,1')->name('orcamento.decide');
+Route::get('orcamento/{token}/foto/{attachment}', [AttachmentController::class, 'showPublic'])->middleware('throttle:120,1')->name('orcamento.foto');
 
 /*
 | Sistema da oficina, num endereço escondido configurável (PAINEL_PATH).
@@ -39,6 +52,10 @@ Route::prefix(config('oficina.panel_path'))->group(function () {
         Route::post('os/{os}/assumir', [ServiceOrderController::class, 'assume'])->name('os.assume');
         Route::post('os/{os}/itens', [ServiceOrderItemController::class, 'store'])->name('os.items.store');
         Route::get('os/{os}/imprimir/{tipo}', [ServiceOrderController::class, 'print'])->name('os.print');
+        Route::post('os/{os}/fotos', [AttachmentController::class, 'store'])->middleware('throttle:30,1')->name('os.photos.store');
+        Route::patch('os/{os}/fotos/{attachment}', [AttachmentController::class, 'update'])->name('os.photos.update');
+        Route::delete('os/{os}/fotos/{attachment}', [AttachmentController::class, 'destroy'])->name('os.photos.destroy');
+        Route::get('anexos/{attachment}', [AttachmentController::class, 'show'])->name('anexos.show');
 
         // Balcão e master
         Route::middleware('role:master,balcao')->group(function () {
@@ -50,6 +67,10 @@ Route::prefix(config('oficina.panel_path'))->group(function () {
             Route::delete('os/{os}/itens/{item}', [ServiceOrderItemController::class, 'destroy'])->name('os.items.destroy');
             Route::post('os/{os}/pagamentos', [OsPaymentController::class, 'store'])->name('os.payments.store');
             Route::delete('os/{os}/pagamentos/{entry}', [OsPaymentController::class, 'destroy'])->name('os.payments.destroy');
+
+            Route::get('pre-atendimentos', [PreServiceController::class, 'index'])->name('pre.index');
+            Route::post('pre-atendimentos/{pre}/descartar', [PreServiceController::class, 'discard'])->name('pre.discard');
+            Route::post('pre-atendimentos/{pre}/restaurar', [PreServiceController::class, 'restore'])->name('pre.restore');
 
             Route::get('clientes', [ClientController::class, 'index'])->name('clientes.index');
             Route::post('clientes', [ClientController::class, 'store'])->name('clientes.store');

@@ -64,7 +64,7 @@ class OsPresenter
 
     public static function full(ServiceOrder $os, User $user): array
     {
-        $os->loadMissing(['client', 'vehicle', 'mechanic', 'items', 'events.user', 'payments']);
+        $os->loadMissing(['client', 'vehicle', 'mechanic', 'items', 'events.user', 'payments', 'attachments.uploader']);
         $sensitive = $user->canSeeSensitive();
 
         return [
@@ -76,6 +76,10 @@ class OsPresenter
             'checklist' => $os->checklist ?? [],
             'revision' => (object) ($os->revision ?? []),
             'approved_at' => $os->approved_at?->toIso8601String(),
+            'rejected_at' => $os->rejected_at?->toIso8601String(),
+            'approval_name' => $os->approval_name,
+            'approval_note' => $os->approval_note,
+            'photos' => $os->attachments->map(fn ($a) => [...$a->toRow(), 'mine' => $a->uploaded_by === $user->id])->values(),
             'delivered_at' => $os->delivered_at?->toIso8601String(),
             'items' => $os->items->map(fn (ServiceOrderItem $i) => [
                 'id' => $i->id,
@@ -97,6 +101,7 @@ class OsPresenter
                 'total' => $os->total(),
                 'down_payment' => $os->down_payment,
                 'payment_method' => $os->payment_method,
+                'public_url' => $os->public_token ? $os->publicUrl() : null,
                 'payments' => $os->payments->map(fn ($p) => [
                     'id' => $p->id,
                     'amount' => $p->amount,

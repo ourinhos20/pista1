@@ -39,7 +39,11 @@ class DashboardController extends Controller
             ];
         }
 
+        $pre = \App\Models\PreService::where('status', 'novo')->latest('id')->limit(5)->get()
+            ->map(fn ($p) => ['id' => $p->id, 'name' => $p->name, 'plate' => $p->plate, 'vehicle' => $p->vehicle, 'complaint' => $p->complaint, 'created_at' => $p->created_at->toIso8601String()]);
+
         return Inertia::render('dashboard', [
+            'pre' => $pre,
             'counts' => $counts,
             'today' => $today,
             'open' => $open,

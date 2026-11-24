@@ -30,6 +30,7 @@
                 <a href="#servicos" class="hover:text-white">Serviços</a>
                 <a href="#como-funciona" class="hover:text-white">Como funciona</a>
                 <a href="#contato" class="hover:text-white">Contato</a>
+                <a href="{{ route('agendar') }}" class="hover:text-white">Agendar online</a>
             </nav>
             <a href="{{ $wa }}" target="_blank" rel="noopener" class="inline-flex h-10 items-center gap-2 rounded-md bg-brand-dark px-4 text-sm font-semibold text-white hover:bg-brand">
                 <svg viewBox="0 0 24 24" class="size-4 fill-current" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm5.3 14.1c-.2.6-1.3 1.2-1.8 1.2-.5.1-1 .2-3.3-.7-2.8-1.1-4.6-4-4.7-4.2-.1-.2-1.1-1.5-1.1-2.8s.7-2 1-2.3c.2-.3.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.8 2c.1.2.1.4 0 .5l-.4.6c-.1.2-.3.3-.1.6.2.3.8 1.3 1.7 2.1 1.2 1 2.1 1.4 2.4 1.5.3.1.5.1.6-.1l.9-1c.2-.3.4-.2.6-.1l1.9.9c.3.1.4.2.5.3.1.2.1.7-.1 1.3Z"/></svg>
@@ -57,8 +58,8 @@
                         <a href="{{ $wa }}" target="_blank" rel="noopener" class="inline-flex h-14 items-center justify-center rounded-md bg-brand-dark px-7 text-base font-bold text-white hover:bg-brand">
                             Agendar pelo WhatsApp
                         </a>
-                        <a href="#servicos" class="inline-flex h-14 items-center justify-center rounded-md border border-white/25 px-7 text-base font-semibold text-white hover:bg-white/10">
-                            Ver serviços
+                        <a href="{{ route('agendar') }}" class="inline-flex h-14 items-center justify-center rounded-md border border-white/25 px-7 text-base font-semibold text-white hover:bg-white/10">
+                            Agendar online
                         </a>
                     </div>
                     <p class="mt-6 text-sm text-zinc-400">{{ $shop['phone'] }} · {{ $shop['instagram'] }}</p>
@@ -122,9 +123,14 @@
                     <p class="text-sm font-semibold tracking-wide text-brand-dark uppercase">Contato</p>
                     <h2 class="mt-2 text-3xl font-black tracking-tight md:text-4xl">Agende uma avaliação</h2>
                     <p class="mt-4 max-w-md text-lg text-zinc-600">Mande uma mensagem contando o que está acontecendo. Respondemos com o melhor horário para você.</p>
-                    <a href="{{ $wa }}" target="_blank" rel="noopener" class="mt-8 inline-flex h-14 items-center justify-center rounded-md bg-brand-dark px-7 text-base font-bold text-white hover:bg-brand">
-                        Chamar no WhatsApp
-                    </a>
+                    <div class="mt-8 flex flex-col gap-3 sm:flex-row">
+                        <a href="{{ $wa }}" target="_blank" rel="noopener" class="inline-flex h-14 items-center justify-center rounded-md bg-brand-dark px-7 text-base font-bold text-white hover:bg-brand">
+                            Chamar no WhatsApp
+                        </a>
+                        <a href="{{ route('agendar') }}" class="inline-flex h-14 items-center justify-center rounded-md border border-zinc-300 px-7 text-base font-semibold hover:bg-zinc-50">
+                            Agendar online, com fotos
+                        </a>
+                    </div>
                 </div>
                 <dl class="divide-y divide-zinc-200 rounded-lg border border-zinc-200">
                     <div class="flex flex-col gap-1 p-5 sm:flex-row sm:justify-between">

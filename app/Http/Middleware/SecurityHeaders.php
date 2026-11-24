@@ -31,7 +31,7 @@ class SecurityHeaders
 
         // O sistema não deve aparecer no Google
         $panel = config('oficina.panel_path');
-        if ($request->is($panel, $panel.'/*')) {
+        if ($request->is($panel, $panel.'/*', 'orcamento/*', 'agendar/enviado')) {
             $h->set('X-Robots-Tag', 'noindex, nofollow, noarchive');
             $h->set('Cache-Control', 'no-store, private');
         }

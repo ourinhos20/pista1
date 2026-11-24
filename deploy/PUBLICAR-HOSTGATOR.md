@@ -82,6 +82,13 @@ php artisan up
 
 - Ative o backup automático da HostGator, se o plano tiver.
 - Uma vez por semana, exporte o banco em *phpMyAdmin › Exportar* e guarde o arquivo fora do servidor (Google Drive, por exemplo).
+- **Fotos das OS e dos pedidos do site** ficam em `~/pista1/storage/app/private`. Inclua essa pasta no backup (no Gerenciador de Arquivos: *Compactar* e baixar). Nunca apague essa pasta numa atualização.
+
+## Links públicos (para divulgar)
+
+- `https://seudominio.com.br/agendar`: o cliente pede um horário e manda fotos. O pedido aparece em **Atendimento › Pedidos do site**. Vale colocar esse link na bio do Instagram e na mensagem automática do WhatsApp Business.
+- `https://seudominio.com.br/orcamento/...`: link individual de cada OS, que o próprio sistema monta ao clicar em **Orçamento no WhatsApp**. Não precisa divulgar.
+- As fotos são reduzidas no próprio celular antes do envio (cerca de 300 KB cada), então o limite de upload padrão da HostGator é suficiente.
 
 ## Segurança já configurada no sistema
 

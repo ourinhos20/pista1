@@ -1,6 +1,9 @@
 /* CSS do site institucional (separado do sistema, só lê a página do site). */
 @import 'tailwindcss' source(none);
 @source '../views/site.blade.php';
+@source '../views/agendar.blade.php';
+@source '../views/orcamento.blade.php';
+@source '../views/layouts/site.blade.php';
 
 @theme {
     --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;

@@ -52,6 +52,8 @@ class HandleInertiaRequests extends Middleware
                     'master' => (bool) $user?->isMaster(),
                 ],
             ],
+            // pedidos novos do site (badge no menu do balcão)
+            'preNew' => fn () => $user?->canSeeSensitive() ? \App\Models\PreService::where('status', 'novo')->count() : 0,
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),
                 'error' => fn () => $request->session()->get('error'),

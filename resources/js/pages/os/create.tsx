@@ -1,11 +1,12 @@
 import { CarDiagramEditor } from '@/components/car-diagram';
 import { Block, Field, Placa, ReadOnly, Tool, selectCls, textareaCls } from '@/components/erp';
+import { PhotoGallery } from '@/components/photo-gallery';
 import { usePlateLookup } from '@/components/plate-search';
 import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
 import { ENTRY_CHECKLIST, FUEL, documentFmt, km, phone } from '@/lib/os';
 import { cn } from '@/lib/utils';
-import type { Damage } from '@/types';
+import type { Damage, Photo } from '@/types';
 import { Head, useForm } from '@inertiajs/react';
 import { CircleCheck, Save, X } from 'lucide-react';
 import { useEffect, useRef } from 'react';
@@ -13,6 +14,7 @@ import { useEffect, useRef } from 'react';
 interface Props {
     mechanics: { id: number; name: string }[];
     prefill: { placa?: string; client_id?: string };
+    pre: { id: number; name: string; phone: string; plate: string | null; vehicle: string | null; complaint: string; preferred_at: string | null; photos: Photo[] } | null;
 }
 
 type Form = {
@@ -27,19 +29,21 @@ type Form = {
     mechanic_id: string;
     damages: Damage[];
     checklist: Record<string, boolean>;
+    pre_service_id: number | null;
 };
 
-export default function NovaOs({ mechanics, prefill }: Props) {
+export default function NovaOs({ mechanics, prefill, pre }: Props) {
     const form = useRef<HTMLFormElement>(null);
     const { data, setData, post, processing, errors, transform } = useForm<Form>({
         plate: prefill.placa ?? '',
         client_id: null,
-        client: { name: '', phone: '', document: '' },
-        vehicle: { brand: '', model: '', year: '', color: '', engine: '' },
+        client: { name: pre?.name ?? '', phone: pre?.phone ?? '', document: '' },
+        vehicle: { brand: '', model: pre?.vehicle ?? '', year: '', color: '', engine: '' },
         km_in: '',
         fuel_level: null,
-        scheduled_at: '',
-        complaint: '',
+        scheduled_at: pre?.preferred_at ?? '',
+        complaint: pre?.complaint ?? '',
+        pre_service_id: pre?.id ?? null,
         mechanic_id: '',
         damages: [],
         checklist: {},
@@ -97,6 +101,19 @@ export default function NovaOs({ mechanics, prefill }: Props) {
                 }}
                 className="grid gap-2 md:gap-3 xl:grid-cols-2"
             >
+                {pre && (
+                    <Block title={`Pedido do site · ${pre.name}`} className="border-l-4 border-l-[#d42a2a] xl:col-span-2">
+                        <p className="text-[13px]">
+                            Os dados que o cliente enviou já estão preenchidos abaixo. Confira a placa{pre.plate ? '' : ' (o cliente não informou)'} e grave.
+                            {pre.photos.length > 0 && ' As fotos do cliente vão junto para a OS.'}
+                        </p>
+                        {pre.photos.length > 0 && (
+                            <div className="mt-2 max-w-xl">
+                                <PhotoGallery photos={pre.photos} />
+                            </div>
+                        )}
+                    </Block>
+                )}
                 <Block title="1 · Veículo e cliente" className="xl:col-span-2">
                     <div className="grid gap-3 md:grid-cols-[220px_1fr]">
                         <Field label="Placa *" error={err.plate}>

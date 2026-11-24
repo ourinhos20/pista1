@@ -15,14 +15,14 @@ import { type ReactNode, useEffect, useState } from 'react';
 
 /* ------------------------------------------------------------------ menus */
 
-type MenuItem = { label: string; href: string; key?: string; code: string };
+type MenuItem = { label: string; href: string; key?: string; code: string; badge?: number };
 type MenuGroup = { label: string; items: MenuItem[] };
 
 /** Caminho relativo da rota (o sistema fica num prefixo escondido, ex.: /sistema). */
 const path = (name: string) => route(name, undefined, false);
 const item = (label: string, name: string, code: string, key?: string): MenuItem => ({ label, href: path(name), code, key });
 
-export function menusFor(role: Role): MenuGroup[] {
+export function menusFor(role: Role, preNew = 0): MenuGroup[] {
     const oficina: MenuGroup = { label: 'Oficina', items: [item('Agenda da oficina', 'mecanico.index', 'OFI010', 'F9')] };
     const conta: MenuGroup = { label: 'Sistema', items: [item('Minha conta', 'profile.edit', 'SIS020')] };
     if (role === 'mecanico') return [oficina, conta];
@@ -32,6 +32,7 @@ export function menusFor(role: Role): MenuGroup[] {
             label: 'Atendimento',
             items: [
                 item('Painel de atendimento', 'dashboard', 'ATD001', 'F1'),
+                { ...item('Pedidos do site (pré-atendimento)', 'pre.index', 'ATD005'), badge: preNew },
                 item('Nova ordem de serviço', 'os.create', 'ATD010', 'F2'),
                 item('Ordens de serviço', 'os.index', 'ATD020', 'F4'),
             ],
@@ -108,10 +109,12 @@ function UserMenu() {
 }
 
 function MenuBar() {
-    const { auth } = usePage<SharedData>().props;
+    const { auth, preNew } = usePage<SharedData>().props;
     const page = usePage();
     const current = page.url.split('?')[0];
-    const groups = menusFor(auth.user.role);
+    const groups = menusFor(auth.user.role, preNew);
+    const Badge = ({ n }: { n?: number }) =>
+        n ? <span className="ml-2 grid h-5 min-w-5 place-items-center rounded-full bg-[#d42a2a] px-1 text-[11px] font-bold text-white">{n}</span> : null;
     const home = path(auth.user.role === 'mecanico' ? 'mecanico.index' : 'dashboard');
     const dash = path('dashboard');
     const [open, setOpen] = useState(false);
@@ -120,8 +123,9 @@ function MenuBar() {
         <div className="no-print sticky top-0 z-40 flex h-12 items-stretch bg-[#0f1012] text-white md:h-10">
             {/* celular: menu lateral */}
             <Sheet open={open} onOpenChange={setOpen}>
-                <SheetTrigger className="grid w-12 place-items-center hover:bg-white/10 md:hidden" aria-label="Abrir menu">
+                <SheetTrigger className="relative grid w-12 place-items-center hover:bg-white/10 md:hidden" aria-label="Abrir menu">
                     <Menu className="size-5" />
+                    {preNew > 0 && <span className="absolute top-2.5 right-2.5 size-2.5 rounded-full bg-[#d42a2a]" />}
                 </SheetTrigger>
                 <SheetContent side="left" className="w-72 border-r-0 bg-[#0f1012] p-0 text-white">
                     <SheetTitle className="sr-only">Menu</SheetTitle>
@@ -140,6 +144,7 @@ function MenuBar() {
                                         className={cn('flex h-12 items-center rounded-[4px] px-3 text-[15px]', current === i.href ? 'bg-white/10 font-semibold' : 'text-zinc-300')}
                                     >
                                         {i.label}
+                                        <Badge n={i.badge} />
                                     </Link>
                                 ))}
                             </div>
@@ -164,6 +169,7 @@ function MenuBar() {
                                 )}
                             >
                                 {g.label}
+                                <Badge n={g.items.reduce((s, i) => s + (i.badge ?? 0), 0)} />
                                 <ChevronDown className="size-3 opacity-60" />
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="start" sideOffset={0} className="min-w-64 rounded-none rounded-b-[4px] p-1">
@@ -172,6 +178,7 @@ function MenuBar() {
                                         <Link href={i.href} className="flex w-full items-center">
                                             <span className="text-muted-foreground w-14 font-mono text-[11px]">{i.code}</span>
                                             <span className="flex-1">{i.label}</span>
+                                            <Badge n={i.badge} />
                                             {i.key && <kbd className="text-muted-foreground ml-4 rounded-[2px] border px-1 font-mono text-[10px]">{i.key}</kbd>}
                                         </Link>
                                     </DropdownMenuItem>

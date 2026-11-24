@@ -7,6 +7,7 @@ use App\Models\Client;
 use App\Models\FinanceEntry;
 use App\Models\Partner;
 use App\Models\PartnerMovement;
+use App\Models\PreService;
 use App\Models\ServiceOrder;
 use App\Support\Installments;
 use App\Models\User;
@@ -101,6 +102,10 @@ class DatabaseSeeder extends Seeder
         ], ['delivered_at' => now()->subDays(2), 'approved_at' => now()->subDays(3), 'km_in' => 80100]);
 
         $this->seedFinance($balcao, $delivered);
+
+        // Pedidos feitos pelo site (pré-atendimento)
+        PreService::create(['name' => 'Fernanda Rocha', 'phone' => '11977776666', 'plate' => 'BRA2E19', 'vehicle' => 'Renault Kwid 2020', 'complaint' => 'O carro está puxando para a direita e o volante treme acima de 80 km/h.', 'preferred_at' => today()->addDays(2)->setTime(10, 0)]);
+        PreService::create(['name' => 'Ricardo Lima', 'phone' => '11966665555', 'vehicle' => 'VW Polo 2019', 'complaint' => 'Ar-condicionado parou de gelar. Gostaria de um orçamento.']);
     }
 
     private function seedFinance(User $balcao, ServiceOrder $delivered): void

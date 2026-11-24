@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Enums\OsStatus;
 use App\Models\Client;
+use App\Models\PreService;
 use App\Models\ServiceOrder;
 use App\Models\User;
 use App\Models\Vehicle;
@@ -81,9 +82,28 @@ class ServiceOrderController extends Controller
 
     public function create(Request $request): Response
     {
+        // Vindo de um pré-atendimento do site: já preenche tudo o que o cliente informou
+        $pre = null;
+        if ($request->filled('pre')) {
+            $p = PreService::with('attachments')->where('status', 'novo')->find($request->integer('pre'));
+            if ($p) {
+                $pre = [
+                    'id' => $p->id,
+                    'name' => $p->name,
+                    'phone' => $p->phone,
+                    'plate' => $p->plate,
+                    'vehicle' => $p->vehicle,
+                    'complaint' => $p->complaint,
+                    'preferred_at' => $p->preferred_at?->format('Y-m-d\TH:i'),
+                    'photos' => $p->attachments->map->toRow()->values(),
+                ];
+            }
+        }
+
         return Inertia::render('os/create', [
             'mechanics' => User::where('role', 'mecanico')->where('active', true)->orderBy('name')->get(['id', 'name']),
-            'prefill' => $request->only(['placa', 'client_id']),
+            'prefill' => [...$request->only(['placa', 'client_id']), ...($pre ? ['placa' => $pre['plate']] : [])],
+            'pre' => $pre,
         ]);
     }
 
@@ -112,8 +132,10 @@ class ServiceOrderController extends Controller
             'damages.*.note' => ['nullable', 'string', 'max:120'],
             'checklist' => ['nullable', 'array'],
             'checklist.*' => ['boolean'],
+            'pre_service_id' => ['nullable', Rule::exists('pre_services', 'id')->where('status', 'novo')],
         ], [
             'plate.required' => 'Informe a placa.',
+            'pre_service_id.exists' => 'Este pedido do site já foi transformado em OS ou descartado.',
             'client.name.required_without' => 'Informe o nome do cliente.',
         ]);
 
@@ -155,6 +177,14 @@ class ServiceOrderController extends Controller
                 'checklist' => $data['checklist'] ?? [],
             ]);
             $os->logEvent($user, 'OS aberta');
+
+            // pré-atendimento do site vira esta OS; as fotos do cliente vêm junto
+            if (! empty($data['pre_service_id'])) {
+                $pre = PreService::lockForUpdate()->find($data['pre_service_id']);
+                $pre->update(['status' => 'convertido', 'service_order_id' => $os->id, 'handled_by' => $user->id]);
+                $pre->attachments()->update(['service_order_id' => $os->id, 'caption' => 'Foto enviada pelo cliente', 'show_to_client' => false]);
+                $os->logEvent($user, 'Criada a partir do pedido feito pelo cliente no site');
+            }
 
             return $os;
         });
