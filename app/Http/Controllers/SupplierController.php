@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\FinanceEntry;
 use App\Models\Supplier;
+use Illuminate\Support\Carbon;
 use App\Support\Plate;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -25,6 +27,39 @@ class SupplierController extends Controller
             ]);
 
         return Inertia::render('pecas/fornecedores', ['rows' => $rows, 'filters' => ['q' => $q]]);
+    }
+
+    /** Ficha do fornecedor: dados + histórico de compras filtrado por mês. */
+    public function show(Request $request, Supplier $supplier): Response
+    {
+        $mes = $request->string('mes')->toString() ?: now()->format('Y-m');
+        $all = $mes === 'todos';
+        $start = $all ? null : (preg_match('/^\d{4}-\d{2}$/', $mes) ? Carbon::createFromFormat('Y-m-d', "$mes-01")->startOfDay() : now()->startOfMonth());
+
+        $purchases = $supplier->purchases()->with(['supplier:id,name', 'items', 'entries'])
+            ->when($start, fn ($q) => $q->whereBetween('date', [$start->toDateString(), $start->copy()->endOfMonth()->toDateString()]))
+            ->latest('date')->latest('id')->get()
+            ->map->toRow();
+
+        // em aberto com o fornecedor (todas as datas)
+        $open = FinanceEntry::whereNull('paid_at')->whereIn('purchase_id', $supplier->purchases()->select('id'));
+
+        // meses com compra, para facilitar a escolha
+        $months = $supplier->purchases()->pluck('date')->map(fn ($d) => $d->format('Y-m'))->unique()->sortDesc()->values();
+
+        return Inertia::render('pecas/fornecedor', [
+            'supplier' => $supplier->only(['id', 'name', 'document', 'phone', 'contact', 'email', 'notes', 'active']),
+            'purchases' => $purchases,
+            'filters' => ['mes' => $all ? 'todos' : $start->format('Y-m')],
+            'months' => $months,
+            'summary' => [
+                'period_total' => round($purchases->sum('total'), 2),
+                'period_count' => $purchases->count(),
+                'all_total' => round((float) $supplier->purchases()->sum('total'), 2),
+                'open_total' => round((float) $open->sum('amount'), 2),
+                'overdue_total' => round((float) (clone $open)->whereDate('due_date', '<', today())->sum('amount'), 2),
+            ],
+        ]);
     }
 
     private function validated(Request $request): array

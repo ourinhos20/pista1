@@ -8,7 +8,6 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\FinanceController;
 use App\Http\Controllers\MechanicController;
 use App\Http\Controllers\OsPaymentController;
-use App\Http\Controllers\PartController;
 use App\Http\Controllers\PartnerController;
 use App\Http\Controllers\PurchaseController;
 use App\Http\Controllers\SupplierController;
@@ -59,7 +58,6 @@ Route::prefix(config('oficina.panel_path'))->group(function () {
         Route::patch('os/{os}/fotos/{attachment}', [AttachmentController::class, 'update'])->name('os.photos.update');
         Route::delete('os/{os}/fotos/{attachment}', [AttachmentController::class, 'destroy'])->name('os.photos.destroy');
         Route::get('anexos/{attachment}', [AttachmentController::class, 'show'])->name('anexos.show');
-        Route::get('pecas/buscar', [PartController::class, 'search'])->name('pecas.search');
 
         // Balcão e master
         Route::middleware('role:master,balcao')->group(function () {
@@ -76,12 +74,10 @@ Route::prefix(config('oficina.panel_path'))->group(function () {
             Route::post('pre-atendimentos/{pre}/descartar', [PreServiceController::class, 'discard'])->name('pre.discard');
             Route::post('pre-atendimentos/{pre}/restaurar', [PreServiceController::class, 'restore'])->name('pre.restore');
 
-            // Peças, fornecedores e compras
-            Route::get('pecas', [PartController::class, 'index'])->name('pecas.index');
-            Route::post('pecas', [PartController::class, 'store'])->name('pecas.store');
-            Route::put('pecas/{part}', [PartController::class, 'update'])->name('pecas.update');
+            // Fornecedores e compras de peças
             Route::get('fornecedores', [SupplierController::class, 'index'])->name('fornecedores.index');
             Route::post('fornecedores', [SupplierController::class, 'store'])->name('fornecedores.store');
+            Route::get('fornecedores/{supplier}', [SupplierController::class, 'show'])->name('fornecedores.show');
             Route::put('fornecedores/{supplier}', [SupplierController::class, 'update'])->name('fornecedores.update');
             Route::get('compras', [PurchaseController::class, 'index'])->name('compras.index');
             Route::post('compras', [PurchaseController::class, 'store'])->name('compras.store');

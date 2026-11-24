@@ -81,8 +81,6 @@ export interface OsItem {
     type: 'servico' | 'peca';
     description: string;
     quantity: number;
-    part_id?: number | null;
-    code?: string | null;
     unit_price?: number;
     total?: number;
 }
@@ -132,7 +130,7 @@ export interface OsFull extends OsCard {
     payments?: { id: number; amount: number; due_date: string; paid_at: string | null; payment_method: string | null; installment: number | null; installments: number | null }[];
     paid_total?: number;
     billed_total?: number;
-    costs?: { catalog: number; purchases: number };
+    costs?: { purchases: number };
 }
 
 export interface Photo {

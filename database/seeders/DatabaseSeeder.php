@@ -7,10 +7,8 @@ use App\Models\Client;
 use App\Models\FinanceEntry;
 use App\Models\Partner;
 use App\Models\PartnerMovement;
-use App\Models\Part;
 use App\Models\PreService;
 use App\Models\Purchase;
-use App\Models\ServiceOrderItem;
 use App\Models\Supplier;
 use App\Models\ServiceOrder;
 use App\Support\Installments;
@@ -119,25 +117,17 @@ class DatabaseSeeder extends Seeder
         $abp = Supplier::create(['name' => 'Auto Peças Brasil', 'document' => '12345678000190', 'phone' => '1133334444', 'contact' => 'Marcos (vendas)']);
         $ff = Supplier::create(['name' => 'Distribuidora Freio Forte', 'phone' => '11922223333', 'contact' => 'Juliana']);
 
-        $p = fn ($code, $desc, $brand, $unit, $cost, $sale, $min, $sup) => Part::create(['code' => $code, 'description' => $desc, 'brand' => $brand, 'unit' => $unit, 'cost_price' => $cost, 'sale_price' => $sale, 'min_stock' => $min, 'supplier_id' => $sup->id]);
-        $oleo = $p('5W30-SN', 'Óleo 5W30 sintético', 'Mobil', 'L', 28, 45, 12, $abp);
-        $filtro = $p('PSL-140', 'Filtro de óleo', 'Tecfil', 'un', 18, 38, 4, $abp);
-        $p('ARL-6079', 'Filtro de ar', 'Tecfil', 'un', 26, 52, 3, $abp);
-        $p('HQJ-2207', 'Pastilha de freio dianteira', 'Cobreq', 'jogo', 85, 160, 2, $ff);
-        $p('DF-3022', 'Disco de freio dianteiro', 'Fremax', 'par', 210, 380, 0, $ff);
-        $p('BL-118', 'Bieleta dianteira', 'Nakata', 'par', 95, 180, 0, $abp);
-
-        // compra de estoque do mês
-        $purchase = Purchase::create(['supplier_id' => $abp->id, 'invoice' => '45871', 'date' => now()->startOfMonth()->addDays(6), 'total' => 0, 'created_by' => $balcao->id]);
-        $purchase->items()->createMany([
-            ['part_id' => $oleo->id, 'description' => $oleo->description, 'quantity' => 20, 'unit_cost' => 28],
-            ['part_id' => $filtro->id, 'description' => $filtro->description, 'quantity' => 6, 'unit_cost' => 18],
-        ]);
-        $purchase->update(['total' => 20 * 28 + 6 * 18]);
-
-        // itens de OS já lançados passam a apontar para o catálogo (o estoque desconta)
-        ServiceOrderItem::where('description', 'like', 'Óleo 5W30%')->update(['part_id' => $oleo->id]);
-        ServiceOrderItem::where('description', 'Filtro de óleo')->update(['part_id' => $filtro->id]);
+        // compras de exemplo (mês passado e este mês) para o histórico do fornecedor
+        $buy = function (Supplier $s, string $nf, $date, array $items) use ($balcao) {
+            $p = Purchase::create(['supplier_id' => $s->id, 'invoice' => $nf, 'date' => $date, 'total' => 0, 'created_by' => $balcao->id]);
+            foreach ($items as [$desc, $qty, $cost]) {
+                $p->items()->create(['description' => $desc, 'quantity' => $qty, 'unit_cost' => $cost]);
+            }
+            $p->update(['total' => collect($items)->sum(fn ($i) => $i[1] * $i[2])]);
+        };
+        $buy($abp, '45210', now()->subMonthNoOverflow()->startOfMonth()->addDays(12), [['Óleo 5W30 sintético (L)', 12, 28], ['Filtro de óleo', 4, 18]]);
+        $buy($abp, '45871', now()->startOfMonth()->addDays(6), [['Óleo 5W30 sintético (L)', 20, 28], ['Filtro de óleo', 6, 18], ['Filtro de ar', 2, 26]]);
+        $buy($ff, '9921', now()->startOfMonth()->addDays(3), [['Pastilha de freio dianteira (jogo)', 2, 85]]);
     }
 
     private function seedFinance(User $balcao, ServiceOrder $delivered): void

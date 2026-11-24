@@ -1,5 +1,5 @@
 import { Block, Field, Grid, Tool, selectCls, textareaCls, type Col } from '@/components/erp';
-import { PartPicker } from '@/components/part-picker';
+import { PaidTag, PurchaseDetailDialog, type PurchaseRow } from '@/components/purchase-detail';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
@@ -8,29 +8,19 @@ import { money } from '@/lib/os';
 import { cn } from '@/lib/utils';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import { Plus, Save, ShoppingCart, Trash2, X } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { SupplierForm } from './fornecedores';
 
-type Row = {
-    id: number;
-    date: string;
-    invoice: string | null;
-    supplier: string;
-    service_order_id: number | null;
-    os_number: string | null;
-    total: number;
-    notes: string | null;
-    items: { description: string; quantity: number; unit_cost: number; part_id: number | null }[];
-    entries: { amount: number; due_date: string; paid_at: string | null }[];
-    paid: boolean;
-};
+type Row = PurchaseRow;
 type Sup = { id: number; name: string };
-type Item = { part_id: number | null; description: string; quantity: string; unit_cost: string; sale_price: string; save_part: boolean; unit?: string };
+type Item = { description: string; quantity: string; unit_cost: string; sale_price: string };
 
 const num = (v: string) => Number(String(v).replace(/\./g, '').replace(',', '.')) || 0;
-const br = (v?: number) => (v || v === 0 ? String(v).replace('.', ',') : '');
-const emptyItem = (): Item => ({ part_id: null, description: '', quantity: '1', unit_cost: '', sale_price: '', save_part: true });
+const emptyItem = (): Item => ({ description: '', quantity: '1', unit_cost: '', sale_price: '' });
 
 function PurchaseForm({ suppliers, methods, os, onDone }: { suppliers: Sup[]; methods: Record<string, string>; os: number | null; onDone: () => void }) {
+    const [newSupplier, setNewSupplier] = useState(false);
+    const known = useRef(suppliers.map((s) => s.id));
     const { data, setData, post, processing, errors, transform } = useForm({
         supplier_id: '',
         invoice: '',
@@ -48,7 +38,16 @@ function PurchaseForm({ suppliers, methods, os, onDone }: { suppliers: Sup[]; me
     const total = data.items.reduce((s, i) => s + num(i.quantity) * num(i.unit_cost), 0);
     const setItem = (idx: number, patch: Partial<Item>) => setData('items', data.items.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
 
+    // fornecedor recém-cadastrado aqui mesmo já fica selecionado
+    useEffect(() => {
+        const added = suppliers.find((s) => !known.current.includes(s.id));
+        known.current = suppliers.map((s) => s.id);
+        if (added) setData('supplier_id', String(added.id));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [suppliers]);
+
     return (
+        <>
         <form
             className="grid gap-3"
             onSubmit={(e) => {
@@ -59,19 +58,23 @@ function PurchaseForm({ suppliers, methods, os, onDone }: { suppliers: Sup[]; me
         >
             <div className="grid gap-3 sm:grid-cols-6">
                 <Field label="Fornecedor *" className="sm:col-span-3" error={err.supplier_id}>
-                    <select className={selectCls} value={data.supplier_id} onChange={(e) => setData('supplier_id', e.target.value)}>
-                        <option value="">Escolha…</option>
-                        {suppliers.map((s) => (
-                            <option key={s.id} value={s.id}>
-                                {s.name}
-                            </option>
-                        ))}
-                    </select>
-                    {!suppliers.length && (
-                        <Link href={route('fornecedores.index')} className="text-[12px] text-[#b51f1f] underline">
-                            Cadastre um fornecedor primeiro
-                        </Link>
-                    )}
+                    <div className="flex gap-1.5">
+                        <select className={selectCls} value={data.supplier_id} onChange={(e) => setData('supplier_id', e.target.value)}>
+                            <option value="">{suppliers.length ? 'Escolha…' : 'Nenhum fornecedor cadastrado'}</option>
+                            {suppliers.map((s) => (
+                                <option key={s.id} value={s.id}>
+                                    {s.name}
+                                </option>
+                            ))}
+                        </select>
+                        <button
+                            type="button"
+                            onClick={() => setNewSupplier(true)}
+                            className="inline-flex h-11 shrink-0 items-center gap-1 rounded-[3px] border border-zinc-800 bg-zinc-900 px-2.5 text-[12px] font-semibold text-white md:h-8"
+                        >
+                            <Plus className="size-3.5" /> Novo
+                        </button>
+                    </div>
                 </Field>
                 <Field label="Nº da nota (NF)" className="sm:col-span-1">
                     <Input value={data.invoice} onChange={(e) => setData('invoice', e.target.value)} />
@@ -80,7 +83,7 @@ function PurchaseForm({ suppliers, methods, os, onDone }: { suppliers: Sup[]; me
                     <Input type="date" value={data.date} onChange={(e) => setData('date', e.target.value)} />
                 </Field>
                 <Field label="Para a OS nº (opcional)" className="sm:col-span-2" error={err.service_order_id}>
-                    <Input value={data.service_order_id} onChange={(e) => setData('service_order_id', e.target.value)} inputMode="numeric" placeholder="Compra para estoque" />
+                    <Input value={data.service_order_id} onChange={(e) => setData('service_order_id', e.target.value)} inputMode="numeric" placeholder="Vazio = não é para uma OS" />
                 </Field>
                 {data.service_order_id && (
                     <label className="flex items-end gap-2 pb-2 text-[13px] font-medium sm:col-span-4">
@@ -94,10 +97,12 @@ function PurchaseForm({ suppliers, methods, os, onDone }: { suppliers: Sup[]; me
                 <table className="w-full min-w-[720px] text-[13px]">
                     <thead>
                         <tr className="border-b border-[#c9cdd3] bg-[#eceef1] text-left text-[11px] font-bold text-zinc-600 uppercase dark:bg-zinc-800">
-                            <th className="h-8 px-2">Peça (busque no catálogo ou digite)</th>
+                            <th className="h-8 px-2">Peça</th>
                             <th className="w-20 px-2 text-right">Qtd</th>
                             <th className="w-28 px-2 text-right">Custo un.</th>
-                            <th className="w-28 px-2 text-right">Venda un.</th>
+                            <th className="w-28 px-2 text-right" title="Preço que vai para a OS do cliente">
+                                Venda un. {data.service_order_id ? '(na OS)' : ''}
+                            </th>
                             <th className="w-28 px-2 text-right">Total</th>
                             <th className="w-10" />
                         </tr>
@@ -106,22 +111,7 @@ function PurchaseForm({ suppliers, methods, os, onDone }: { suppliers: Sup[]; me
                         {data.items.map((it, idx) => (
                             <tr key={idx} className="border-b border-[#e3e5e8] align-top">
                                 <td className="p-1.5">
-                                    <PartPicker
-                                        value={it.description}
-                                        onChange={(v) => setItem(idx, { description: v, part_id: null })}
-                                        onPick={(p) => setItem(idx, { part_id: p.id, description: p.description, unit_cost: br(p.cost_price), sale_price: br(p.sale_price), unit: p.unit })}
-                                        placeholder="Ex.: pastilha dianteira"
-                                    />
-                                    <p className="mt-1 text-[11px]">
-                                        {it.part_id ? (
-                                            <span className="font-semibold text-green-700">✓ do catálogo (entra no estoque)</span>
-                                        ) : it.description ? (
-                                            <label className="inline-flex items-center gap-1.5 text-zinc-600">
-                                                <input type="checkbox" className="size-3.5 accent-[#d42a2a]" checked={it.save_part} onChange={(e) => setItem(idx, { save_part: e.target.checked })} />
-                                                Salvar no catálogo de peças
-                                            </label>
-                                        ) : null}
-                                    </p>
+                                    <Input value={it.description} onChange={(e) => setItem(idx, { description: e.target.value })} placeholder="Ex.: pastilha de freio dianteira" />
                                     {err[`items.${idx}.description`] && <p className="text-[12px] text-red-600">{err[`items.${idx}.description`]}</p>}
                                 </td>
                                 <td className="p-1.5">
@@ -131,7 +121,14 @@ function PurchaseForm({ suppliers, methods, os, onDone }: { suppliers: Sup[]; me
                                     <Input value={it.unit_cost} onChange={(e) => setItem(idx, { unit_cost: e.target.value })} inputMode="decimal" className="text-right tabular-nums" placeholder="0,00" />
                                 </td>
                                 <td className="p-1.5">
-                                    <Input value={it.sale_price} onChange={(e) => setItem(idx, { sale_price: e.target.value })} inputMode="decimal" className="text-right tabular-nums" placeholder="opcional" />
+                                    <Input
+                                        value={it.sale_price}
+                                        onChange={(e) => setItem(idx, { sale_price: e.target.value })}
+                                        inputMode="decimal"
+                                        className="text-right tabular-nums"
+                                        placeholder={data.service_order_id ? 'opcional' : '—'}
+                                        disabled={!data.service_order_id}
+                                    />
                                 </td>
                                 <td className="p-1.5 pt-3 text-right font-semibold tabular-nums">{money(num(it.quantity) * num(it.unit_cost))}</td>
                                 <td className="p-1.5 pt-2.5 text-center">
@@ -198,6 +195,17 @@ function PurchaseForm({ suppliers, methods, os, onDone }: { suppliers: Sup[]; me
                 </button>
             </div>
         </form>
+
+        {/* cadastro rápido de fornecedor sem sair da compra */}
+        <Dialog open={newSupplier} onOpenChange={setNewSupplier}>
+            <DialogContent className="max-h-[92svh] overflow-y-auto rounded-[4px] sm:max-w-xl">
+                <DialogHeader>
+                    <DialogTitle>Novo fornecedor</DialogTitle>
+                </DialogHeader>
+                {newSupplier && <SupplierForm onDone={() => setNewSupplier(false)} />}
+            </DialogContent>
+        </Dialog>
+        </>
     );
 }
 
@@ -230,11 +238,7 @@ export default function Compras({
         { label: 'Total', render: (r) => <b>{money(r.total)}</b>, align: 'right', className: 'w-28' },
         {
             label: 'Pagamento',
-            render: (r) => (
-                <span className={cn('rounded-[3px] px-1.5 py-0.5 text-[11px] font-bold uppercase ring-1 ring-inset', r.paid ? 'bg-green-50 text-green-800 ring-green-300' : 'bg-amber-50 text-amber-900 ring-amber-300')}>
-                    {r.paid ? 'Pago' : 'A pagar'}
-                </span>
-            ),
+            render: (r) => <PaidTag r={r} />,
             className: 'w-24',
         },
     ];
@@ -288,68 +292,7 @@ export default function Compras({
                 </DialogContent>
             </Dialog>
 
-            <Dialog open={view !== null} onOpenChange={(o) => !o && setView(null)}>
-                <DialogContent className="max-h-[92svh] overflow-y-auto rounded-[4px] sm:max-w-2xl">
-                    <DialogHeader>
-                        <DialogTitle>
-                            Compra {view?.invoice ? `NF ${view.invoice}` : ''} · {view?.supplier}
-                        </DialogTitle>
-                    </DialogHeader>
-                    {view && (
-                        <div className="grid gap-3 text-[13px]">
-                            <p>
-                                {dateBr(view.date)}
-                                {view.service_order_id && (
-                                    <>
-                                        {' · '}
-                                        <Link href={route('os.show', view.service_order_id)} className="font-semibold text-[#b51f1f] hover:underline">
-                                            OS {view.os_number}
-                                        </Link>
-                                    </>
-                                )}
-                            </p>
-                            <table className="w-full">
-                                <tbody>
-                                    {view.items.map((i, k) => (
-                                        <tr key={k} className="border-b border-[#e3e5e8]">
-                                            <td className="py-1">{i.description}</td>
-                                            <td className="py-1 text-right tabular-nums">
-                                                {i.quantity} × {money(i.unit_cost)}
-                                            </td>
-                                            <td className="w-28 py-1 text-right font-semibold tabular-nums">{money(i.quantity * i.unit_cost)}</td>
-                                        </tr>
-                                    ))}
-                                    <tr>
-                                        <td colSpan={2} className="py-1.5 font-bold">
-                                            Total
-                                        </td>
-                                        <td className="py-1.5 text-right text-[15px] font-bold tabular-nums">{money(view.total)}</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                            <div>
-                                <p className="text-[11px] font-bold text-zinc-600 uppercase">Contas a pagar</p>
-                                {view.entries.map((e, k) => (
-                                    <p key={k} className="flex justify-between border-b border-[#eceef1] py-1">
-                                        <span>Vence {dateBr(e.due_date)}</span>
-                                        <span className={e.paid_at ? 'text-green-700' : 'text-amber-700'}>{e.paid_at ? `Pago ${dateBr(e.paid_at)}` : 'Em aberto'}</span>
-                                        <b className="tabular-nums">{money(e.amount)}</b>
-                                    </p>
-                                ))}
-                            </div>
-                            {view.notes && <p className="text-muted-foreground">{view.notes}</p>}
-                            <div className="flex justify-end">
-                                <Tool
-                                    danger
-                                    icon={<Trash2 />}
-                                    label="Excluir compra"
-                                    onClick={() => confirm('Excluir esta compra e as contas a pagar dela?') && router.delete(route('compras.destroy', view.id), { preserveScroll: true, onSuccess: () => setView(null) })}
-                                />
-                            </div>
-                        </div>
-                    )}
-                </DialogContent>
-            </Dialog>
+            <PurchaseDetailDialog row={view} onClose={() => setView(null)} />
         </AppLayout>
     );
 }

@@ -21,7 +21,7 @@ type Sup = {
     purchases_total: number;
 };
 
-function SupplierForm({ s, onDone }: { s?: Sup; onDone: () => void }) {
+export function SupplierForm({ s, onDone }: { s?: Sup; onDone: () => void }) {
     const { data, setData, post, put, processing, errors } = useForm({
         name: s?.name ?? '',
         document: s?.document ?? '',
@@ -36,7 +36,8 @@ function SupplierForm({ s, onDone }: { s?: Sup; onDone: () => void }) {
             className="grid gap-3 sm:grid-cols-2"
             onSubmit={(e) => {
                 e.preventDefault();
-                const opts = { preserveScroll: true, onSuccess: onDone };
+                // preserveState: a tela que abriu este formulário (ex.: a compra) continua como estava
+                const opts = { preserveScroll: true, preserveState: true, onSuccess: onDone };
                 if (s) put(route('fornecedores.update', s.id), opts);
                 else post(route('fornecedores.store'), opts);
             }}
@@ -117,7 +118,7 @@ export default function Fornecedores({ rows, filters }: { rows: Sup[]; filters: 
                     </form>
                 </Block>
                 <Block title="Fornecedores" bodyClassName="p-0">
-                    <Grid cols={cols} rows={rows} rowKey={(r) => r.id} onRowClick={setOpen} footer={<span>{rows.length} fornecedor(es) · clique para alterar</span>} />
+                    <Grid cols={cols} rows={rows} rowKey={(r) => r.id} onRowClick={(r) => router.visit(route('fornecedores.show', r.id))} footer={<span>{rows.length} fornecedor(es) · clique para ver o histórico de compras</span>} />
                 </Block>
             </div>
             <Dialog open={open !== null} onOpenChange={(o) => !o && setOpen(null)}>

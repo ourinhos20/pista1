@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Part;
 use App\Models\Purchase;
 use App\Models\ServiceOrder;
 use App\Models\Supplier;
@@ -33,19 +32,7 @@ class PurchaseController extends Controller
             ->whereBetween('date', [$start->toDateString(), $start->copy()->endOfMonth()->toDateString()])
             ->when($supplier, fn ($q) => $q->where('supplier_id', $supplier))
             ->latest('date')->latest('id')->get()
-            ->map(fn (Purchase $p) => [
-                'id' => $p->id,
-                'date' => $p->date->toDateString(),
-                'invoice' => $p->invoice,
-                'supplier' => $p->supplier?->name,
-                'service_order_id' => $p->service_order_id,
-                'os_number' => $p->service_order_id ? str_pad((string) $p->service_order_id, 5, '0', STR_PAD_LEFT) : null,
-                'total' => $p->total,
-                'notes' => $p->notes,
-                'items' => $p->items->map(fn ($i) => $i->only(['description', 'quantity', 'unit_cost', 'part_id'])),
-                'entries' => $p->entries->map(fn ($e) => ['amount' => $e->amount, 'due_date' => $e->due_date->toDateString(), 'paid_at' => $e->paid_at?->toDateString()]),
-                'paid' => $p->entries->isNotEmpty() && $p->entries->every(fn ($e) => $e->paid_at !== null),
-            ]);
+            ->map->toRow();
 
         return Inertia::render('pecas/compras', [
             'rows' => $rows,
@@ -76,12 +63,10 @@ class PurchaseController extends Controller
             'add_to_os' => ['boolean'],
             'notes' => ['nullable', 'string', 'max:2000'],
             'items' => ['required', 'array', 'min:1', 'max:60'],
-            'items.*.part_id' => ['nullable', Rule::exists('parts', 'id')],
             'items.*.description' => ['required', 'string', 'max:255'],
             'items.*.quantity' => ['required', 'numeric', 'gt:0', 'max:9999'],
             'items.*.unit_cost' => ['required', 'numeric', 'min:0', 'max:999999'],
             'items.*.sale_price' => ['nullable', 'numeric', 'min:0', 'max:999999'],
-            'items.*.save_part' => ['boolean'],
             'payment_method' => ['nullable', Rule::in(array_keys(Finance::METHODS))],
             'installments' => ['nullable', 'integer', 'between:1,24'],
             'first_due' => ['required', 'date'],
@@ -111,39 +96,19 @@ class PurchaseController extends Controller
             $os = ! empty($d['service_order_id']) ? ServiceOrder::find($d['service_order_id']) : null;
 
             foreach ($d['items'] as $i) {
-                $partId = $i['part_id'] ?? null;
-
-                // peça nova pode ir para o catálogo; peça existente atualiza o último custo
-                if (! $partId && ! empty($i['save_part'])) {
-                    $partId = Part::create([
-                        'description' => $i['description'],
-                        'cost_price' => $i['unit_cost'],
-                        'sale_price' => $i['sale_price'] ?? 0,
-                        'supplier_id' => $supplier->id,
-                    ])->id;
-                } elseif ($partId) {
-                    Part::whereKey($partId)->update(array_filter([
-                        'cost_price' => $i['unit_cost'],
-                        'sale_price' => $i['sale_price'] ?? null,
-                    ], fn ($v) => $v !== null));
-                }
-
                 $purchase->items()->create([
-                    'part_id' => $partId,
                     'description' => $i['description'],
                     'quantity' => $i['quantity'],
                     'unit_cost' => $i['unit_cost'],
                 ]);
 
-                // lança a peça na OS com o preço de venda (o balcão ajusta se quiser)
+                // lança a peça na OS com o preço de venda informado (sem preço, o balcão completa na OS)
                 if ($os && ! empty($d['add_to_os'])) {
-                    $sale = $i['sale_price'] ?? ($partId ? (float) Part::find($partId)?->sale_price : 0);
                     $os->items()->create([
-                        'part_id' => $partId,
                         'type' => 'peca',
                         'description' => $i['description'],
                         'quantity' => $i['quantity'],
-                        'unit_price' => $sale ?: 0,
+                        'unit_price' => $i['sale_price'] ?? 0,
                     ]);
                 }
             }

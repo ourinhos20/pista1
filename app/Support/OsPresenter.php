@@ -64,7 +64,7 @@ class OsPresenter
 
     public static function full(ServiceOrder $os, User $user): array
     {
-        $os->loadMissing(['client', 'vehicle', 'mechanic', 'items.part', 'events.user', 'payments', 'attachments.uploader']);
+        $os->loadMissing(['client', 'vehicle', 'mechanic', 'items','events.user', 'payments', 'attachments.uploader']);
         $sensitive = $user->canSeeSensitive();
 
         return [
@@ -86,13 +86,10 @@ class OsPresenter
                 'type' => $i->type,
                 'description' => $i->description,
                 'quantity' => $i->quantity,
-                'part_id' => $i->part_id,
-                'code' => $i->part?->code,
                 ...($sensitive ? ['unit_price' => $i->unit_price, 'total' => $i->total()] : []),
             ])->values(),
             // custo e margem: só os sócios
             ...($user->isMaster() ? ['costs' => [
-                'catalog' => round($os->items->sum(fn ($i) => $i->part ? $i->quantity * $i->part->cost_price : 0), 2),
                 'purchases' => round((float) \App\Models\Purchase::where('service_order_id', $os->id)->sum('total'), 2),
             ]] : []),
             'events' => $os->events->map(fn ($e) => [
