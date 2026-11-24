@@ -9,7 +9,8 @@ import { REVISION_GROUPS, REVISION_TOTAL, REVISION_VALUES, type RevisionValue } 
 import { cn } from '@/lib/utils';
 import type { OsEvent, OsFull, OsItem, OsStatus, SharedData } from '@/types';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
-import { ArrowRight, ChevronDown, CircleCheck, Hourglass, Link2, MessageCircle, Plus, Printer, Save, Trash2 } from 'lucide-react';
+import { ArrowRight, ChevronDown, CircleCheck, Hourglass, Link2, MessageCircle, Plus, Printer, Save, ShoppingCart, Trash2 } from 'lucide-react';
+import { PartPicker } from '@/components/part-picker';
 import { useEffect, useState } from 'react';
 
 type Hist = { id: number; number: string; status: OsStatus; date: string; km_in: number | null; summary: string | null };
@@ -129,7 +130,10 @@ function ItemRow({ item, osId }: { item: OsItem; osId: number }) {
     return (
         <tr className={cn('border-b border-[#e3e5e8] even:bg-[#f8f9fa] dark:even:bg-zinc-900/60', noPrice && 'bg-amber-50/70 even:bg-amber-50/70 dark:bg-amber-950/20')}>
             <td className="px-2.5 py-1 text-[11px] font-bold uppercase">{item.type === 'peca' ? 'Peça' : 'Serviço'}</td>
-            <td className="px-2.5 py-1">{item.description}</td>
+            <td className="px-2.5 py-1">
+                {item.description}
+                {item.code && <span className="text-muted-foreground ml-1.5 font-mono text-[11px]">{item.code}</span>}
+            </td>
             <td className="w-20 px-1.5 py-1">
                 <Input value={qty} onChange={(e) => setQty(e.target.value)} onBlur={save} inputMode="decimal" className="text-right tabular-nums" aria-label="Quantidade" />
             </td>
@@ -152,13 +156,15 @@ function ItemRow({ item, osId }: { item: OsItem; osId: number }) {
 }
 
 function AddItem({ osId, sensitive }: { osId: number; sensitive: boolean }) {
-    const { data, setData, post, processing, errors, reset } = useForm({ type: 'peca' as 'servico' | 'peca', description: '', quantity: '1', unit_price: '' });
+    const { data, setData, post, processing, errors, reset, transform } = useForm({ type: 'peca' as 'servico' | 'peca', description: '', quantity: '1', unit_price: '', part_id: null as number | null });
     return (
         <form
             className="grid items-end gap-2 border-t border-[#d7dade] bg-[#f6f7f8] p-2.5 sm:grid-cols-[130px_1fr_80px_auto] lg:grid-cols-[130px_1fr_80px_120px_auto] dark:bg-zinc-800"
             onSubmit={(e) => {
                 e.preventDefault();
-                post(route('os.items.store', osId), { preserveScroll: true, onSuccess: () => reset('description', 'unit_price', 'quantity') });
+                const n = (v: string) => (v.trim() === '' ? null : Number(v.replace(/\./g, '').replace(',', '.')) || 0);
+                transform((d) => ({ ...d, quantity: n(d.quantity) ?? 1, unit_price: n(d.unit_price) }) as never);
+                post(route('os.items.store', osId), { preserveScroll: true, onSuccess: () => reset('description', 'unit_price', 'quantity', 'part_id') });
             }}
         >
             <Field label="Tipo">
@@ -167,8 +173,18 @@ function AddItem({ osId, sensitive }: { osId: number; sensitive: boolean }) {
                     <option value="servico">Serviço</option>
                 </select>
             </Field>
-            <Field label="Descrição" error={errors.description}>
-                <Input value={data.description} onChange={(e) => setData('description', e.target.value)} placeholder={sensitive ? 'Peça ou serviço' : 'Peça ou serviço necessário'} />
+            <Field label={data.type === 'peca' ? 'Peça (busca no catálogo)' : 'Descrição do serviço'} error={errors.description}>
+                {data.type === 'peca' ? (
+                    <PartPicker
+                        value={data.description}
+                        showPrice={sensitive}
+                        placeholder={sensitive ? 'Digite para buscar no catálogo' : 'Peça necessária'}
+                        onChange={(v) => setData((d) => ({ ...d, description: v, part_id: null }))}
+                        onPick={(p) => setData((d) => ({ ...d, description: p.description, part_id: p.id, unit_price: p.sale_price ? String(p.sale_price).replace('.', ',') : d.unit_price }))}
+                    />
+                ) : (
+                    <Input value={data.description} onChange={(e) => setData('description', e.target.value)} placeholder="Ex.: mão de obra troca de pastilhas" />
+                )}
             </Field>
             <Field label="Qtd">
                 <Input value={data.quantity} onChange={(e) => setData('quantity', e.target.value)} inputMode="decimal" className="text-right tabular-nums" />
@@ -204,6 +220,30 @@ function Totais({ os }: { os: OsFull }) {
                 <span className="text-[12px] font-bold uppercase">Total</span>
                 <b className="text-[20px] tabular-nums">{money(total)}</b>
             </div>
+            {os.costs && (
+                <div className="grid gap-1 rounded-[3px] border border-dashed border-[#c9cdd3] px-2.5 py-2 text-[12px]">
+                    <p className="text-[10px] font-bold tracking-wide text-zinc-500 uppercase">Só sócios</p>
+                    {(() => {
+                        // custo real = compras feitas para esta OS; se não houver, custo do catálogo
+                        const cost = os.costs.purchases || os.costs.catalog;
+                        const margin = total - cost;
+                        return (
+                            <>
+                                <p className="flex justify-between">
+                                    <span>Custo das peças {os.costs.purchases ? '(compras da OS)' : '(catálogo)'}</span>
+                                    <b className="tabular-nums">{money(cost)}</b>
+                                </p>
+                                <p className="flex justify-between">
+                                    <span>Margem bruta</span>
+                                    <b className={cn('tabular-nums', margin < 0 ? 'text-[#b51f1f]' : 'text-green-800')}>
+                                        {money(margin)} {total > 0 && `(${Math.round((margin / total) * 100)}%)`}
+                                    </b>
+                                </p>
+                            </>
+                        );
+                    })()}
+                </div>
+            )}
             {isDirty && (
                 <Tool
                     primary
@@ -425,6 +465,9 @@ export default function OsShow({ os, history, mechanics, statuses }: Props) {
                             // enviar o orçamento já marca a OS como "aguardando aprovação" (o link passa a aceitar a resposta)
                             onClick={() => os.status === 'orcamento' && !os.items.some((i) => !i.unit_price) && setStatus('aprovacao')}
                         />
+                    )}
+                    {sensitive && !['entregue', 'cancelada'].includes(os.status) && (
+                        <Tool icon={<ShoppingCart />} label="Comprar peças" href={route('compras.index', { os: os.id })} className="hidden lg:inline-flex" />
                     )}
                     {sensitive && os.public_url && ['orcamento', 'aprovacao'].includes(os.status) && (
                         <Tool

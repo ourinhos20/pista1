@@ -7,7 +7,11 @@ use App\Models\Client;
 use App\Models\FinanceEntry;
 use App\Models\Partner;
 use App\Models\PartnerMovement;
+use App\Models\Part;
 use App\Models\PreService;
+use App\Models\Purchase;
+use App\Models\ServiceOrderItem;
+use App\Models\Supplier;
 use App\Models\ServiceOrder;
 use App\Support\Installments;
 use App\Models\User;
@@ -103,9 +107,37 @@ class DatabaseSeeder extends Seeder
 
         $this->seedFinance($balcao, $delivered);
 
+        $this->seedParts($balcao);
+
         // Pedidos feitos pelo site (pré-atendimento)
         PreService::create(['name' => 'Fernanda Rocha', 'phone' => '11977776666', 'plate' => 'BRA2E19', 'vehicle' => 'Renault Kwid 2020', 'complaint' => 'O carro está puxando para a direita e o volante treme acima de 80 km/h.', 'preferred_at' => today()->addDays(2)->setTime(10, 0)]);
         PreService::create(['name' => 'Ricardo Lima', 'phone' => '11966665555', 'vehicle' => 'VW Polo 2019', 'complaint' => 'Ar-condicionado parou de gelar. Gostaria de um orçamento.']);
+    }
+
+    private function seedParts(User $balcao): void
+    {
+        $abp = Supplier::create(['name' => 'Auto Peças Brasil', 'document' => '12345678000190', 'phone' => '1133334444', 'contact' => 'Marcos (vendas)']);
+        $ff = Supplier::create(['name' => 'Distribuidora Freio Forte', 'phone' => '11922223333', 'contact' => 'Juliana']);
+
+        $p = fn ($code, $desc, $brand, $unit, $cost, $sale, $min, $sup) => Part::create(['code' => $code, 'description' => $desc, 'brand' => $brand, 'unit' => $unit, 'cost_price' => $cost, 'sale_price' => $sale, 'min_stock' => $min, 'supplier_id' => $sup->id]);
+        $oleo = $p('5W30-SN', 'Óleo 5W30 sintético', 'Mobil', 'L', 28, 45, 12, $abp);
+        $filtro = $p('PSL-140', 'Filtro de óleo', 'Tecfil', 'un', 18, 38, 4, $abp);
+        $p('ARL-6079', 'Filtro de ar', 'Tecfil', 'un', 26, 52, 3, $abp);
+        $p('HQJ-2207', 'Pastilha de freio dianteira', 'Cobreq', 'jogo', 85, 160, 2, $ff);
+        $p('DF-3022', 'Disco de freio dianteiro', 'Fremax', 'par', 210, 380, 0, $ff);
+        $p('BL-118', 'Bieleta dianteira', 'Nakata', 'par', 95, 180, 0, $abp);
+
+        // compra de estoque do mês
+        $purchase = Purchase::create(['supplier_id' => $abp->id, 'invoice' => '45871', 'date' => now()->startOfMonth()->addDays(6), 'total' => 0, 'created_by' => $balcao->id]);
+        $purchase->items()->createMany([
+            ['part_id' => $oleo->id, 'description' => $oleo->description, 'quantity' => 20, 'unit_cost' => 28],
+            ['part_id' => $filtro->id, 'description' => $filtro->description, 'quantity' => 6, 'unit_cost' => 18],
+        ]);
+        $purchase->update(['total' => 20 * 28 + 6 * 18]);
+
+        // itens de OS já lançados passam a apontar para o catálogo (o estoque desconta)
+        ServiceOrderItem::where('description', 'like', 'Óleo 5W30%')->update(['part_id' => $oleo->id]);
+        ServiceOrderItem::where('description', 'Filtro de óleo')->update(['part_id' => $filtro->id]);
     }
 
     private function seedFinance(User $balcao, ServiceOrder $delivered): void

@@ -39,6 +39,14 @@ export function menusFor(role: Role, preNew = 0): MenuGroup[] {
         },
         oficina,
         { label: 'Cadastros', items: [item('Clientes e veículos', 'clientes.index', 'CAD010', 'F6')] },
+        {
+            label: 'Peças',
+            items: [
+                item('Catálogo e estoque', 'pecas.index', 'PEC010'),
+                item('Compras de peças', 'compras.index', 'PEC030'),
+                item('Fornecedores', 'fornecedores.index', 'PEC020'),
+            ],
+        },
     ];
     if (role === 'master') {
         groups.push({
