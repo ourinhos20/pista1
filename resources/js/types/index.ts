@@ -40,7 +40,7 @@ export interface User {
     [key: string]: unknown; // This allows for additional properties...
 }
 
-export type OsStatus = 'aguardando' | 'diagnostico' | 'aprovacao' | 'execucao' | 'pronto' | 'entregue' | 'cancelada';
+export type OsStatus = 'aguardando' | 'diagnostico' | 'orcamento' | 'aprovacao' | 'execucao' | 'pronto' | 'entregue' | 'cancelada';
 
 export interface ClientData {
     id: number;
@@ -112,6 +112,7 @@ export interface OsFull extends OsCard {
     notes: string | null;
     damages: Damage[];
     checklist: Record<string, boolean>;
+    revision: Record<string, 'ok' | 'atencao' | 'trocar'>;
     approved_at: string | null;
     delivered_at: string | null;
     items: OsItem[];
@@ -120,6 +121,9 @@ export interface OsFull extends OsCard {
     discount?: number;
     down_payment?: number;
     payment_method?: string | null;
+    payments?: { id: number; amount: number; due_date: string; paid_at: string | null; payment_method: string | null; installment: number | null; installments: number | null }[];
+    paid_total?: number;
+    billed_total?: number;
 }
 
 export interface Shop {

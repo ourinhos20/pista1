@@ -127,7 +127,7 @@ export function CarDiagramEditor({ value, onChange }: { value: Damage[]; onChang
                         aria-checked={type === t}
                         onClick={() => setType(t)}
                         className={cn(
-                            'inline-flex h-11 items-center gap-2 rounded-full px-4 text-sm font-semibold ring-1 transition',
+                            'inline-flex h-11 items-center gap-2 rounded-[3px] px-3 text-[13px] font-semibold ring-1 transition md:h-8',
                             type === t ? 'bg-foreground text-background ring-foreground' : 'bg-card ring-border hover:bg-muted',
                         )}
                     >
@@ -139,7 +139,7 @@ export function CarDiagramEditor({ value, onChange }: { value: Damage[]; onChang
                 ))}
             </div>
 
-            <div className="bg-muted/50 rounded-2xl p-2 md:p-4">
+            <div className="rounded-[4px] border border-[#d7dade] bg-white p-2 text-zinc-900">
                 <CarDiagramSvg
                     damages={value}
                     onAdd={(x, y) => onChange([...value, { x, y, type }])}
@@ -159,7 +159,7 @@ export function CarDiagramEditor({ value, onChange }: { value: Damage[]; onChang
             {value.length > 0 && (
                 <ol className="grid gap-2 sm:grid-cols-2">
                     {value.map((d, i) => (
-                        <li key={i} className="bg-card flex items-center gap-2 rounded-xl px-3 py-2 ring-1 ring-black/5 dark:ring-white/10">
+                        <li key={i} className="bg-card flex items-center gap-2 rounded-[3px] border border-[#d7dade] px-2.5 py-1.5">
                             <span className="grid size-7 shrink-0 place-items-center rounded-full text-xs font-black text-white" style={{ background: DAMAGE[d.type].color }}>
                                 {DAMAGE[d.type].letter}
                                 {i + 1}

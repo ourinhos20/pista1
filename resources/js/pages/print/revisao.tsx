@@ -1,16 +1,9 @@
 import { BlankLines, Box, Line, PrintShell, Signatures } from '@/components/print-sheet';
 import { km, plate } from '@/lib/os';
+import { REVISION_GROUPS, type RevisionValue } from '@/lib/revisao';
 import type { OsFull, Shop } from '@/types';
 
-const GROUPS: { title: string; items: string[] }[] = [
-    { title: 'Motor', items: ['Óleo do motor', 'Filtro de óleo', 'Filtro de ar', 'Filtro de combustível', 'Velas de ignição', 'Cabos / bobinas', 'Correia dentada', 'Correia de acessórios', 'Vazamentos'] },
-    { title: 'Arrefecimento', items: ['Nível do líquido', 'Mangueiras', 'Radiador', 'Ventoinha', 'Bomba d’água'] },
-    { title: 'Freios', items: ['Pastilhas dianteiras', 'Discos dianteiros', 'Lonas / pastilhas traseiras', 'Tambores / discos traseiros', 'Fluido de freio', 'Freio de mão'] },
-    { title: 'Suspensão e direção', items: ['Amortecedores dianteiros', 'Amortecedores traseiros', 'Bandejas / buchas', 'Pivôs', 'Terminais de direção', 'Bieletas', 'Coifas / homocinéticas', 'Caixa de direção'] },
-    { title: 'Elétrica', items: ['Bateria', 'Alternador / carga', 'Motor de partida', 'Faróis', 'Lanternas / luz de freio', 'Setas / pisca-alerta', 'Painel / luzes de alerta'] },
-    { title: 'Pneus e rodas', items: ['Calibragem', 'Desgaste dos pneus', 'Estepe', 'Alinhamento / balanceamento'] },
-    { title: 'Outros', items: ['Embreagem', 'Câmbio (óleo)', 'Escapamento', 'Ar-condicionado', 'Filtro de cabine', 'Palhetas do limpador', 'Água do limpador'] },
-];
+const MARKS: RevisionValue[] = ['ok', 'atencao', 'trocar'];
 
 function Head3() {
     return (
@@ -23,11 +16,12 @@ function Head3() {
     );
 }
 
-/** Checklist de revisão completa para o mecânico ir marcando. */
+/** Checklist de revisão: sai em branco ou já marcado com o que foi lançado no sistema. */
 export default function PrintRevisao({ os, shop }: { os: OsFull; shop: Shop }) {
     const v = os.vehicle;
+    const values = os.revision ?? {};
     // 3 colunas equilibradas para caber numa folha A4
-    const by = (...t: string[]) => GROUPS.filter((g) => t.includes(g.title));
+    const by = (...t: string[]) => REVISION_GROUPS.filter((g) => t.includes(g.title));
     const cols = [by('Motor', 'Arrefecimento', 'Pneus e rodas'), by('Freios', 'Suspensão e direção'), by('Elétrica', 'Outros')];
 
     return (
@@ -49,10 +43,12 @@ export default function PrintRevisao({ os, shop }: { os: OsFull; shop: Shop }) {
                                 <h3 className="text-[12.5px] font-extrabold">{g.title}</h3>
                                 <Head3 />
                                 {g.items.map((it) => (
-                                    <div key={it} className="grid grid-cols-[1fr_repeat(3,28px)] items-center gap-1 border-b border-zinc-300 py-[2px] text-[11px] last:border-b-0">
-                                        <span className="truncate">{it}</span>
-                                        {[0, 1, 2].map((k) => (
-                                            <span key={k} className="mx-auto inline-block size-[13px] rounded-[3px] border-[1.5px] border-black" />
+                                    <div key={it.key} className="grid grid-cols-[1fr_repeat(3,28px)] items-center gap-1 border-b border-zinc-300 py-[2px] text-[11px] last:border-b-0">
+                                        <span className="truncate">{it.label}</span>
+                                        {MARKS.map((m) => (
+                                            <span key={m} className="mx-auto inline-grid size-[13px] place-items-center rounded-[3px] border-[1.5px] border-black text-[10px] leading-none font-black">
+                                                {values[it.key] === m ? '✕' : ''}
+                                            </span>
                                         ))}
                                     </div>
                                 ))}
@@ -63,7 +59,7 @@ export default function PrintRevisao({ os, shop }: { os: OsFull; shop: Shop }) {
             </div>
 
             <Box label="Observações / peças a trocar">
-                <BlankLines n={3} />
+                <BlankLines n={os.diagnosis ? 2 : 3} text={os.diagnosis} />
             </Box>
 
             <Signatures left="Mecânico Responsável" />

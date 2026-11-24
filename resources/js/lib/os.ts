@@ -2,7 +2,7 @@ import type { DamageType, OsStatus } from '@/types';
 
 export const STATUS: Record<OsStatus, { label: string; badge: string; dot: string }> = {
     aguardando: {
-        label: 'Aguardando',
+        label: 'Agendado',
         badge: 'bg-zinc-100 text-zinc-700 ring-zinc-300 dark:bg-zinc-800 dark:text-zinc-200 dark:ring-zinc-600',
         dot: 'bg-zinc-400',
     },
@@ -10,6 +10,11 @@ export const STATUS: Record<OsStatus, { label: string; badge: string; dot: strin
         label: 'Em diagnóstico',
         badge: 'bg-blue-50 text-blue-800 ring-blue-200 dark:bg-blue-950 dark:text-blue-200 dark:ring-blue-800',
         dot: 'bg-blue-500',
+    },
+    orcamento: {
+        label: 'Aguardando orçamento',
+        badge: 'bg-violet-50 text-violet-800 ring-violet-300 dark:bg-violet-950 dark:text-violet-200 dark:ring-violet-700',
+        dot: 'bg-violet-500',
     },
     aprovacao: {
         label: 'Aguardando aprovação',
@@ -39,16 +44,31 @@ export const STATUS: Record<OsStatus, { label: string; badge: string; dot: strin
 };
 
 /** Fluxo principal da OS (briefing): cada etapa vira um status. */
-export const FLOW: OsStatus[] = ['aguardando', 'diagnostico', 'aprovacao', 'execucao', 'pronto', 'entregue'];
-export const OPEN_STATUSES: OsStatus[] = ['aguardando', 'diagnostico', 'aprovacao', 'execucao', 'pronto'];
+export const FLOW: OsStatus[] = ['aguardando', 'diagnostico', 'orcamento', 'aprovacao', 'execucao', 'pronto', 'entregue'];
+export const OPEN_STATUSES: OsStatus[] = ['aguardando', 'diagnostico', 'orcamento', 'aprovacao', 'execucao', 'pronto'];
 
-/** Próximo passo sugerido (botão principal). */
-export const NEXT_STEP: Partial<Record<OsStatus, { to: OsStatus; label: string }>> = {
-    aguardando: { to: 'diagnostico', label: 'Iniciar diagnóstico' },
-    diagnostico: { to: 'aprovacao', label: 'Diagnóstico pronto' },
-    aprovacao: { to: 'execucao', label: 'Cliente aprovou' },
-    execucao: { to: 'pronto', label: 'Serviço concluído' },
-    pronto: { to: 'entregue', label: 'Entregar ao cliente' },
+/** Quem faz cada etapa do fluxo (para o botão principal da OS). */
+const STEPS: Partial<Record<OsStatus, { to: OsStatus; label: string; who: 'todos' | 'balcao' }>> = {
+    aguardando: { to: 'diagnostico', label: 'Iniciar atendimento', who: 'todos' },
+    diagnostico: { to: 'orcamento', label: 'Enviar para o balcão', who: 'todos' },
+    orcamento: { to: 'aprovacao', label: 'Orçamento enviado ao cliente', who: 'balcao' },
+    aprovacao: { to: 'execucao', label: 'Cliente aprovou', who: 'balcao' },
+    execucao: { to: 'pronto', label: 'Serviço concluído', who: 'todos' },
+    pronto: { to: 'entregue', label: 'Entregar ao cliente', who: 'balcao' },
+};
+
+export function nextStep(status: OsStatus, role: string) {
+    const s = STEPS[status];
+    if (!s) return null;
+    if (s.who === 'balcao' && role === 'mecanico') return null;
+    return s;
+}
+
+/** Texto para o mecânico quando a etapa é do balcão. */
+export const WAITING_FOR: Partial<Record<OsStatus, string>> = {
+    orcamento: 'Com o balcão: lançando valores do orçamento',
+    aprovacao: 'Aguardando o cliente autorizar o orçamento',
+    pronto: 'Pronto. Aguardando o cliente retirar',
 };
 
 export const FUEL = ['Reserva', '1/4', '1/2', '3/4', 'Cheio'];
@@ -78,6 +98,8 @@ export const PAYMENT: Record<string, string> = {
     pix: 'Pix',
     debito: 'Cartão de débito',
     credito: 'Cartão de crédito',
+    boleto: 'Boleto',
+    transferencia: 'Transferência',
     parcelado: 'Parcelado',
 };
 

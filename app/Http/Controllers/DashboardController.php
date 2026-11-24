@@ -25,7 +25,7 @@ class DashboardController extends Controller
             ->map(fn ($os) => OsPresenter::card($os, $user));
 
         $open = ServiceOrder::with(['client', 'vehicle', 'mechanic', 'items'])
-            ->whereIn('status', OsStatus::open())->latest('updated_at')->limit(12)->get()
+            ->whereIn('status', OsStatus::open())->where('status', '!=', OsStatus::Aguardando)->latest('updated_at')->limit(40)->get()
             ->map(fn ($os) => OsPresenter::card($os, $user));
 
         $month = null;

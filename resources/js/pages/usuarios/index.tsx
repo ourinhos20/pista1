@@ -1,23 +1,20 @@
-import InputError from '@/components/input-error';
-import { Page, PageHeader, Panel } from '@/components/oficina';
-import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Block, Field, Grid, Tool, selectCls, type Col } from '@/components/erp';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
 import type { Role } from '@/types';
 import { Head, useForm } from '@inertiajs/react';
-import { Pencil, UserPlus } from 'lucide-react';
+import { Save, UserPlus } from 'lucide-react';
 import { useState } from 'react';
 
 type U = { id: number; name: string; email: string; role: Role; active: boolean };
 type R = { value: Role; label: string };
 
 const ROLE_HELP: Record<Role, string> = {
-    master: 'Vê tudo, inclusive valores, finanças e usuários.',
-    balcao: 'Clientes, OS, orçamentos, pagamentos e impressão.',
-    mecanico: 'Só os carros dele. Não vê CPF, telefone nem valores.',
+    master: 'Vê tudo, inclusive valores e usuários.',
+    balcao: 'Clientes, OS, valores, orçamentos e impressão.',
+    mecanico: 'Agenda e fichas. Não vê CPF, telefone nem valores.',
 };
 
 function UserForm({ user, roles, onDone }: { user?: U; roles: R[]; onDone: () => void }) {
@@ -30,7 +27,7 @@ function UserForm({ user, roles, onDone }: { user?: U; roles: R[]; onDone: () =>
     });
     return (
         <form
-            className="grid gap-4"
+            className="grid gap-3"
             onSubmit={(e) => {
                 e.preventDefault();
                 const opts = { preserveScroll: true, onSuccess: onDone };
@@ -38,111 +35,65 @@ function UserForm({ user, roles, onDone }: { user?: U; roles: R[]; onDone: () =>
                 else post(route('usuarios.store'), opts);
             }}
         >
-            <div className="grid gap-2">
-                <Label htmlFor="u-name">Nome</Label>
-                <Input id="u-name" className="h-12 text-base" value={data.name} onChange={(e) => setData('name', e.target.value)} />
-                <InputError message={errors.name} />
-            </div>
-            <div className="grid gap-2">
-                <Label htmlFor="u-email">E-mail (login)</Label>
-                <Input id="u-email" type="email" className="h-12 text-base" value={data.email} onChange={(e) => setData('email', e.target.value)} />
-                <InputError message={errors.email} />
-            </div>
-            <div className="grid gap-2">
-                <Label>Perfil</Label>
-                <div className="grid gap-2">
+            <Field label="Nome *" error={errors.name}>
+                <Input value={data.name} onChange={(e) => setData('name', e.target.value)} />
+            </Field>
+            <Field label="E-mail (login) *" error={errors.email}>
+                <Input type="email" value={data.email} onChange={(e) => setData('email', e.target.value)} />
+            </Field>
+            <Field label="Perfil *">
+                <select className={selectCls} value={data.role} onChange={(e) => setData('role', e.target.value as Role)}>
                     {roles.map((r) => (
-                        <button
-                            key={r.value}
-                            type="button"
-                            onClick={() => setData('role', r.value)}
-                            className={cn('rounded-xl p-3 text-left ring-1 transition', data.role === r.value ? 'ring-primary bg-primary/5 ring-2' : 'ring-border hover:bg-muted')}
-                        >
-                            <p className="font-semibold">{r.label}</p>
-                            <p className="text-muted-foreground text-sm">{ROLE_HELP[r.value]}</p>
-                        </button>
+                        <option key={r.value} value={r.value}>
+                            {r.label}
+                        </option>
                     ))}
-                </div>
-            </div>
-            <div className="grid gap-2">
-                <Label htmlFor="u-pass">{user ? 'Nova senha (deixe vazio para manter)' : 'Senha'}</Label>
-                <Input id="u-pass" type="password" autoComplete="new-password" className="h-12 text-base" value={data.password} onChange={(e) => setData('password', e.target.value)} />
-                <InputError message={errors.password} />
-            </div>
+                </select>
+                <span className="text-muted-foreground text-[12px]">{ROLE_HELP[data.role]}</span>
+            </Field>
+            <Field label={user ? 'Nova senha (vazio = manter)' : 'Senha *'} error={errors.password}>
+                <Input type="password" autoComplete="new-password" value={data.password} onChange={(e) => setData('password', e.target.value)} />
+            </Field>
             {user && (
-                <label className="flex items-center gap-3 text-[15px] font-medium">
-                    <input type="checkbox" className="size-5 accent-[#d42a2a]" checked={data.active} onChange={(e) => setData('active', e.target.checked)} />
+                <label className="flex items-center gap-2 text-[13px] font-medium">
+                    <input type="checkbox" className="size-4 accent-[#d42a2a]" checked={data.active} onChange={(e) => setData('active', e.target.checked)} />
                     Acesso ativo
                 </label>
             )}
-            <Button type="submit" size="lg" disabled={processing}>
-                {user ? 'Salvar' : 'Criar usuário'}
-            </Button>
+            <div className="flex justify-end">
+                <button type="submit" disabled={processing} className="inline-flex h-11 items-center gap-1.5 rounded-[3px] border border-[#b51f1f] bg-[#d42a2a] px-4 text-[13px] font-semibold text-white md:h-8">
+                    <Save className="size-4" /> Gravar
+                </button>
+            </div>
         </form>
     );
 }
 
 export default function Usuarios({ users, roles }: { users: U[]; roles: R[] }) {
-    const [open, setOpen] = useState<number | 'new' | null>(null);
+    const [open, setOpen] = useState<U | 'new' | null>(null);
     const label = (r: Role) => roles.find((x) => x.value === r)?.label ?? r;
 
+    const cols: Col<U>[] = [
+        { label: 'Nome', render: (r) => <span className={cn('font-semibold', !r.active && 'text-zinc-400 line-through')}>{r.name}</span> },
+        { label: 'E-mail (login)', render: (r) => r.email, hide: 'sm' },
+        { label: 'Perfil', render: (r) => <span className={cn('rounded-[2px] px-1.5 py-0.5 text-[11px] font-bold uppercase', r.role === 'master' ? 'bg-zinc-900 text-white' : 'bg-zinc-200 dark:bg-zinc-700')}>{label(r.role)}</span>, className: 'w-40' },
+        { label: 'Situação', render: (r) => (r.active ? <span className="font-semibold text-green-700">Ativo</span> : <span className="text-zinc-500">Inativo</span>), className: 'w-24' },
+    ];
+
     return (
-        <AppLayout breadcrumbs={[{ title: 'Usuários', href: '/usuarios' }]}>
+        <AppLayout title="Usuários e Permissões" code="SIS010" toolbar={<Tool primary icon={<UserPlus />} label="Novo usuário" onClick={() => setOpen('new')} />}>
             <Head title="Usuários" />
-            <Page className="max-w-4xl">
-                <PageHeader
-                    title="Usuários e permissões"
-                    subtitle="Quem acessa o sistema e o que cada um vê."
-                    actions={
-                        <Dialog open={open === 'new'} onOpenChange={(o) => setOpen(o ? 'new' : null)}>
-                            <DialogTrigger asChild>
-                                <Button size="lg">
-                                    <UserPlus className="size-5" /> Novo usuário
-                                </Button>
-                            </DialogTrigger>
-                            <DialogContent className="max-h-[90svh] overflow-y-auto rounded-2xl">
-                                <DialogHeader>
-                                    <DialogTitle>Novo usuário</DialogTitle>
-                                </DialogHeader>
-                                <UserForm roles={roles} onDone={() => setOpen(null)} />
-                            </DialogContent>
-                        </Dialog>
-                    }
-                />
-                <Panel>
-                    <ul className="divide-y">
-                        {users.map((u) => (
-                            <li key={u.id} className="flex items-center gap-4 py-3">
-                                <div className="min-w-0 flex-1">
-                                    <p className={cn('truncate font-semibold', !u.active && 'text-muted-foreground line-through')}>{u.name}</p>
-                                    <p className="text-muted-foreground truncate text-sm">{u.email}</p>
-                                </div>
-                                <span
-                                    className={cn(
-                                        'rounded-full px-3 py-1 text-xs font-bold',
-                                        u.role === 'master' ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900' : 'bg-muted',
-                                    )}
-                                >
-                                    {label(u.role)}
-                                </span>
-                                <Dialog open={open === u.id} onOpenChange={(o) => setOpen(o ? u.id : null)}>
-                                    <DialogTrigger asChild>
-                                        <Button variant="ghost" size="icon" aria-label={`Editar ${u.name}`}>
-                                            <Pencil className="size-4" />
-                                        </Button>
-                                    </DialogTrigger>
-                                    <DialogContent className="max-h-[90svh] overflow-y-auto rounded-2xl">
-                                        <DialogHeader>
-                                            <DialogTitle>Editar {u.name}</DialogTitle>
-                                        </DialogHeader>
-                                        <UserForm user={u} roles={roles} onDone={() => setOpen(null)} />
-                                    </DialogContent>
-                                </Dialog>
-                            </li>
-                        ))}
-                    </ul>
-                </Panel>
-            </Page>
+            <Block title="Usuários do sistema" bodyClassName="p-0">
+                <Grid cols={cols} rows={users} rowKey={(r) => r.id} onRowClick={(r) => setOpen(r)} footer={<span>{users.length} usuário(s) · clique para alterar</span>} />
+            </Block>
+            <Dialog open={open !== null} onOpenChange={(o) => !o && setOpen(null)}>
+                <DialogContent className="rounded-[4px]">
+                    <DialogHeader>
+                        <DialogTitle>{open === 'new' ? 'Novo usuário' : `Alterar ${open?.name}`}</DialogTitle>
+                    </DialogHeader>
+                    {open && <UserForm key={open === 'new' ? 'new' : open.id} user={open === 'new' ? undefined : open} roles={roles} onDone={() => setOpen(null)} />}
+                </DialogContent>
+            </Dialog>
         </AppLayout>
     );
 }

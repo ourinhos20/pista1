@@ -59,9 +59,30 @@ class OficinaAccessTest extends TestCase
             );
     }
 
-    public function test_mecanico_nao_abre_os_de_outro_mecanico(): void
+    public function test_mecanico_ve_agenda_inteira_sem_dados_sensiveis(): void
     {
-        $this->actingAs($this->carlos)->get("/os/{$this->osRafael->id}")->assertForbidden();
+        $this->actingAs($this->carlos)->get("/os/{$this->osRafael->id}")->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->missing('os.client.phone')->missing('os.total'));
+
+        $this->get('/mecanico')->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('mecanico/index')
+                ->has('agenda', 2)
+                ->missing('agenda.0.client.phone')
+            );
+    }
+
+    public function test_mecanico_preenche_revisao_e_envia_para_o_balcao(): void
+    {
+        $this->actingAs($this->carlos);
+        $this->patch("/os/{$this->osRafael->id}/revisao", ['revision' => ['oleo_motor' => 'trocar', 'bateria' => 'ok', 'velas' => null]])
+            ->assertSessionHasNoErrors();
+        $this->assertSame(['oleo_motor' => 'trocar', 'bateria' => 'ok'], $this->osRafael->fresh()->revision);
+
+        $this->patch("/os/{$this->osRafael->id}/revisao", ['revision' => ['oleo_motor' => 'qualquer']])->assertSessionHasErrors();
+
+        $this->patch("/os/{$this->osRafael->id}/status", ['status' => 'orcamento'])->assertSessionHasNoErrors();
+        $this->assertSame(OsStatus::Orcamento, $this->osRafael->fresh()->status);
     }
 
     public function test_mecanico_so_imprime_fichas_sem_dados_sensiveis(): void

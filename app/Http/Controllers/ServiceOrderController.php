@@ -18,12 +18,34 @@ use Inertia\Response;
 
 class ServiceOrderController extends Controller
 {
-    /** Mecânico só acessa OS dele ou ainda sem mecânico (para poder assumir). */
+    /**
+     * Todos os mecânicos veem a agenda inteira da oficina (decisão do dono).
+     * A privacidade (CPF, telefone, valores) é garantida pelo OsPresenter.
+     * Mantido como ponto único caso a regra mude.
+     */
     public static function guard(ServiceOrder $os, User $user): void
     {
-        if ($user->isMechanic() && $os->mechanic_id && $os->mechanic_id !== $user->id) {
-            abort(403, 'Esta OS está com outro mecânico.');
+        if ($user->isMechanic() && $os->status === OsStatus::Cancelada) {
+            abort(403, 'OS cancelada.');
         }
+    }
+
+    /** Checklist de revisão preenchido pelo mecânico (celular) ou pelo balcão. */
+    public function revision(Request $request, ServiceOrder $os): RedirectResponse
+    {
+        self::guard($os, $request->user());
+        $data = $request->validate([
+            'revision' => ['present', 'array', 'max:80'],
+            'revision.*' => ['nullable', Rule::in(['ok', 'atencao', 'trocar'])],
+        ]);
+
+        $clean = collect($data['revision'])
+            ->filter(fn ($v, $k) => $v !== null && is_string($k) && mb_strlen($k) <= 60)
+            ->all();
+        $os->update(['revision' => $clean]);
+
+        // sem aviso: a tela grava sozinha a cada toque e mostra "Gravado"
+        return back();
     }
 
     public function index(Request $request): Response

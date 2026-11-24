@@ -1,17 +1,14 @@
 import { CarDiagramEditor } from '@/components/car-diagram';
-import InputError from '@/components/input-error';
-import { Page, PageHeader, Panel, PlateBadge } from '@/components/oficina';
+import { Block, Field, Placa, ReadOnly, Tool, selectCls, textareaCls } from '@/components/erp';
 import { usePlateLookup } from '@/components/plate-search';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
-import { ENTRY_CHECKLIST, FUEL, km, phone } from '@/lib/os';
+import { ENTRY_CHECKLIST, FUEL, documentFmt, km, phone } from '@/lib/os';
 import { cn } from '@/lib/utils';
 import type { Damage } from '@/types';
 import { Head, useForm } from '@inertiajs/react';
-import { Check, CircleCheck, LoaderCircle } from 'lucide-react';
-import { FormEventHandler, useEffect } from 'react';
+import { CircleCheck, Save, X } from 'lucide-react';
+import { useEffect, useRef } from 'react';
 
 interface Props {
     mechanics: { id: number; name: string }[];
@@ -32,9 +29,8 @@ type Form = {
     checklist: Record<string, boolean>;
 };
 
-const field = 'h-12 rounded-xl text-base';
-
 export default function NovaOs({ mechanics, prefill }: Props) {
+    const form = useRef<HTMLFormElement>(null);
     const { data, setData, post, processing, errors, transform } = useForm<Form>({
         plate: prefill.placa ?? '',
         client_id: null,
@@ -53,14 +49,14 @@ export default function NovaOs({ mechanics, prefill }: Props) {
     const found = exact ? matches.find((m) => m.id === exact) : undefined;
     const cleanPlate = data.plate.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
     const isNew = cleanPlate.length >= 7 && !found;
+    const err = errors as Record<string, string>;
 
     useEffect(() => {
         setData('client_id', found?.client?.id ?? null);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [found?.id]);
 
-    const submit: FormEventHandler = (e) => {
-        e.preventDefault();
+    const submit = () => {
         transform((d) => ({
             ...d,
             km_in: d.km_in ? Number(d.km_in.replace(/\D/g, '')) : null,
@@ -70,212 +66,196 @@ export default function NovaOs({ mechanics, prefill }: Props) {
         post(route('os.store'));
     };
 
+    useEffect(() => {
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key === 'F10') {
+                e.preventDefault();
+                form.current?.requestSubmit();
+            }
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, []);
+
     return (
         <AppLayout
-            breadcrumbs={[
-                { title: 'Ordens de serviço', href: '/os' },
-                { title: 'Nova OS', href: '/os/nova' },
-            ]}
+            title="Pré-atendimento · Nova OS"
+            code="ATD010"
+            toolbar={
+                <>
+                    <Tool primary icon={<Save />} label="Gravar OS" fkey="F10" onClick={() => form.current?.requestSubmit()} disabled={processing || cleanPlate.length < 3} />
+                    <Tool icon={<X />} label="Cancelar" href={route('dashboard')} />
+                </>
+            }
         >
             <Head title="Nova OS" />
-            <form onSubmit={submit}>
-                <Page className="max-w-4xl">
-                    <PageHeader title="Nova OS" subtitle="Comece pela placa. Se o carro já veio antes, o sistema puxa tudo sozinho." />
+            <form
+                ref={form}
+                onSubmit={(e) => {
+                    e.preventDefault();
+                    submit();
+                }}
+                className="grid gap-2 md:gap-3 xl:grid-cols-2"
+            >
+                <Block title="1 · Veículo e cliente" className="xl:col-span-2">
+                    <div className="grid gap-3 md:grid-cols-[220px_1fr]">
+                        <Field label="Placa *" error={err.plate}>
+                            <Input
+                                autoFocus
+                                value={data.plate}
+                                onChange={(e) => setData('plate', e.target.value.toUpperCase())}
+                                placeholder="ABC1D23"
+                                maxLength={8}
+                                autoComplete="off"
+                                autoCapitalize="characters"
+                                className="h-12 font-mono text-2xl font-bold tracking-[0.15em] uppercase md:h-10 md:text-xl"
+                            />
+                        </Field>
 
-                    {/* 1. Veículo */}
-                    <Panel title="1. Veículo e cliente">
-                        <div className="grid gap-4">
-                            <div className="grid gap-2">
-                                <Label htmlFor="plate" className="text-[15px]">
-                                    Placa
-                                </Label>
-                                <Input
-                                    id="plate"
-                                    autoFocus
-                                    value={data.plate}
-                                    onChange={(e) => setData('plate', e.target.value.toUpperCase())}
-                                    placeholder="ABC1D23"
-                                    maxLength={8}
-                                    autoComplete="off"
-                                    autoCapitalize="characters"
-                                    className="h-16 rounded-2xl font-mono text-3xl font-bold tracking-[0.2em] uppercase placeholder:tracking-[0.2em]"
-                                />
-                                <InputError message={errors.plate} />
-                            </div>
-
-                            {found && (
-                                <div className="flex items-center gap-4 rounded-2xl bg-green-50 p-4 ring-1 ring-green-200 dark:bg-green-950/40 dark:ring-green-900">
-                                    <CircleCheck className="size-7 shrink-0 text-green-600" />
-                                    <div className="min-w-0 flex-1">
-                                        <p className="font-semibold">
-                                            {found.title || 'Veículo'} <span className="text-muted-foreground font-normal">· {km(found.km)}</span>
-                                        </p>
-                                        <p className="text-muted-foreground text-[15px]">
-                                            {found.client?.name}
-                                            {found.client?.phone ? ` · ${phone(found.client.phone)}` : ''}
-                                        </p>
-                                    </div>
-                                    <PlateBadge value={found.plate} />
+                        <div className="grid content-end">
+                            {found ? (
+                                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-[3px] border border-green-300 bg-green-50 px-3 py-2 text-[13px] dark:border-green-800 dark:bg-green-950/40">
+                                    <CircleCheck className="size-5 text-green-700" />
+                                    <b>Veículo já cadastrado</b>
+                                    <span>{found.title}</span>
+                                    <span>Km: {km(found.km)}</span>
+                                    <span>
+                                        Cliente: <b>{found.client?.name}</b> {found.client?.phone ? `· ${phone(found.client.phone)}` : ''}
+                                    </span>
                                 </div>
-                            )}
-
-                            {!found && cleanPlate.length >= 3 && matches.length > 0 && (
-                                <div className="flex flex-wrap gap-2">
-                                    <span className="text-muted-foreground self-center text-sm">Você quis dizer:</span>
-                                    {matches.slice(0, 4).map((m) => (
-                                        <button key={m.id} type="button" onClick={() => setData('plate', m.plate)} className="hover:bg-muted rounded-lg p-1">
-                                            <PlateBadge value={m.plate} />
+                            ) : cleanPlate.length >= 3 && matches.length > 0 ? (
+                                <div className="flex flex-wrap items-center gap-2 text-[13px]">
+                                    <span className="text-muted-foreground">Placas parecidas:</span>
+                                    {matches.slice(0, 5).map((m) => (
+                                        <button key={m.id} type="button" onClick={() => setData('plate', m.plate)}>
+                                            <Placa value={m.plate} />
                                         </button>
                                     ))}
                                 </div>
-                            )}
-
-                            {isNew && (
-                                <div className="grid gap-4 border-t pt-4">
-                                    <p className="text-muted-foreground text-sm">Carro novo na oficina. Cadastre o cliente e o veículo:</p>
-                                    <div className="grid gap-4 md:grid-cols-3">
-                                        <div className="grid gap-2 md:col-span-3">
-                                            <Label htmlFor="cname">Nome do cliente</Label>
-                                            <Input id="cname" className={field} value={data.client.name} onChange={(e) => setData('client', { ...data.client, name: e.target.value })} />
-                                            <InputError message={errors['client.name' as keyof Form]} />
-                                        </div>
-                                        <div className="grid gap-2">
-                                            <Label htmlFor="cphone">WhatsApp</Label>
-                                            <Input id="cphone" inputMode="tel" placeholder="(11) 90000-0000" className={field} value={data.client.phone} onChange={(e) => setData('client', { ...data.client, phone: e.target.value })} />
-                                        </div>
-                                        <div className="grid gap-2">
-                                            <Label htmlFor="cdoc">CPF / CNPJ</Label>
-                                            <Input id="cdoc" inputMode="numeric" className={field} value={data.client.document} onChange={(e) => setData('client', { ...data.client, document: e.target.value })} />
-                                        </div>
-                                        <div />
-                                        {(
-                                            [
-                                                ['brand', 'Marca', 'Volkswagen'],
-                                                ['model', 'Modelo', 'Gol 1.6'],
-                                                ['year', 'Ano', '2019'],
-                                                ['color', 'Cor', 'Prata'],
-                                                ['engine', 'Motor', '1.6 8v'],
-                                            ] as const
-                                        ).map(([k, label, ph]) => (
-                                            <div key={k} className="grid gap-2">
-                                                <Label htmlFor={k}>{label}</Label>
-                                                <Input id={k} placeholder={ph} className={field} value={data.vehicle[k]} onChange={(e) => setData('vehicle', { ...data.vehicle, [k]: e.target.value })} />
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
+                            ) : isNew ? (
+                                <p className="rounded-[3px] border border-amber-300 bg-amber-50 px-3 py-2 text-[13px] dark:border-amber-800 dark:bg-amber-950/40">
+                                    Placa nova. Preencha os dados do cliente e do veículo abaixo.
+                                </p>
+                            ) : (
+                                <p className="text-muted-foreground text-[13px]">Digite a placa. Se o carro já veio antes, o sistema puxa cliente e histórico.</p>
                             )}
                         </div>
-                    </Panel>
-
-                    {/* 2. Entrada */}
-                    <Panel title="2. Entrada">
-                        <div className="grid gap-5">
-                            <div className="grid gap-4 md:grid-cols-3">
-                                <div className="grid gap-2">
-                                    <Label htmlFor="km">Km atual</Label>
-                                    <Input
-                                        id="km"
-                                        inputMode="numeric"
-                                        placeholder={found?.km ? String(found.km) : '0'}
-                                        className={cn(field, 'tabular text-xl font-semibold')}
-                                        value={data.km_in}
-                                        onChange={(e) => setData('km_in', e.target.value.replace(/\D/g, ''))}
-                                    />
-                                    <InputError message={errors.km_in} />
-                                </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="sched">Agendado para (opcional)</Label>
-                                    <Input id="sched" type="datetime-local" className={field} value={data.scheduled_at} onChange={(e) => setData('scheduled_at', e.target.value)} />
-                                </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="mech">Mecânico</Label>
-                                    <select
-                                        id="mech"
-                                        className={cn(field, 'border-input bg-card border px-3')}
-                                        value={data.mechanic_id}
-                                        onChange={(e) => setData('mechanic_id', e.target.value)}
-                                    >
-                                        <option value="">Definir depois</option>
-                                        {mechanics.map((m) => (
-                                            <option key={m.id} value={m.id}>
-                                                {m.name}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                            </div>
-
-                            <div className="grid gap-2">
-                                <Label>Combustível</Label>
-                                <div className="grid grid-cols-5 gap-1 rounded-xl bg-zinc-100 p-1 dark:bg-zinc-800">
-                                    {FUEL.map((f, i) => (
-                                        <button
-                                            key={f}
-                                            type="button"
-                                            onClick={() => setData('fuel_level', data.fuel_level === i ? null : i)}
-                                            className={cn(
-                                                'h-11 rounded-lg text-sm font-semibold transition',
-                                                data.fuel_level === i ? 'bg-card shadow ring-1 ring-black/5' : 'text-muted-foreground',
-                                            )}
-                                        >
-                                            {f}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            <div className="grid gap-2">
-                                <Label htmlFor="complaint">O que o cliente relatou?</Label>
-                                <textarea
-                                    id="complaint"
-                                    rows={4}
-                                    className="border-input bg-card focus-visible:ring-ring rounded-xl border px-3 py-3 text-base outline-none focus-visible:ring-2"
-                                    placeholder="Ex.: barulho na roda dianteira ao frear; luz da injeção acesa; revisão dos 60 mil km…"
-                                    value={data.complaint}
-                                    onChange={(e) => setData('complaint', e.target.value)}
-                                />
-                            </div>
-                        </div>
-                    </Panel>
-
-                    {/* 3. Checklist */}
-                    <Panel title="3. Itens no veículo">
-                        <div className="flex flex-wrap gap-2">
-                            {ENTRY_CHECKLIST.map((c) => {
-                                const on = !!data.checklist[c.key];
-                                return (
-                                    <button
-                                        key={c.key}
-                                        type="button"
-                                        aria-pressed={on}
-                                        onClick={() => setData('checklist', { ...data.checklist, [c.key]: !on })}
-                                        className={cn(
-                                            'inline-flex h-11 items-center gap-2 rounded-full px-4 text-[15px] font-medium ring-1 transition',
-                                            on ? 'bg-foreground text-background ring-foreground' : 'bg-card ring-border hover:bg-muted',
-                                        )}
-                                    >
-                                        {on && <Check className="size-4" />}
-                                        {c.label}
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    </Panel>
-
-                    {/* 4. Avarias */}
-                    <Panel title="4. Avarias na lataria">
-                        <CarDiagramEditor value={data.damages} onChange={(v) => setData('damages', v)} />
-                    </Panel>
-
-                    {/* Ação principal no rodapé */}
-                    <div className="bg-background/90 sticky bottom-16 z-20 -mx-4 border-t px-4 py-3 backdrop-blur md:bottom-0 md:mx-0 md:rounded-2xl md:border md:px-4">
-                        <Button type="submit" size="lg" className="w-full" disabled={processing || cleanPlate.length < 3}>
-                            {processing && <LoaderCircle className="size-5 animate-spin" />}
-                            Abrir OS
-                        </Button>
                     </div>
-                </Page>
+
+                    {found && (
+                        <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                            <Field label="Cliente">
+                                <ReadOnly>{found.client?.name}</ReadOnly>
+                            </Field>
+                            <Field label="CPF / CNPJ">
+                                <ReadOnly>{documentFmt(found.client?.document)}</ReadOnly>
+                            </Field>
+                            <Field label="Veículo">
+                                <ReadOnly>{found.title}</ReadOnly>
+                            </Field>
+                            <Field label="Cor">
+                                <ReadOnly>{found.color}</ReadOnly>
+                            </Field>
+                        </div>
+                    )}
+
+                    {isNew && (
+                        <div className="mt-3 grid gap-3 border-t border-dashed border-[#c9cdd3] pt-3 sm:grid-cols-2 lg:grid-cols-6">
+                            <Field label="Nome do cliente *" className="lg:col-span-3" error={err['client.name']}>
+                                <Input value={data.client.name} onChange={(e) => setData('client', { ...data.client, name: e.target.value })} />
+                            </Field>
+                            <Field label="WhatsApp" className="lg:col-span-1">
+                                <Input inputMode="tel" value={data.client.phone} onChange={(e) => setData('client', { ...data.client, phone: e.target.value })} />
+                            </Field>
+                            <Field label="CPF / CNPJ" className="lg:col-span-2">
+                                <Input inputMode="numeric" value={data.client.document} onChange={(e) => setData('client', { ...data.client, document: e.target.value })} />
+                            </Field>
+                            {(
+                                [
+                                    ['brand', 'Marca', 2],
+                                    ['model', 'Modelo', 2],
+                                    ['year', 'Ano', 1],
+                                    ['color', 'Cor', 1],
+                                ] as const
+                            ).map(([k, label, span]) => (
+                                <Field key={k} label={label} className={span === 2 ? 'lg:col-span-2' : ''}>
+                                    <Input value={data.vehicle[k]} onChange={(e) => setData('vehicle', { ...data.vehicle, [k]: e.target.value })} />
+                                </Field>
+                            ))}
+                        </div>
+                    )}
+                </Block>
+
+                <Block title="2 · Agendamento e solicitação">
+                    <div className="grid gap-3 sm:grid-cols-3">
+                        <Field label="Data / hora agendada">
+                            <Input type="datetime-local" value={data.scheduled_at} onChange={(e) => setData('scheduled_at', e.target.value)} />
+                        </Field>
+                        <Field label="Km atual" error={err.km_in}>
+                            <Input inputMode="numeric" placeholder={found?.km ? String(found.km) : ''} value={data.km_in} onChange={(e) => setData('km_in', e.target.value.replace(/\D/g, ''))} className="tabular-nums" />
+                        </Field>
+                        <Field label="Mecânico">
+                            <select className={selectCls} value={data.mechanic_id} onChange={(e) => setData('mechanic_id', e.target.value)}>
+                                <option value="">Quem pegar na agenda</option>
+                                {mechanics.map((m) => (
+                                    <option key={m.id} value={m.id}>
+                                        {m.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </Field>
+                        <Field label="Defeitos / solicitação do cliente" className="sm:col-span-3">
+                            <textarea
+                                rows={6}
+                                className={textareaCls}
+                                placeholder="Ex.: barulho na roda dianteira ao frear; luz da injeção acesa; revisão dos 60 mil km; troca preventiva de correia…"
+                                value={data.complaint}
+                                onChange={(e) => setData('complaint', e.target.value)}
+                            />
+                        </Field>
+                    </div>
+                </Block>
+
+                <Block title="3 · Vistoria de entrada (pode ser feita na chegada)">
+                    <div className="grid gap-3">
+                        <Field label="Combustível">
+                            <div className="grid grid-cols-5 overflow-hidden rounded-[3px] border border-[#b9bec6]">
+                                {FUEL.map((f, i) => (
+                                    <button
+                                        key={f}
+                                        type="button"
+                                        onClick={() => setData('fuel_level', data.fuel_level === i ? null : i)}
+                                        className={cn('h-11 border-r border-[#d7dade] text-[13px] font-semibold last:border-r-0 md:h-8', data.fuel_level === i ? 'bg-zinc-900 text-white' : 'bg-card hover:bg-zinc-50')}
+                                    >
+                                        {f}
+                                    </button>
+                                ))}
+                            </div>
+                        </Field>
+                        <Field label="Itens no veículo">
+                            <div className="grid grid-cols-2 gap-x-3 gap-y-1 sm:grid-cols-3">
+                                {ENTRY_CHECKLIST.map((c) => (
+                                    <label key={c.key} className="flex h-10 items-center gap-2 text-[14px] md:h-7 md:text-[13px]">
+                                        <input type="checkbox" className="size-5 accent-[#d42a2a] md:size-4" checked={!!data.checklist[c.key]} onChange={(e) => setData('checklist', { ...data.checklist, [c.key]: e.target.checked })} />
+                                        {c.label}
+                                    </label>
+                                ))}
+                            </div>
+                        </Field>
+                    </div>
+                </Block>
+
+                <Block title="4 · Avarias na lataria" className="xl:col-span-2">
+                    <div className="mx-auto max-w-3xl">
+                        <CarDiagramEditor value={data.damages} onChange={(v) => setData('damages', v)} />
+                    </div>
+                </Block>
+
+                <div className="no-print bg-background/95 sticky bottom-0 z-10 -mx-2 border-t border-[#c9cdd3] p-2 md:hidden xl:col-span-2">
+                    <button type="submit" disabled={processing || cleanPlate.length < 3} className="h-12 w-full rounded-[4px] bg-[#d42a2a] font-semibold text-white disabled:opacity-50">
+                        Gravar OS
+                    </button>
+                </div>
             </form>
         </AppLayout>
     );

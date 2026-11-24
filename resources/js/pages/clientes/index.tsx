@@ -1,14 +1,11 @@
-import InputError from '@/components/input-error';
-import { Empty, Page, PageHeader, Panel, PlateBadge } from '@/components/oficina';
-import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Block, Field, Grid, Placa, Tool, textareaCls, type Col } from '@/components/erp';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
 import { documentFmt, phone } from '@/lib/os';
 import type { ClientData } from '@/types';
-import { Head, Link, router, useForm } from '@inertiajs/react';
-import { ChevronRight, Search, UserPlus, Users } from 'lucide-react';
+import { Head, router, useForm } from '@inertiajs/react';
+import { Save, Search, UserPlus } from 'lucide-react';
 import { useState } from 'react';
 
 type Row = ClientData & { vehicles: { id: number; plate: string; brand: string | null; model: string | null }[]; service_orders_count: number };
@@ -23,17 +20,9 @@ export function ClientForm({ client, onDone }: { client?: ClientData; onDone?: (
         city: client?.city ?? '',
         notes: client?.notes ?? '',
     });
-    const fields: [keyof typeof data, string, string?][] = [
-        ['name', 'Nome completo'],
-        ['phone', 'WhatsApp', 'tel'],
-        ['document', 'CPF / CNPJ', 'numeric'],
-        ['email', 'E-mail', 'email'],
-        ['address', 'Endereço'],
-        ['city', 'Cidade'],
-    ];
     return (
         <form
-            className="grid gap-4"
+            className="grid gap-3"
             onSubmit={(e) => {
                 e.preventDefault();
                 const opts = { preserveScroll: true, onSuccess: () => onDone?.() };
@@ -41,22 +30,34 @@ export function ClientForm({ client, onDone }: { client?: ClientData; onDone?: (
                 else post(route('clientes.store'), opts);
             }}
         >
-            <div className="grid gap-4 sm:grid-cols-2">
-                {fields.map(([k, label, mode]) => (
-                    <div key={k} className={k === 'name' || k === 'address' ? 'grid gap-2 sm:col-span-2' : 'grid gap-2'}>
-                        <Label htmlFor={k}>{label}</Label>
-                        <Input id={k} inputMode={mode as never} value={data[k]} onChange={(e) => setData(k, e.target.value)} className="h-12 text-base" />
-                        <InputError message={errors[k]} />
-                    </div>
-                ))}
-                <div className="grid gap-2 sm:col-span-2">
-                    <Label htmlFor="notes">Observações</Label>
-                    <textarea id="notes" rows={2} value={data.notes} onChange={(e) => setData('notes', e.target.value)} className="border-input bg-card rounded-xl border px-3 py-2 text-base" />
-                </div>
+            <div className="grid gap-3 sm:grid-cols-6">
+                <Field label="Nome completo *" className="sm:col-span-6" error={errors.name}>
+                    <Input value={data.name} onChange={(e) => setData('name', e.target.value)} autoFocus />
+                </Field>
+                <Field label="WhatsApp" className="sm:col-span-2" error={errors.phone}>
+                    <Input inputMode="tel" value={data.phone} onChange={(e) => setData('phone', e.target.value)} />
+                </Field>
+                <Field label="CPF / CNPJ" className="sm:col-span-2" error={errors.document}>
+                    <Input inputMode="numeric" value={data.document} onChange={(e) => setData('document', e.target.value)} />
+                </Field>
+                <Field label="E-mail" className="sm:col-span-2" error={errors.email}>
+                    <Input type="email" value={data.email} onChange={(e) => setData('email', e.target.value)} />
+                </Field>
+                <Field label="Endereço" className="sm:col-span-4">
+                    <Input value={data.address} onChange={(e) => setData('address', e.target.value)} />
+                </Field>
+                <Field label="Cidade" className="sm:col-span-2">
+                    <Input value={data.city} onChange={(e) => setData('city', e.target.value)} />
+                </Field>
+                <Field label="Observações" className="sm:col-span-6">
+                    <textarea rows={2} className={textareaCls} value={data.notes} onChange={(e) => setData('notes', e.target.value)} />
+                </Field>
             </div>
-            <Button type="submit" size="lg" disabled={processing}>
-                {client ? 'Salvar' : 'Cadastrar cliente'}
-            </Button>
+            <div className="flex justify-end">
+                <button type="submit" disabled={processing} className="inline-flex h-11 items-center gap-1.5 rounded-[3px] border border-[#b51f1f] bg-[#d42a2a] px-4 text-[13px] font-semibold text-white md:h-8">
+                    <Save className="size-4" /> {client ? 'Gravar alterações' : 'Gravar cliente'}
+                </button>
+            </div>
         </form>
     );
 }
@@ -65,68 +66,58 @@ export default function Clientes({ clients, filters }: { clients: Row[]; filters
     const [q, setQ] = useState(filters.q);
     const [open, setOpen] = useState(false);
 
+    const cols: Col<Row>[] = [
+        { label: 'Código', render: (r) => <span className="tabular-nums">{String(r.id).padStart(5, '0')}</span>, className: 'w-20', hide: 'md' },
+        { label: 'Nome', render: (r) => <b className="font-semibold">{r.name}</b> },
+        { label: 'WhatsApp', render: (r) => phone(r.phone) || '—', className: 'w-36', hide: 'sm' },
+        { label: 'CPF / CNPJ', render: (r) => documentFmt(r.document) || '—', className: 'w-40', hide: 'lg' },
+        {
+            label: 'Veículos',
+            render: (r) => (
+                <span className="flex flex-wrap gap-1">
+                    {r.vehicles.slice(0, 3).map((v) => (
+                        <Placa key={v.id} value={v.plate} />
+                    ))}
+                </span>
+            ),
+            hide: 'md',
+        },
+        { label: 'OS', render: (r) => r.service_orders_count, align: 'right', className: 'w-14' },
+    ];
+
     return (
-        <AppLayout breadcrumbs={[{ title: 'Clientes', href: '/clientes' }]}>
+        <AppLayout title="Clientes e Veículos" code="CAD010" toolbar={<Tool primary icon={<UserPlus />} label="Novo cliente" onClick={() => setOpen(true)} />}>
             <Head title="Clientes" />
-            <Page>
-                <PageHeader
-                    title="Clientes"
-                    actions={
-                        <Dialog open={open} onOpenChange={setOpen}>
-                            <DialogTrigger asChild>
-                                <Button size="lg">
-                                    <UserPlus className="size-5" /> Novo cliente
-                                </Button>
-                            </DialogTrigger>
-                            <DialogContent className="max-h-[90svh] overflow-y-auto rounded-2xl sm:max-w-xl">
-                                <DialogHeader>
-                                    <DialogTitle>Novo cliente</DialogTitle>
-                                </DialogHeader>
-                                <ClientForm onDone={() => setOpen(false)} />
-                            </DialogContent>
-                        </Dialog>
-                    }
-                />
+            <div className="grid gap-2 md:gap-3">
+                <Block title="Pesquisa">
+                    <form
+                        className="grid items-end gap-2 sm:grid-cols-[1fr_auto]"
+                        onSubmit={(e) => {
+                            e.preventDefault();
+                            router.get(route('clientes.index'), { q }, { preserveState: true, replace: true });
+                        }}
+                    >
+                        <Field label="Nome, placa, CPF/CNPJ ou telefone">
+                            <Input value={q} onChange={(e) => setQ(e.target.value)} />
+                        </Field>
+                        <button type="submit" className="inline-flex h-11 items-center gap-1.5 rounded-[3px] border border-[#c9cdd3] bg-white px-3 text-[13px] font-semibold md:h-8 dark:bg-zinc-900">
+                            <Search className="size-4" /> Pesquisar
+                        </button>
+                    </form>
+                </Block>
+                <Block title="Clientes" bodyClassName="p-0">
+                    <Grid cols={cols} rows={clients} rowKey={(r) => r.id} onRowClick={(r) => router.visit(route('clientes.show', r.id))} footer={<span>{clients.length} registro(s)</span>} />
+                </Block>
+            </div>
 
-                <form
-                    onSubmit={(e) => {
-                        e.preventDefault();
-                        router.get(route('clientes.index'), { q }, { preserveState: true, replace: true });
-                    }}
-                    className="relative"
-                >
-                    <Search className="text-muted-foreground absolute top-1/2 left-4 size-5 -translate-y-1/2" />
-                    <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Nome, placa, CPF ou telefone" className="h-12 rounded-xl pl-12 text-base" />
-                </form>
-
-                <Panel>
-                    {clients.length ? (
-                        <ul className="divide-y">
-                            {clients.map((c) => (
-                                <li key={c.id}>
-                                    <Link href={route('clientes.show', c.id)} className="hover:bg-muted/70 -mx-2 flex items-center gap-4 rounded-xl px-2 py-3">
-                                        <div className="min-w-0 flex-1">
-                                            <p className="truncate font-semibold">{c.name}</p>
-                                            <p className="text-muted-foreground truncate text-sm">
-                                                {[phone(c.phone), documentFmt(c.document)].filter(Boolean).join(' · ') || 'Sem contato'}
-                                            </p>
-                                        </div>
-                                        <div className="hidden flex-wrap justify-end gap-1.5 sm:flex">
-                                            {c.vehicles.slice(0, 3).map((v) => (
-                                                <PlateBadge key={v.id} value={v.plate} size="sm" />
-                                            ))}
-                                        </div>
-                                        <span className="text-muted-foreground tabular hidden w-16 text-right text-sm md:block">{c.service_orders_count} OS</span>
-                                        <ChevronRight className="text-muted-foreground size-4" />
-                                    </Link>
-                                </li>
-                            ))}
-                        </ul>
-                    ) : (
-                        <Empty icon={<Users className="size-8 opacity-40" />} title="Nenhum cliente encontrado" />
-                    )}
-                </Panel>
-            </Page>
+            <Dialog open={open} onOpenChange={setOpen}>
+                <DialogContent className="max-h-[90svh] overflow-y-auto rounded-[4px] sm:max-w-2xl">
+                    <DialogHeader>
+                        <DialogTitle>Novo cliente</DialogTitle>
+                    </DialogHeader>
+                    <ClientForm onDone={() => setOpen(false)} />
+                </DialogContent>
+            </Dialog>
         </AppLayout>
     );
 }

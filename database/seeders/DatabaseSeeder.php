@@ -4,7 +4,11 @@ namespace Database\Seeders;
 
 use App\Enums\OsStatus;
 use App\Models\Client;
+use App\Models\FinanceEntry;
+use App\Models\Partner;
+use App\Models\PartnerMovement;
 use App\Models\ServiceOrder;
+use App\Support\Installments;
 use App\Models\User;
 use App\Models\Vehicle;
 use Illuminate\Database\Seeder;
@@ -73,15 +77,66 @@ class DatabaseSeeder extends Seeder
             ['peca', 'Bieleta dianteira (par)', 1, 180], ['servico', 'Troca de bieletas', 1, 120],
         ], ['approved_at' => now()->subHours(3)]);
         $make($vehicles[1], OsStatus::Diagnostico, $rafael, 'Luz de injeção acesa e motor falhando a frio.', []);
-        $make($vehicles[2], OsStatus::Aprovacao, $carlos, 'Revisão dos 60 mil km.', [
-            ['peca', 'Óleo 5W30 sintético (L)', 4, 45], ['peca', 'Filtro de óleo', 1, 38], ['peca', 'Filtro de ar', 1, 52], ['servico', 'Revisão completa', 1, 250],
+        // Mecânico terminou a revisão e enviou ao balcão: itens ainda sem preço
+        $make($vehicles[2], OsStatus::Orcamento, $carlos, 'Revisão dos 60 mil km.', [
+            ['peca', 'Óleo 5W30 sintético (L)', 4, 0], ['peca', 'Filtro de óleo', 1, 0], ['peca', 'Filtro de ar', 1, 0], ['servico', 'Revisão completa', 1, 0],
+        ], [
+            'diagnosis' => "Revisão feita. Pastilhas dianteiras com 30% — trocar na próxima.\nFiltro de ar muito sujo.",
+            'revision' => ['oleo_motor' => 'trocar', 'filtro_oleo' => 'trocar', 'filtro_ar' => 'trocar', 'velas' => 'ok', 'pastilhas_diant' => 'atencao', 'bateria' => 'ok', 'calibragem' => 'ok'],
         ]);
         $make($vehicles[3], OsStatus::Aguardando, null, 'Cliente agendou pelo WhatsApp: troca de pastilhas e barulho ao frear.', [], ['scheduled_at' => today()->setTime(14, 0)]);
+        $make($vehicles[1], OsStatus::Aguardando, null, 'Revisão dos 50 mil km + alinhamento.', [], ['scheduled_at' => today()->addDay()->setTime(9, 0), 'damages' => []]);
         $make($vehicles[4], OsStatus::Pronto, $rafael, 'Troca de óleo.', [
             ['peca', 'Óleo 5W30 (L)', 3.5, 42], ['peca', 'Filtro de óleo', 1, 35], ['servico', 'Mão de obra troca de óleo', 1, 60],
         ]);
-        $make($vehicles[0], OsStatus::Entregue, $carlos, 'Troca de óleo e filtros.', [
+        $delivered = $make($vehicles[0], OsStatus::Entregue, $carlos, 'Troca de óleo e filtros.', [
             ['peca', 'Óleo 5W30 (L)', 4, 42], ['peca', 'Filtro de óleo', 1, 35], ['servico', 'Mão de obra', 1, 60],
         ], ['delivered_at' => now()->subDays(2), 'approved_at' => now()->subDays(3), 'km_in' => 80100]);
+
+        $this->seedFinance($balcao, $delivered);
+    }
+
+    private function seedFinance(User $balcao, ServiceOrder $delivered): void
+    {
+        $socios = User::where('role', 'master')->orderBy('email')->get();
+        $shares = [33.33, 33.33, 33.34];
+        $partners = $socios->values()->map(fn ($u, $i) => Partner::create(['name' => $u->name, 'user_id' => $u->id, 'share' => $shares[$i] ?? 0]));
+
+        // Aportes desiguais para mostrar o equilíbrio
+        $mov = fn ($p, $type, $amount, $date, $desc) => PartnerMovement::create(['partner_id' => $p->id, 'type' => $type, 'amount' => $amount, 'date' => $date, 'description' => $desc]);
+        $mov($partners[0], 'aporte', 5000, now()->subMonths(3)->startOfMonth(), 'Capital inicial');
+        $mov($partners[1], 'aporte', 5000, now()->subMonths(3)->startOfMonth(), 'Capital inicial');
+        $mov($partners[2], 'aporte', 5000, now()->subMonths(3)->startOfMonth(), 'Capital inicial');
+        $mov($partners[0], 'aporte', 1000, now()->startOfMonth()->addDays(2), 'Compra de elevador (sinal)');
+        $mov($partners[1], 'retirada', 300, now()->startOfMonth()->addDays(9), 'Adiantamento');
+
+        $e = fn (array $a) => FinanceEntry::create(['created_by' => $balcao->id, ...$a]);
+
+        // Últimos meses (para o histórico)
+        foreach ([3, 2, 1] as $back) {
+            $m = now()->subMonthsNoOverflow($back)->startOfMonth();
+            $e(['type' => 'entrada', 'category' => 'servicos', 'description' => 'Serviços do mês (resumo)', 'amount' => [7200, 9850, 11400][3 - $back], 'due_date' => $m->copy()->addDays(27), 'paid_at' => $m->copy()->addDays(27), 'payment_method' => 'pix']);
+            $e(['type' => 'saida', 'category' => 'aluguel', 'description' => 'Aluguel do galpão', 'party' => 'Imobiliária Centro', 'amount' => 2500, 'due_date' => $m->copy()->addDays(4), 'paid_at' => $m->copy()->addDays(4), 'payment_method' => 'boleto']);
+            $e(['type' => 'saida', 'category' => 'autopecas', 'description' => 'Peças do mês', 'party' => 'Auto Peças Brasil', 'amount' => [3100, 4200, 4800][3 - $back], 'due_date' => $m->copy()->addDays(20), 'paid_at' => $m->copy()->addDays(20), 'payment_method' => 'boleto']);
+            $e(['type' => 'saida', 'category' => 'energia_agua', 'description' => 'Energia elétrica', 'party' => 'Enel', 'amount' => 410, 'due_date' => $m->copy()->addDays(14), 'paid_at' => $m->copy()->addDays(14), 'payment_method' => 'pix']);
+        }
+
+        // Mês atual
+        $m = now()->startOfMonth();
+        $e(['type' => 'saida', 'category' => 'aluguel', 'description' => 'Aluguel do galpão', 'party' => 'Imobiliária Centro', 'amount' => 2500, 'due_date' => $m->copy()->addDays(4), 'paid_at' => $m->copy()->addDays(4), 'payment_method' => 'boleto']);
+        $e(['type' => 'saida', 'category' => 'autopecas', 'description' => 'Filtros e óleo', 'party' => 'Auto Peças Brasil', 'amount' => 1240.5, 'due_date' => $m->copy()->addDays(8), 'paid_at' => $m->copy()->addDays(8), 'payment_method' => 'pix']);
+        $e(['type' => 'saida', 'category' => 'impostos', 'description' => 'DAS Simples Nacional', 'amount' => 450, 'due_date' => today()->subDays(3)]);
+        $e(['type' => 'saida', 'category' => 'energia_agua', 'description' => 'Energia elétrica', 'party' => 'Enel', 'amount' => 395.8, 'due_date' => today()->addDays(5)]);
+        Installments::create(
+            ['type' => 'saida', 'category' => 'ferramentas', 'description' => 'Scanner automotivo', 'party' => 'Ferramentas SP', 'payment_method' => 'boleto', 'created_by' => $balcao->id],
+            1800, $m->copy()->addDays(9), 3, true,
+        );
+        $e(['type' => 'entrada', 'category' => 'servicos', 'description' => 'Serviços avulsos', 'amount' => 3650, 'due_date' => $m->copy()->addDays(10), 'paid_at' => $m->copy()->addDays(10), 'payment_method' => 'pix']);
+
+        // Pagamento da OS entregue (cartão em 2x: 1ª recebida, 2ª a receber)
+        Installments::create(
+            ['type' => 'entrada', 'category' => 'servicos', 'description' => "OS {$delivered->number()} · {$delivered->vehicle->title()}", 'party' => $delivered->client->name, 'payment_method' => 'credito', 'service_order_id' => $delivered->id, 'created_by' => $balcao->id],
+            $delivered->load('items')->total(), today()->subDays(2), 2, true, today()->subDays(2),
+        );
     }
 }

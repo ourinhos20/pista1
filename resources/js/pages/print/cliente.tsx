@@ -7,7 +7,11 @@ export default function PrintCliente({ os, shop }: { os: OsFull; shop: Shop }) {
     const c = os.client;
     const v = os.vehicle;
     const rows = Math.max(9, os.items.length);
-    const remaining = Math.max(0, (os.total ?? 0) - (os.down_payment ?? 0));
+    // Pagamentos reais registrados na OS (financeiro)
+    const paid = os.paid_total ?? 0;
+    const remaining = Math.max(0, (os.total ?? 0) - paid);
+    const methods = [...new Set((os.payments ?? []).map((p) => (p.payment_method ? PAYMENT[p.payment_method] : '')).filter(Boolean))].join(', ');
+    const parcelas = (os.payments ?? []).find((p) => p.installments)?.installments;
 
     return (
         <PrintShell title={os.approved_at ? 'Ordem de Serviço' : 'Orçamento'} os={os} shop={shop}>
@@ -72,9 +76,9 @@ export default function PrintCliente({ os, shop }: { os: OsFull; shop: Shop }) {
 
             <Box>
                 <div className="grid grid-cols-3 gap-6">
-                    <Line label="Entrada" value={os.down_payment ? money(os.down_payment) : ''} />
-                    <Line label="Restante" value={os.down_payment ? money(remaining) : ''} />
-                    <Line label="Pagamento" value={os.payment_method ? PAYMENT[os.payment_method] : ''} />
+                    <Line label="Pago" value={paid ? money(paid) : ''} />
+                    <Line label="Restante" value={paid ? money(remaining) : ''} />
+                    <Line label="Pagamento" value={methods ? `${methods}${parcelas ? ` (${parcelas}x)` : ''}` : ''} />
                 </div>
             </Box>
 

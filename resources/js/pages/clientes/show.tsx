@@ -1,14 +1,11 @@
-import InputError from '@/components/input-error';
-import { Empty, Info, OsRow, Page, PageHeader, Panel, PlateBadge } from '@/components/oficina';
-import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Block, Field, Grid, Placa, ReadOnly, Situacao, Tool, type Col } from '@/components/erp';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
-import { documentFmt, km, phone, whatsapp } from '@/lib/os';
+import { date, documentFmt, km, money, phone, whatsapp } from '@/lib/os';
 import type { ClientData, OsCard, VehicleData } from '@/types';
-import { Head, Link, useForm } from '@inertiajs/react';
-import { Car, ChevronRight, MessageCircle, Pencil, Plus } from 'lucide-react';
+import { Head, router, useForm } from '@inertiajs/react';
+import { CarFront, FilePlus2, MessageCircle, Pencil, Save } from 'lucide-react';
 import { useState } from 'react';
 import { ClientForm } from './index';
 
@@ -24,7 +21,7 @@ export function VehicleForm({ clientId, vehicle, onDone }: { clientId?: number; 
         km: vehicle?.km ? String(vehicle.km) : '',
     });
     const fields: [Exclude<keyof typeof data, 'client_id'>, string][] = [
-        ['plate', 'Placa'],
+        ['plate', 'Placa *'],
         ['brand', 'Marca'],
         ['model', 'Modelo'],
         ['year', 'Ano'],
@@ -34,7 +31,7 @@ export function VehicleForm({ clientId, vehicle, onDone }: { clientId?: number; 
     ];
     return (
         <form
-            className="grid gap-4"
+            className="grid gap-3"
             onSubmit={(e) => {
                 e.preventDefault();
                 const opts = { preserveScroll: true, onSuccess: () => onDone?.() };
@@ -42,147 +39,110 @@ export function VehicleForm({ clientId, vehicle, onDone }: { clientId?: number; 
                 else post(route('veiculos.store'), opts);
             }}
         >
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-3 sm:grid-cols-4">
                 {fields.map(([k, label]) => (
-                    <div key={k} className="grid gap-2">
-                        <Label htmlFor={`v-${k}`}>{label}</Label>
+                    <Field key={k} label={label} error={errors[k]} className={k === 'model' ? 'sm:col-span-2' : ''}>
                         <Input
-                            id={`v-${k}`}
                             value={data[k]}
                             onChange={(e) => setData(k, k === 'plate' ? e.target.value.toUpperCase() : k === 'km' ? e.target.value.replace(/\D/g, '') : e.target.value)}
-                            className={k === 'plate' ? 'h-12 font-mono text-lg font-bold tracking-widest uppercase' : 'h-12 text-base'}
+                            className={k === 'plate' ? 'font-mono font-bold tracking-widest uppercase' : ''}
                             inputMode={k === 'km' ? 'numeric' : undefined}
                         />
-                        <InputError message={errors[k]} />
-                    </div>
+                    </Field>
                 ))}
             </div>
-            <Button type="submit" size="lg" disabled={processing}>
-                {vehicle ? 'Salvar veículo' : 'Cadastrar veículo'}
-            </Button>
+            <div className="flex justify-end">
+                <button type="submit" disabled={processing} className="inline-flex h-11 items-center gap-1.5 rounded-[3px] border border-[#b51f1f] bg-[#d42a2a] px-4 text-[13px] font-semibold text-white md:h-8">
+                    <Save className="size-4" /> Gravar veículo
+                </button>
+            </div>
         </form>
     );
 }
 
 export default function ClienteShow({ client, vehicles, orders }: { client: ClientData; vehicles: VehicleData[]; orders: OsCard[] }) {
-    const [editing, setEditing] = useState(false);
-    const [adding, setAdding] = useState(false);
+    const [dialog, setDialog] = useState<'cliente' | 'veiculo' | null>(null);
     const wa = whatsapp(client.phone, `Olá, ${client.name.split(' ')[0]}! Aqui é da Pista 1 Mecânica Automotiva.`);
+
+    const vCols: Col<VehicleData>[] = [
+        { label: 'Placa', render: (r) => <Placa value={r.plate} />, className: 'w-24' },
+        { label: 'Veículo', render: (r) => r.title },
+        { label: 'Cor', render: (r) => r.color ?? '—', hide: 'md' },
+        { label: 'Km atual', render: (r) => km(r.km), align: 'right', className: 'w-28' },
+    ];
+    const oCols: Col<OsCard>[] = [
+        { label: 'Nº OS', render: (r) => <b>{r.number}</b>, className: 'w-20' },
+        { label: 'Data', render: (r) => date(r.created_at), className: 'w-24' },
+        { label: 'Placa', render: (r) => <Placa value={r.vehicle?.plate} />, className: 'w-24', hide: 'sm' },
+        { label: 'Solicitação', render: (r) => <span className="line-clamp-1">{r.complaint}</span>, hide: 'md' },
+        { label: 'Situação', render: (r) => <Situacao status={r.status} /> },
+        { label: 'Valor', render: (r) => (r.total ? money(r.total) : '—'), align: 'right' },
+    ];
 
     return (
         <AppLayout
-            breadcrumbs={[
-                { title: 'Clientes', href: '/clientes' },
-                { title: client.name, href: `/clientes/${client.id}` },
-            ]}
+            title={`Cliente · ${client.name}`}
+            code="CAD011"
+            toolbar={
+                <>
+                    {vehicles[0] && <Tool primary icon={<FilePlus2 />} label="Nova OS" href={route('os.create', { placa: vehicles[0].plate })} />}
+                    <Tool icon={<Pencil />} label="Alterar" onClick={() => setDialog('cliente')} />
+                    <Tool icon={<CarFront />} label="Incluir veículo" onClick={() => setDialog('veiculo')} />
+                    {wa && <Tool icon={<MessageCircle className="text-green-600" />} label="WhatsApp" href={wa} external />}
+                </>
+            }
         >
             <Head title={client.name} />
-            <Page>
-                <PageHeader
-                    title={client.name}
-                    subtitle={`${orders.length} ${orders.length === 1 ? 'OS' : 'ordens de serviço'} · ${vehicles.length} ${vehicles.length === 1 ? 'veículo' : 'veículos'}`}
-                    actions={
-                        <>
-                            {wa && (
-                                <Button size="lg" variant="outline" asChild>
-                                    <a href={wa} target="_blank" rel="noreferrer">
-                                        <MessageCircle className="size-5 text-green-600" /> WhatsApp
-                                    </a>
-                                </Button>
-                            )}
-                            <Dialog open={editing} onOpenChange={setEditing}>
-                                <DialogTrigger asChild>
-                                    <Button size="lg" variant="outline">
-                                        <Pencil className="size-4" /> Editar
-                                    </Button>
-                                </DialogTrigger>
-                                <DialogContent className="max-h-[90svh] overflow-y-auto rounded-2xl sm:max-w-xl">
-                                    <DialogHeader>
-                                        <DialogTitle>Editar cliente</DialogTitle>
-                                    </DialogHeader>
-                                    <ClientForm client={client} onDone={() => setEditing(false)} />
-                                </DialogContent>
-                            </Dialog>
-                        </>
-                    }
-                />
-
-                <div className="grid gap-6 lg:grid-cols-3">
-                    <div className="grid content-start gap-6">
-                        <Panel title="Dados">
-                            <dl className="grid gap-4">
-                                <Info label="WhatsApp">{phone(client.phone)}</Info>
-                                <Info label="CPF / CNPJ">{documentFmt(client.document)}</Info>
-                                <Info label="E-mail">{client.email}</Info>
-                                <Info label="Endereço">{[client.address, client.city].filter(Boolean).join(' · ')}</Info>
-                                {client.notes && <Info label="Observações">{client.notes}</Info>}
-                            </dl>
-                        </Panel>
-
-                        <Panel
-                            title="Veículos"
-                            action={
-                                <Dialog open={adding} onOpenChange={setAdding}>
-                                    <DialogTrigger asChild>
-                                        <Button size="sm" variant="outline">
-                                            <Plus className="size-4" /> Veículo
-                                        </Button>
-                                    </DialogTrigger>
-                                    <DialogContent className="max-h-[90svh] overflow-y-auto rounded-2xl sm:max-w-xl">
-                                        <DialogHeader>
-                                            <DialogTitle>Novo veículo</DialogTitle>
-                                        </DialogHeader>
-                                        <VehicleForm clientId={client.id} onDone={() => setAdding(false)} />
-                                    </DialogContent>
-                                </Dialog>
-                            }
-                        >
-                            {vehicles.length ? (
-                                <ul className="grid gap-1">
-                                    {vehicles.map((v) => (
-                                        <li key={v.id}>
-                                            <Link href={route('veiculos.show', v.id)} className="hover:bg-muted -mx-2 flex items-center gap-3 rounded-xl px-2 py-2.5">
-                                                <PlateBadge value={v.plate} />
-                                                <div className="min-w-0 flex-1">
-                                                    <p className="truncate font-semibold">{v.title || 'Veículo'}</p>
-                                                    <p className="text-muted-foreground tabular text-sm">{km(v.km)}</p>
-                                                </div>
-                                                <ChevronRight className="text-muted-foreground size-4" />
-                                            </Link>
-                                        </li>
-                                    ))}
-                                </ul>
-                            ) : (
-                                <Empty icon={<Car className="size-8 opacity-40" />} title="Nenhum veículo" />
-                            )}
-                        </Panel>
-                    </div>
-
-                    <Panel
-                        title="Ordens de serviço"
-                        className="lg:col-span-2"
-                        action={
-                            vehicles[0] && (
-                                <Button size="sm" asChild>
-                                    <Link href={route('os.create', { placa: vehicles[0].plate })}>
-                                        <Plus className="size-4" /> Nova OS
-                                    </Link>
-                                </Button>
-                            )
-                        }
-                    >
-                        {orders.length ? (
-                            <div className="divide-y">
-                                {orders.map((os) => (
-                                    <OsRow key={os.id} os={os} showMoney />
-                                ))}
-                            </div>
-                        ) : (
-                            <Empty title="Nenhuma OS ainda" />
+            <div className="grid gap-2 md:gap-3">
+                <Block title="Dados cadastrais">
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
+                        <Field label="Código">
+                            <ReadOnly>{String(client.id).padStart(5, '0')}</ReadOnly>
+                        </Field>
+                        <Field label="Nome" className="lg:col-span-3">
+                            <ReadOnly className="font-semibold">{client.name}</ReadOnly>
+                        </Field>
+                        <Field label="CPF / CNPJ" className="lg:col-span-2">
+                            <ReadOnly>{documentFmt(client.document)}</ReadOnly>
+                        </Field>
+                        <Field label="WhatsApp">
+                            <ReadOnly>{phone(client.phone)}</ReadOnly>
+                        </Field>
+                        <Field label="E-mail" className="lg:col-span-2">
+                            <ReadOnly>{client.email}</ReadOnly>
+                        </Field>
+                        <Field label="Endereço" className="lg:col-span-2">
+                            <ReadOnly>{client.address}</ReadOnly>
+                        </Field>
+                        <Field label="Cidade">
+                            <ReadOnly>{client.city}</ReadOnly>
+                        </Field>
+                        {client.notes && (
+                            <Field label="Observações" className="sm:col-span-2 lg:col-span-6">
+                                <ReadOnly>{client.notes}</ReadOnly>
+                            </Field>
                         )}
-                    </Panel>
+                    </div>
+                </Block>
+
+                <div className="grid gap-2 md:gap-3 xl:grid-cols-[2fr_3fr]">
+                    <Block title={`Veículos · ${vehicles.length}`} bodyClassName="p-0">
+                        <Grid cols={vCols} rows={vehicles} rowKey={(r) => r.id} onRowClick={(r) => router.visit(route('veiculos.show', r.id))} empty="Nenhum veículo." />
+                    </Block>
+                    <Block title={`Ordens de serviço · ${orders.length}`} bodyClassName="p-0">
+                        <Grid cols={oCols} rows={orders} rowKey={(r) => r.id} onRowClick={(r) => router.visit(route('os.show', r.id))} empty="Nenhuma OS." />
+                    </Block>
                 </div>
-            </Page>
+            </div>
+
+            <Dialog open={dialog !== null} onOpenChange={(o) => !o && setDialog(null)}>
+                <DialogContent className="max-h-[90svh] overflow-y-auto rounded-[4px] sm:max-w-2xl">
+                    <DialogHeader>
+                        <DialogTitle>{dialog === 'cliente' ? 'Alterar cliente' : 'Incluir veículo'}</DialogTitle>
+                    </DialogHeader>
+                    {dialog === 'cliente' ? <ClientForm client={client} onDone={() => setDialog(null)} /> : <VehicleForm clientId={client.id} onDone={() => setDialog(null)} />}
+                </DialogContent>
+            </Dialog>
         </AppLayout>
     );
 }

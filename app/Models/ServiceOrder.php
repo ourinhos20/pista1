@@ -11,7 +11,7 @@ class ServiceOrder extends Model
 {
     protected $fillable = [
         'client_id', 'vehicle_id', 'mechanic_id', 'created_by', 'status', 'scheduled_at', 'km_in',
-        'fuel_level', 'complaint', 'diagnosis', 'notes', 'damages', 'checklist', 'discount',
+        'fuel_level', 'complaint', 'diagnosis', 'notes', 'damages', 'checklist', 'revision', 'discount',
         'down_payment', 'payment_method', 'approved_at', 'delivered_at',
     ];
 
@@ -24,6 +24,7 @@ class ServiceOrder extends Model
             'delivered_at' => 'datetime',
             'damages' => 'array',
             'checklist' => 'array',
+            'revision' => 'array',
             'discount' => 'float',
             'down_payment' => 'float',
             'km_in' => 'integer',
@@ -49,6 +50,11 @@ class ServiceOrder extends Model
     public function items(): HasMany
     {
         return $this->hasMany(ServiceOrderItem::class);
+    }
+
+    public function payments(): HasMany
+    {
+        return $this->hasMany(FinanceEntry::class)->orderBy('due_date')->orderBy('id');
     }
 
     public function events(): HasMany

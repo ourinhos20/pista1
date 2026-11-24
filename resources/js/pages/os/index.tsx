@@ -1,77 +1,84 @@
-import { Empty, OsRow, Page, PageHeader, Panel } from '@/components/oficina';
-import { Button } from '@/components/ui/button';
+import { Block, Field, Grid, Placa, Situacao, Tool, selectCls, type Col } from '@/components/erp';
 import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
-import { STATUS } from '@/lib/os';
-import { cn } from '@/lib/utils';
+import { STATUS, date, money, time } from '@/lib/os';
 import type { OsCard, OsStatus } from '@/types';
-import { Head, Link, router } from '@inertiajs/react';
-import { Plus, Search } from 'lucide-react';
+import { Head, router } from '@inertiajs/react';
+import { FilePlus2, Search } from 'lucide-react';
 import { useState } from 'react';
 
-const TABS: { value: string; label: string }[] = [
-    { value: 'abertas', label: 'Em aberto' },
-    ...(['aguardando', 'diagnostico', 'aprovacao', 'execucao', 'pronto', 'entregue'] as OsStatus[]).map((s) => ({ value: s, label: STATUS[s].label })),
-    { value: 'todas', label: 'Todas' },
-];
+const STATUSES: OsStatus[] = ['aguardando', 'diagnostico', 'orcamento', 'aprovacao', 'execucao', 'pronto', 'entregue', 'cancelada'];
 
 export default function OsIndex({ orders, filters }: { orders: OsCard[]; filters: { status: string; q: string } }) {
     const [q, setQ] = useState(filters.q);
-    const go = (params: Partial<typeof filters>) => router.get(route('os.index'), { ...filters, ...params }, { preserveState: true, replace: true });
+    const [status, setStatus] = useState(filters.status);
+    const search = (params?: Partial<typeof filters>) => router.get(route('os.index'), { status, q, ...params }, { preserveState: true, replace: true });
+
+    const cols: Col<OsCard>[] = [
+        { label: 'Nº OS', render: (r) => <b className="tabular-nums">{r.number}</b>, className: 'w-20' },
+        { label: 'Abertura', render: (r) => date(r.created_at), hide: 'md', className: 'w-24' },
+        { label: 'Agendado', render: (r) => (r.scheduled_at ? `${date(r.scheduled_at)} ${time(r.scheduled_at)}` : '—'), hide: 'lg', className: 'w-36' },
+        { label: 'Placa', render: (r) => <Placa value={r.vehicle?.plate} />, className: 'w-24' },
+        { label: 'Veículo', render: (r) => r.vehicle?.title },
+        { label: 'Cliente', render: (r) => r.client?.name, hide: 'md' },
+        { label: 'Mecânico', render: (r) => r.mechanic?.name ?? '—', hide: 'lg' },
+        { label: 'Situação', render: (r) => <Situacao status={r.status} /> },
+        { label: 'Valor', render: (r) => (r.total ? money(r.total) : '—'), align: 'right', hide: 'sm' },
+    ];
 
     return (
-        <AppLayout breadcrumbs={[{ title: 'Ordens de serviço', href: '/os' }]}>
+        <AppLayout title="Ordens de Serviço" code="ATD020" toolbar={<Tool primary icon={<FilePlus2 />} label="Nova OS" fkey="F2" href={route('os.create')} />}>
             <Head title="Ordens de serviço" />
-            <Page>
-                <PageHeader
-                    title="Ordens de serviço"
-                    actions={
-                        <Button asChild size="lg">
-                            <Link href={route('os.create')}>
-                                <Plus className="size-5" /> Nova OS
-                            </Link>
-                        </Button>
-                    }
-                />
+            <div className="grid gap-2 md:gap-3">
+                <Block title="Filtros">
+                    <form
+                        className="grid items-end gap-2 sm:grid-cols-[220px_1fr_auto]"
+                        onSubmit={(e) => {
+                            e.preventDefault();
+                            search();
+                        }}
+                    >
+                        <Field label="Situação">
+                            <select
+                                className={selectCls}
+                                value={status}
+                                onChange={(e) => {
+                                    setStatus(e.target.value);
+                                    search({ status: e.target.value });
+                                }}
+                            >
+                                <option value="abertas">Em aberto (todas)</option>
+                                {STATUSES.map((s) => (
+                                    <option key={s} value={s}>
+                                        {STATUS[s].label}
+                                    </option>
+                                ))}
+                                <option value="todas">Todas as OS</option>
+                            </select>
+                        </Field>
+                        <Field label="Pesquisa">
+                            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Placa, nome do cliente, modelo ou nº da OS" />
+                        </Field>
+                        <Tool icon={<Search />} label="Pesquisar" onClick={() => search()} />
+                    </form>
+                </Block>
 
-                <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 md:mx-0 md:flex-wrap md:px-0">
-                    {TABS.map((t) => (
-                        <button
-                            key={t.value}
-                            onClick={() => go({ status: t.value })}
-                            className={cn(
-                                'h-10 shrink-0 rounded-full px-4 text-sm font-semibold ring-1 transition',
-                                filters.status === t.value ? 'bg-foreground text-background ring-foreground' : 'bg-card ring-border hover:bg-muted',
-                            )}
-                        >
-                            {t.label}
-                        </button>
-                    ))}
-                </div>
-
-                <form
-                    onSubmit={(e) => {
-                        e.preventDefault();
-                        go({ q });
-                    }}
-                    className="relative"
-                >
-                    <Search className="text-muted-foreground absolute top-1/2 left-4 size-5 -translate-y-1/2" />
-                    <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Placa, nome do cliente ou número da OS" className="h-12 rounded-xl pl-12 text-base" />
-                </form>
-
-                <Panel>
-                    {orders.length ? (
-                        <div className="divide-y">
-                            {orders.map((os) => (
-                                <OsRow key={os.id} os={os} showMoney />
-                            ))}
-                        </div>
-                    ) : (
-                        <Empty title="Nenhuma OS encontrada" text="Tente outro filtro ou busca." />
-                    )}
-                </Panel>
-            </Page>
+                <Block title="Resultado" bodyClassName="p-0">
+                    <Grid
+                        cols={cols}
+                        rows={orders}
+                        rowKey={(r) => r.id}
+                        onRowClick={(r) => router.visit(route('os.show', r.id))}
+                        empty="Nenhuma OS encontrada com esses filtros."
+                        footer={
+                            <>
+                                <span>{orders.length} registro(s)</span>
+                                <span className="hidden md:inline">Clique na linha para abrir a OS</span>
+                            </>
+                        }
+                    />
+                </Block>
+            </div>
         </AppLayout>
     );
 }

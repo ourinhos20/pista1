@@ -1,307 +1,413 @@
 import { CarDiagramSvg, DamageLegend } from '@/components/car-diagram';
-import InputError from '@/components/input-error';
-import { Info, Page, Panel, PlateBadge, StatusBadge } from '@/components/oficina';
-import { Button } from '@/components/ui/button';
+import { Block, Field, Grid, Placa, ReadOnly, Situacao, Tabs, Tool, selectCls, textareaCls, type Col } from '@/components/erp';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
-import { ENTRY_CHECKLIST, FLOW, FUEL, NEXT_STEP, PAYMENT, STATUS, date, documentFmt, km, money, phone, plate, whatsapp } from '@/lib/os';
+import { ENTRY_CHECKLIST, FLOW, FUEL, PAYMENT, STATUS, WAITING_FOR, date, documentFmt, km, money, nextStep, phone, plate, whatsapp } from '@/lib/os';
+import { REVISION_GROUPS, REVISION_TOTAL, REVISION_VALUES, type RevisionValue } from '@/lib/revisao';
 import { cn } from '@/lib/utils';
-import type { OsFull, OsItem, OsStatus, SharedData } from '@/types';
-import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
-import { ArrowRight, Check, ChevronRight, LoaderCircle, MessageCircle, Plus, Printer, Trash2, UserCheck } from 'lucide-react';
-import { useState } from 'react';
+import type { OsEvent, OsFull, OsItem, OsStatus, SharedData } from '@/types';
+import { Head, router, useForm, usePage } from '@inertiajs/react';
+import { ArrowRight, ChevronDown, CircleCheck, Hourglass, MessageCircle, Plus, Printer, Save, Trash2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
+type Hist = { id: number; number: string; status: OsStatus; date: string; km_in: number | null; summary: string | null };
 interface Props {
     os: OsFull;
-    history: { id: number; number: string; status: OsStatus; date: string; km_in: number | null; summary: string | null }[];
+    history: Hist[];
     mechanics: { id: number; name: string }[];
     statuses: { value: OsStatus; label: string }[];
 }
+type Tab = 'diag' | 'revisao' | 'itens' | 'vistoria' | 'historico';
 
-const MECHANIC_ALLOWED: OsStatus[] = ['diagnostico', 'aprovacao', 'execucao', 'pronto'];
-
-function StatusTrack({ status }: { status: OsStatus }) {
-    const current = FLOW.indexOf(status);
+/* --------------------------------------------------------------- etapas */
+function Etapas({ status }: { status: OsStatus }) {
+    const cur = FLOW.indexOf(status);
     return (
-        <ol className="flex items-center gap-1 overflow-x-auto pb-1">
-            {FLOW.map((s, i) => {
-                const done = current >= 0 && i < current;
-                const active = i === current;
-                return (
-                    <li key={s} className="flex min-w-0 flex-1 items-center gap-1">
-                        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-                            <div className={cn('h-1.5 rounded-full', done || active ? STATUS[s].dot : 'bg-zinc-200 dark:bg-zinc-800')} />
-                            <span className={cn('truncate text-xs', active ? 'text-foreground font-semibold' : 'text-muted-foreground')}>{STATUS[s].label}</span>
-                        </div>
-                    </li>
-                );
-            })}
+        <ol className="flex overflow-x-auto rounded-[4px] border border-[#c9cdd3] bg-white text-[11px] font-semibold dark:bg-zinc-900">
+            {FLOW.map((s, i) => (
+                <li
+                    key={s}
+                    className={cn(
+                        'flex min-w-28 flex-1 items-center gap-1.5 border-r border-[#e3e5e8] px-2 py-1.5 whitespace-nowrap last:border-r-0',
+                        i === cur ? 'bg-zinc-900 text-white' : i < cur ? 'text-zinc-700 dark:text-zinc-300' : 'text-zinc-400',
+                    )}
+                >
+                    <span className={cn('grid size-4 place-items-center rounded-[2px] text-[10px]', i === cur ? 'bg-[#d42a2a]' : i < cur ? STATUS[s].dot + ' text-white' : 'border border-zinc-300')}>
+                        {i < cur ? '✓' : i + 1}
+                    </span>
+                    {STATUS[s].label}
+                </li>
+            ))}
         </ol>
     );
 }
 
-function ItemRow({ item, osId, sensitive }: { item: OsItem; osId: number; sensitive: boolean }) {
+/* ------------------------------------------------------------ revisão */
+function Revisao({ os }: { os: OsFull }) {
+    const [values, setValues] = useState<Record<string, RevisionValue>>({ ...(os.revision ?? {}) });
+    const [dirty, setDirty] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const filled = Object.keys(values).length;
+
+    const set = (k: string, v: RevisionValue) => {
+        setValues((cur) => {
+            const n = { ...cur };
+            if (n[k] === v) delete n[k];
+            else n[k] = v;
+            return n;
+        });
+        setDirty(true);
+    };
+    // grava sozinho logo após cada toque (o mecânico não perde nada se mudar de etapa)
+    useEffect(() => {
+        if (!dirty) return;
+        const t = setTimeout(() => {
+            setSaving(true);
+            router.patch(route('os.revision', os.id), { revision: values }, { preserveScroll: true, preserveState: true, onSuccess: () => setDirty(false), onFinish: () => setSaving(false) });
+        }, 600);
+        return () => clearTimeout(t);
+    }, [values, dirty, os.id]);
+
+    return (
+        <div className="grid gap-3">
+            <div className="flex flex-wrap items-center gap-2 text-[13px]">
+                <span>
+                    Preenchidos: <b className="tabular-nums">{filled}</b> de {REVISION_TOTAL}
+                </span>
+                <span className="text-muted-foreground text-[12px]">{saving || dirty ? 'Gravando…' : filled ? 'Gravado ✓' : 'Toque para marcar; grava sozinho'}</span>
+                <span className="ml-auto flex gap-1.5">
+                    {REVISION_VALUES.map((r) => (
+                        <span key={r.value} className={cn('rounded-[2px] border px-1.5 py-0.5 text-[11px] font-bold', r.cls)}>
+                            {r.label}: {Object.values(values).filter((v) => v === r.value).length}
+                        </span>
+                    ))}
+                </span>
+            </div>
+            <div className="grid gap-3 lg:grid-cols-2 2xl:grid-cols-3">
+                {REVISION_GROUPS.map((g) => (
+                    <div key={g.title} className="overflow-hidden rounded-[4px] border border-[#c9cdd3]">
+                        <div className="flex h-8 items-center border-b border-[#d7dade] bg-[#eceef1] px-2.5 text-[11px] font-bold tracking-wide uppercase dark:bg-zinc-800">{g.title}</div>
+                        {g.items.map((it) => (
+                            <div key={it.key} className="flex items-center gap-2 border-b border-[#eceef1] px-2.5 py-1.5 last:border-b-0 even:bg-[#f8f9fa] dark:even:bg-zinc-900/60">
+                                <span className="min-w-0 flex-1 text-[15px] md:text-[13px]">{it.label}</span>
+                                {REVISION_VALUES.map((r) => (
+                                    <button
+                                        key={r.value}
+                                        type="button"
+                                        onClick={() => set(it.key, r.value)}
+                                        className={cn(
+                                            'h-10 w-14 rounded-[3px] border text-[12px] font-bold md:h-7 md:w-11 md:text-[11px]',
+                                            values[it.key] === r.value ? r.cls : 'border-[#c9cdd3] bg-white text-zinc-500 hover:bg-zinc-50 dark:bg-zinc-900',
+                                        )}
+                                        aria-pressed={values[it.key] === r.value}
+                                    >
+                                        {r.short}
+                                    </button>
+                                ))}
+                            </div>
+                        ))}
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+/* ------------------------------------------------------ peças/serviços */
+function ItemRow({ item, osId }: { item: OsItem; osId: number }) {
     const [price, setPrice] = useState(String(item.unit_price ?? 0));
     const [qty, setQty] = useState(String(item.quantity));
-
     const save = () => {
         const p = Number(price.replace(',', '.')) || 0;
         const q = Number(qty.replace(',', '.')) || 1;
         if (p === item.unit_price && q === item.quantity) return;
         router.put(route('os.items.update', [osId, item.id]), { ...item, unit_price: p, quantity: q }, { preserveScroll: true });
     };
-
+    const noPrice = !item.unit_price;
     return (
-        <li className="flex items-center gap-3 py-3">
-            <span
-                className={cn(
-                    'shrink-0 rounded-md px-2 py-0.5 text-[11px] font-bold tracking-wide uppercase',
-                    item.type === 'peca' ? 'bg-zinc-900 text-white dark:bg-zinc-200 dark:text-zinc-900' : 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200',
-                )}
-            >
-                {item.type === 'peca' ? 'Peça' : 'Serviço'}
-            </span>
-            <span className="min-w-0 flex-1 text-[15px] font-medium">{item.description}</span>
-            {sensitive ? (
-                <>
-                    <Input value={qty} onChange={(e) => setQty(e.target.value)} onBlur={save} inputMode="decimal" className="tabular h-10 w-16 text-center" aria-label="Quantidade" />
-                    <div className="relative">
-                        <span className="text-muted-foreground absolute top-1/2 left-2.5 -translate-y-1/2 text-sm">R$</span>
-                        <Input value={price} onChange={(e) => setPrice(e.target.value)} onBlur={save} inputMode="decimal" className="tabular h-10 w-28 pl-8 text-right" aria-label="Valor unitário" />
-                    </div>
-                    <span className="tabular hidden w-24 text-right font-semibold sm:block">{money(item.total)}</span>
-                    <button
-                        type="button"
-                        aria-label="Remover item"
-                        className="text-muted-foreground hover:text-destructive grid size-10 place-items-center rounded-lg"
-                        onClick={() => confirm(`Remover "${item.description}"?`) && router.delete(route('os.items.destroy', [osId, item.id]), { preserveScroll: true })}
-                    >
-                        <Trash2 className="size-4" />
-                    </button>
-                </>
-            ) : (
-                <span className="tabular text-muted-foreground text-sm">× {item.quantity}</span>
-            )}
-        </li>
+        <tr className={cn('border-b border-[#e3e5e8] even:bg-[#f8f9fa] dark:even:bg-zinc-900/60', noPrice && 'bg-amber-50/70 even:bg-amber-50/70 dark:bg-amber-950/20')}>
+            <td className="px-2.5 py-1 text-[11px] font-bold uppercase">{item.type === 'peca' ? 'Peça' : 'Serviço'}</td>
+            <td className="px-2.5 py-1">{item.description}</td>
+            <td className="w-20 px-1.5 py-1">
+                <Input value={qty} onChange={(e) => setQty(e.target.value)} onBlur={save} inputMode="decimal" className="text-right tabular-nums" aria-label="Quantidade" />
+            </td>
+            <td className="w-32 px-1.5 py-1">
+                <Input value={price} onChange={(e) => setPrice(e.target.value)} onBlur={save} inputMode="decimal" className={cn('text-right tabular-nums', noPrice && 'border-amber-400')} aria-label="Valor unitário" />
+            </td>
+            <td className="w-28 px-2.5 py-1 text-right font-semibold tabular-nums">{money(item.total)}</td>
+            <td className="w-10 px-1 py-1 text-center">
+                <button
+                    type="button"
+                    aria-label="Remover item"
+                    className="grid size-9 place-items-center rounded-[3px] text-zinc-500 hover:bg-red-50 hover:text-red-700 md:size-7"
+                    onClick={() => confirm(`Remover "${item.description}"?`) && router.delete(route('os.items.destroy', [osId, item.id]), { preserveScroll: true })}
+                >
+                    <Trash2 className="size-4" />
+                </button>
+            </td>
+        </tr>
     );
 }
 
 function AddItem({ osId, sensitive }: { osId: number; sensitive: boolean }) {
-    const { data, setData, post, processing, errors, reset } = useForm({ type: 'servico' as 'servico' | 'peca', description: '', quantity: '1', unit_price: '' });
+    const { data, setData, post, processing, errors, reset } = useForm({ type: 'peca' as 'servico' | 'peca', description: '', quantity: '1', unit_price: '' });
     return (
         <form
-            className="flex flex-wrap items-start gap-2 border-t pt-4"
+            className="grid items-end gap-2 border-t border-[#d7dade] bg-[#f6f7f8] p-2.5 sm:grid-cols-[130px_1fr_80px_auto] lg:grid-cols-[130px_1fr_80px_120px_auto] dark:bg-zinc-800"
             onSubmit={(e) => {
                 e.preventDefault();
                 post(route('os.items.store', osId), { preserveScroll: true, onSuccess: () => reset('description', 'unit_price', 'quantity') });
             }}
         >
-            <div className="grid grid-cols-2 gap-1 rounded-xl bg-zinc-100 p-1 dark:bg-zinc-800">
-                {(['servico', 'peca'] as const).map((t) => (
-                    <button
-                        key={t}
-                        type="button"
-                        onClick={() => setData('type', t)}
-                        className={cn('h-10 rounded-lg px-3 text-sm font-semibold', data.type === t ? 'bg-card shadow ring-1 ring-black/5' : 'text-muted-foreground')}
-                    >
-                        {t === 'peca' ? 'Peça' : 'Serviço'}
-                    </button>
-                ))}
-            </div>
-            <div className="min-w-[220px] flex-1">
-                <Input
-                    placeholder={sensitive ? 'Descrição da peça ou serviço' : 'Peça ou serviço necessário'}
-                    value={data.description}
-                    onChange={(e) => setData('description', e.target.value)}
-                    className="h-12 text-base"
-                />
-                <InputError message={errors.description} />
-            </div>
-            <Input value={data.quantity} onChange={(e) => setData('quantity', e.target.value)} inputMode="decimal" className="tabular h-12 w-20 text-center" aria-label="Quantidade" placeholder="Qtd" />
+            <Field label="Tipo">
+                <select className={selectCls} value={data.type} onChange={(e) => setData('type', e.target.value as 'peca' | 'servico')}>
+                    <option value="peca">Peça</option>
+                    <option value="servico">Serviço</option>
+                </select>
+            </Field>
+            <Field label="Descrição" error={errors.description}>
+                <Input value={data.description} onChange={(e) => setData('description', e.target.value)} placeholder={sensitive ? 'Peça ou serviço' : 'Peça ou serviço necessário'} />
+            </Field>
+            <Field label="Qtd">
+                <Input value={data.quantity} onChange={(e) => setData('quantity', e.target.value)} inputMode="decimal" className="text-right tabular-nums" />
+            </Field>
             {sensitive && (
-                <Input value={data.unit_price} onChange={(e) => setData('unit_price', e.target.value)} inputMode="decimal" placeholder="Valor R$" className="tabular h-12 w-32" />
+                <Field label="Vl. unitário" className="hidden lg:grid">
+                    <Input value={data.unit_price} onChange={(e) => setData('unit_price', e.target.value)} inputMode="decimal" className="text-right tabular-nums" />
+                </Field>
             )}
-            <Button type="submit" variant="outline" className="h-12" disabled={processing || !data.description}>
-                <Plus className="size-4" /> {sensitive ? 'Adicionar' : 'Pedir'}
-            </Button>
+            <button type="submit" disabled={processing || !data.description} className="inline-flex h-11 items-center justify-center gap-1.5 rounded-[3px] border border-zinc-800 bg-zinc-900 px-3 text-[13px] font-semibold text-white disabled:opacity-50 md:h-8">
+                <Plus className="size-4" /> Incluir
+            </button>
         </form>
     );
 }
 
-function Payment({ os }: { os: OsFull }) {
+function Totais({ os }: { os: OsFull }) {
     const { data, setData, patch, processing, isDirty, transform } = useForm({
         discount: String(os.discount ?? 0),
-        down_payment: String(os.down_payment ?? 0),
-        payment_method: os.payment_method ?? '',
     });
-    const remaining = Math.max(0, (os.total ?? 0) - (Number(data.down_payment.replace(',', '.')) || 0));
-
+    const num = (v: string) => Number(v.replace(',', '.')) || 0;
+    const total = Math.max(0, (os.subtotal ?? 0) - num(data.discount));
     return (
-        <div className="grid gap-4">
-            <dl className="grid gap-2 text-[15px]">
-                <div className="flex justify-between">
-                    <dt className="text-muted-foreground">Subtotal</dt>
-                    <dd className="tabular font-medium">{money(os.subtotal)}</dd>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                    <dt className="text-muted-foreground">Desconto</dt>
-                    <dd>
-                        <Input value={data.discount} onChange={(e) => setData('discount', e.target.value)} inputMode="decimal" className="tabular h-10 w-28 text-right" />
-                    </dd>
-                </div>
-                <div className="flex items-baseline justify-between border-t pt-3">
-                    <dt className="font-semibold">Total</dt>
-                    <dd className="tabular text-3xl font-bold tracking-tight">{money(os.total)}</dd>
-                </div>
-            </dl>
-            <div className="grid grid-cols-2 gap-3">
-                <label className="grid gap-1.5 text-sm font-medium">
-                    Entrada
-                    <Input value={data.down_payment} onChange={(e) => setData('down_payment', e.target.value)} inputMode="decimal" className="tabular h-11" />
-                </label>
-                <label className="grid gap-1.5 text-sm font-medium">
-                    Pagamento
-                    <select value={data.payment_method} onChange={(e) => setData('payment_method', e.target.value)} className="border-input bg-card h-11 rounded-xl border px-2">
-                        <option value="">—</option>
-                        {Object.entries(PAYMENT).map(([k, v]) => (
-                            <option key={k} value={k}>
-                                {v}
-                            </option>
-                        ))}
-                    </select>
-                </label>
+        <div className="grid gap-2.5">
+            <div className="flex justify-between text-[13px]">
+                <span>Subtotal</span>
+                <b className="tabular-nums">{money(os.subtotal)}</b>
             </div>
-            <p className="text-muted-foreground flex justify-between text-sm">
-                <span>Restante a receber</span>
-                <span className="tabular text-foreground font-semibold">{money(remaining)}</span>
-            </p>
+            <Field label="Desconto (R$)">
+                <Input value={data.discount} onChange={(e) => setData('discount', e.target.value)} inputMode="decimal" className="text-right tabular-nums" />
+            </Field>
+            <div className="flex items-baseline justify-between rounded-[3px] bg-zinc-900 px-3 py-2 text-white">
+                <span className="text-[12px] font-bold uppercase">Total</span>
+                <b className="text-[20px] tabular-nums">{money(total)}</b>
+            </div>
             {isDirty && (
-                <Button
+                <Tool
+                    primary
+                    icon={<Save />}
+                    label="Gravar valores"
                     disabled={processing}
                     onClick={() => {
-                        transform((d) => ({
-                            discount: Number(d.discount.replace(',', '.')) || 0,
-                            down_payment: Number(d.down_payment.replace(',', '.')) || 0,
-                            payment_method: d.payment_method || null,
-                        }) as never);
+                        transform((d) => ({ discount: num(d.discount) }) as never);
                         patch(route('os.update', os.id), { preserveScroll: true });
                     }}
-                >
-                    Salvar valores
-                </Button>
+                />
             )}
         </div>
     );
 }
 
+/* ------------------------------------------------------------ pagamentos */
+function Pagamentos({ os }: { os: OsFull }) {
+    const total = os.total ?? 0;
+    const billed = os.billed_total ?? 0;
+    const remaining = Math.max(0, Math.round((total - billed) * 100) / 100);
+    const { data, setData, post, processing, errors, reset } = useForm({
+        amount: remaining ? remaining.toFixed(2).replace('.', ',') : '',
+        payment_method: 'pix',
+        installments: '1',
+        received: true as boolean,
+    });
+    const multi = ['credito', 'parcelado', 'boleto'].includes(data.payment_method);
+    const err = errors as Record<string, string>;
+
+    return (
+        <div className="grid gap-2.5">
+            {(os.payments ?? []).length > 0 && (
+                <table className="w-full text-[12px]">
+                    <tbody>
+                        {os.payments!.map((p) => (
+                            <tr key={p.id} className="border-b border-[#e3e5e8]">
+                                <td className="py-1">
+                                    {PAYMENT[p.payment_method ?? ''] ?? '—'}
+                                    {p.installments ? ` ${p.installment}/${p.installments}` : ''}
+                                    <span className={cn('block text-[11px]', p.paid_at ? 'text-green-700' : 'text-amber-700')}>
+                                        {p.paid_at ? `Recebido ${p.paid_at.split('-').reverse().join('/')}` : `Vence ${p.due_date.split('-').reverse().join('/')}`}
+                                    </span>
+                                </td>
+                                <td className="py-1 text-right font-semibold tabular-nums">{money(p.amount)}</td>
+                                <td className="w-8 py-1 text-right">
+                                    <button
+                                        type="button"
+                                        title="Excluir pagamento"
+                                        className="text-zinc-400 hover:text-red-700"
+                                        onClick={() => confirm('Excluir este pagamento?') && router.delete(route('os.payments.destroy', [os.id, p.id]), { preserveScroll: true })}
+                                    >
+                                        <Trash2 className="size-3.5" />
+                                    </button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            )}
+            <div className="grid grid-cols-2 gap-1 text-[12px]">
+                <span>Recebido</span>
+                <b className="text-right text-green-800 tabular-nums">{money(os.paid_total)}</b>
+                <span>A receber (parcelas)</span>
+                <b className="text-right tabular-nums">{money(billed - (os.paid_total ?? 0))}</b>
+                <span>Falta lançar</span>
+                <b className={cn('text-right tabular-nums', remaining > 0 && 'text-[#b51f1f]')}>{money(remaining)}</b>
+            </div>
+            {total > 0 && remaining > 0 && (
+                <form
+                    className="grid gap-2 border-t border-dashed border-[#c9cdd3] pt-2.5"
+                    onSubmit={(e) => {
+                        e.preventDefault();
+                        post(route('os.payments.store', os.id), { preserveScroll: true, onSuccess: () => reset() });
+                    }}
+                >
+                    <div className="grid grid-cols-2 gap-2">
+                        <Field label="Valor (R$)" error={err.amount}>
+                            <Input value={data.amount} onChange={(e) => setData('amount', e.target.value)} inputMode="decimal" className="text-right tabular-nums" />
+                        </Field>
+                        <Field label="Forma">
+                            <select className={selectCls} value={data.payment_method} onChange={(e) => setData('payment_method', e.target.value)}>
+                                {Object.entries(PAYMENT).map(([k, v]) => (
+                                    <option key={k} value={k}>
+                                        {v}
+                                    </option>
+                                ))}
+                            </select>
+                        </Field>
+                    </div>
+                    {multi && (
+                        <Field label="Parcelas">
+                            <select className={selectCls} value={data.installments} onChange={(e) => setData('installments', e.target.value)}>
+                                {Array.from({ length: 12 }, (_, i) => i + 1).map((i) => (
+                                    <option key={i} value={i}>
+                                        {i}x {i > 1 ? `de ${money((Number(data.amount.replace(/\./g, '').replace(',', '.')) || 0) / i)}` : ''}
+                                    </option>
+                                ))}
+                            </select>
+                        </Field>
+                    )}
+                    <label className="flex items-center gap-2 text-[12px] font-medium">
+                        <input type="checkbox" className="size-4 accent-[#d42a2a]" checked={data.received} onChange={(e) => setData('received', e.target.checked)} />
+                        {Number(data.installments) > 1 ? '1ª parcela recebida agora' : 'Recebido agora'}
+                    </label>
+                    <button type="submit" disabled={processing} className="inline-flex h-11 items-center justify-center gap-1.5 rounded-[3px] border border-green-800 bg-green-700 text-[13px] font-semibold text-white disabled:opacity-60 md:h-8">
+                        <CircleCheck className="size-4" /> Registrar pagamento
+                    </button>
+                </form>
+            )}
+        </div>
+    );
+}
+
+/* ----------------------------------------------------------------- tela */
 export default function OsShow({ os, history, mechanics, statuses }: Props) {
     const { auth } = usePage<SharedData>().props;
     const sensitive = auth.can.sensitive;
     const isMechanic = auth.user.role === 'mecanico';
     const [busy, setBusy] = useState(false);
-    const diag = useForm({ diagnosis: os.diagnosis ?? '' });
+    const [tab, setTab] = useState<Tab>(() => (sensitive && ['orcamento', 'aprovacao'].includes(os.status) ? 'itens' : 'diag'));
+    const diag = useForm({ diagnosis: os.diagnosis ?? '', complaint: os.complaint ?? '' });
 
-    const next = NEXT_STEP[os.status];
-    const canNext = next && (!isMechanic || MECHANIC_ALLOWED.includes(next.to));
+    const next = nextStep(os.status, auth.user.role);
+    const v = os.vehicle;
+    const pendingPrice = os.items.some((i) => !i.unit_price);
 
     const setStatus = (status: OsStatus) => {
         setBusy(true);
         router.patch(route('os.status', os.id), { status }, { preserveScroll: true, onFinish: () => setBusy(false) });
     };
 
-    const v = os.vehicle;
+    const saveDiag = () => {
+        if (sensitive) diag.patch(route('os.update', os.id), { preserveScroll: true });
+        else diag.patch(route('os.diagnosis', os.id), { preserveScroll: true });
+    };
+
+    useEffect(() => {
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key === 'F8') {
+                e.preventDefault();
+                window.open(route('os.print', [os.id, sensitive ? 'cliente' : 'diagnostico']), '_blank');
+            }
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, [os.id, sensitive]);
+
+    const first = os.client?.name?.split(' ')[0];
     const budgetText = [
-        `Olá, ${os.client?.name?.split(' ')[0]}! Aqui é da Pista 1 Mecânica Automotiva.`,
+        `Olá, ${first}! Aqui é da Pista 1 Mecânica Automotiva.`,
         `Orçamento da OS ${os.number} — ${v?.title} (${plate(v?.plate)}):`,
         '',
         ...os.items.map((i) => `• ${i.description}${i.quantity !== 1 ? ` (${i.quantity}x)` : ''} — ${money(i.total)}`),
         '',
-        os.discount ? `Desconto: ${money(os.discount)}` : '',
         `*Total: ${money(os.total)}*`,
         '',
-        'Podemos seguir com o serviço? Responda SIM para aprovar.',
-    ]
-        .filter((l, i, a) => l !== '' || a[i - 1] !== '')
-        .join('\n');
-    const readyText = `Olá, ${os.client?.name?.split(' ')[0]}! Seu ${v?.title} (${plate(v?.plate)}) está pronto para retirada na Pista 1. Total: ${money(os.total)}. Te esperamos!`;
-    const waBudget = sensitive ? whatsapp(os.client?.phone, budgetText) : null;
-    const waReady = sensitive ? whatsapp(os.client?.phone, readyText) : null;
+        'Podemos seguir com o serviço? Responda SIM para autorizar.',
+    ].join('\n');
+    const readyText = `Olá, ${first}! Seu ${v?.title} (${plate(v?.plate)}) está pronto para retirada na Pista 1. Total: ${money(os.total)}.`;
+    const wa = sensitive ? whatsapp(os.client?.phone, os.status === 'pronto' ? readyText : budgetText) : null;
 
-    const printTypes = sensitive
+    const printTypes: [string, string][] = sensitive
         ? [
-              ['cliente', 'Ficha do cliente (orçamento / OS)'],
-              ['entrada', 'Vistoria de entrada (avarias)'],
-              ['diagnostico', 'Ficha do mecânico (diagnóstico)'],
-              ['revisao', 'Checklist de revisão completa'],
+              ['cliente', 'Via do cliente (orçamento / OS)'],
+              ['entrada', 'Vistoria de entrada'],
+              ['diagnostico', 'Ficha do mecânico'],
+              ['revisao', 'Checklist de revisão'],
           ]
         : [
-              ['diagnostico', 'Ficha de diagnóstico'],
-              ['revisao', 'Checklist de revisão completa'],
+              ['diagnostico', 'Ficha do mecânico'],
+              ['revisao', 'Checklist de revisão'],
           ];
+
+    const histCols: Col<Hist>[] = [
+        { label: 'Data', render: (r) => date(r.date), className: 'w-24' },
+        { label: 'OS', render: (r) => r.number, className: 'w-20' },
+        { label: 'Km', render: (r) => km(r.km_in), align: 'right', className: 'w-28' },
+        { label: 'Serviços', render: (r) => <span className="line-clamp-1">{r.summary}</span> },
+        { label: 'Situação', render: (r) => <Situacao status={r.status} />, hide: 'md' },
+    ];
+    const evCols: Col<OsEvent>[] = [
+        { label: 'Data / hora', render: (r) => date(r.created_at, true), className: 'w-36' },
+        { label: 'Situação', render: (r) => (r.status ? <Situacao status={r.status} /> : '—'), className: 'w-48' },
+        { label: 'Ocorrência', render: (r) => r.note ?? '' },
+        { label: 'Usuário', render: (r) => r.user ?? '', hide: 'md' },
+    ];
 
     return (
         <AppLayout
-            breadcrumbs={[
-                { title: isMechanic ? 'Minhas OS' : 'Ordens de serviço', href: isMechanic ? '/mecanico' : '/os' },
-                { title: `OS ${os.number}`, href: `/os/${os.id}` },
-            ]}
-        >
-            <Head title={`OS ${os.number} · ${plate(v?.plate)}`} />
-            <Page>
-                {/* Cabeçalho: placa, carro e status em destaque */}
-                <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                    <div className="flex items-start gap-4">
-                        <PlateBadge value={v?.plate} size="lg" />
-                        <div className="min-w-0">
-                            <h1 className="text-2xl font-bold tracking-tight md:text-3xl">{v?.title || 'Veículo'}</h1>
-                            <p className="text-muted-foreground mt-0.5 text-[15px]">
-                                OS {os.number} · {os.client?.name}
-                                {v?.color ? ` · ${v.color}` : ''}
-                            </p>
-                        </div>
-                    </div>
-                    <StatusBadge status={os.status} className="self-start px-3 py-1.5 text-sm" />
-                </div>
-
-                <StatusTrack status={os.status} />
-
-                {/* Ações */}
-                <div className="flex flex-wrap gap-2">
-                    {canNext && (
-                        <Button size="lg" className="hidden md:inline-flex" disabled={busy} onClick={() => setStatus(next.to)}>
-                            {busy ? <LoaderCircle className="size-5 animate-spin" /> : <ArrowRight className="size-5" />}
-                            {next.label}
-                        </Button>
-                    )}
-                    {isMechanic && !os.mechanic && (
-                        <Button size="lg" variant="outline" onClick={() => router.post(route('os.assume', os.id), {}, { preserveScroll: true })}>
-                            <UserCheck className="size-5" /> Assumir esta OS
-                        </Button>
-                    )}
-                    {waBudget && os.items.length > 0 && ['diagnostico', 'aprovacao'].includes(os.status) && (
-                        <Button size="lg" variant="outline" asChild>
-                            <a href={waBudget} target="_blank" rel="noreferrer" onClick={() => os.status === 'diagnostico' && setStatus('aprovacao')}>
-                                <MessageCircle className="size-5 text-green-600" /> Enviar orçamento
-                            </a>
-                        </Button>
-                    )}
-                    {waReady && os.status === 'pronto' && (
-                        <Button size="lg" variant="outline" asChild>
-                            <a href={waReady} target="_blank" rel="noreferrer">
-                                <MessageCircle className="size-5 text-green-600" /> Avisar que está pronto
-                            </a>
-                        </Button>
-                    )}
+            title={`OS ${os.number} · ${plate(v?.plate)} · ${v?.title ?? ''}`}
+            code="ATD030"
+            toolbar={
+                <>
+                    {next && <Tool primary icon={<ArrowRight />} label={next.label} onClick={() => setStatus(next.to)} disabled={busy} className="hidden md:inline-flex" />}
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <Button size="lg" variant="outline">
-                                <Printer className="size-5" /> Imprimir
-                            </Button>
+                            <button className="inline-flex h-11 items-center gap-1.5 rounded-[3px] border border-[#c9cdd3] bg-white px-3 text-[13px] font-semibold md:h-8 md:px-2.5 dark:bg-zinc-900">
+                                <Printer className="size-4" /> Imprimir <kbd className="hidden rounded-[2px] border px-1 font-mono text-[10px] font-normal text-zinc-500 md:inline">F8</kbd>
+                                <ChevronDown className="size-3.5" />
+                            </button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="start" className="w-72 rounded-xl p-1.5">
+                        <DropdownMenuContent align="end" className="w-64 rounded-[4px] p-1">
                             {printTypes.map(([k, label]) => (
-                                <DropdownMenuItem key={k} asChild className="h-11 rounded-lg text-[15px]">
+                                <DropdownMenuItem key={k} asChild className="h-9 rounded-[3px] text-[13px]">
                                     <a href={route('os.print', [os.id, k])} target="_blank" rel="noreferrer">
                                         {label}
                                     </a>
@@ -309,14 +415,12 @@ export default function OsShow({ os, history, mechanics, statuses }: Props) {
                             ))}
                         </DropdownMenuContent>
                     </DropdownMenu>
+                    {wa && ['orcamento', 'aprovacao', 'pronto'].includes(os.status) && os.items.length > 0 && (
+                        <Tool icon={<MessageCircle className="text-green-600" />} label={os.status === 'pronto' ? 'Avisar cliente' : 'Orçamento no WhatsApp'} href={wa} external />
+                    )}
                     {sensitive && (
-                        <select
-                            aria-label="Mudar status"
-                            className="border-input bg-card text-muted-foreground h-14 rounded-2xl border px-3 text-[15px] font-medium"
-                            value=""
-                            onChange={(e) => e.target.value && setStatus(e.target.value as OsStatus)}
-                        >
-                            <option value="">Mudar status…</option>
+                        <select aria-label="Alterar situação" className={cn(selectCls, 'w-auto md:w-44')} value="" onChange={(e) => e.target.value && setStatus(e.target.value as OsStatus)}>
+                            <option value="">Alterar situação…</option>
                             {statuses
                                 .filter((s) => s.value !== os.status)
                                 .map((s) => (
@@ -326,90 +430,82 @@ export default function OsShow({ os, history, mechanics, statuses }: Props) {
                                 ))}
                         </select>
                     )}
-                </div>
+                    {auth.can.master && (
+                        <Tool danger icon={<Trash2 />} label="Excluir" onClick={() => confirm(`Excluir a OS ${os.number}? Não pode ser desfeito.`) && router.delete(route('os.destroy', os.id))} className="hidden lg:inline-flex" />
+                    )}
+                </>
+            }
+        >
+            <Head title={`OS ${os.number} · ${plate(v?.plate)}`} />
+            <div className="grid gap-2 md:gap-3">
+                <Etapas status={os.status} />
 
-                <div className="grid gap-6 lg:grid-cols-3">
-                    <div className="grid content-start gap-6 lg:col-span-2">
-                        <Panel title="Relato do cliente">
-                            <p className="text-[17px] leading-relaxed whitespace-pre-line">{os.complaint || <span className="text-muted-foreground">Nada relatado.</span>}</p>
-                        </Panel>
+                {isMechanic && WAITING_FOR[os.status] && (
+                    <p className="flex items-center gap-2 rounded-[3px] border border-amber-300 bg-amber-50 px-3 py-2 text-[14px] font-medium dark:border-amber-800 dark:bg-amber-950/40">
+                        <Hourglass className="size-4" /> {WAITING_FOR[os.status]}
+                    </p>
+                )}
+                {sensitive && os.status === 'orcamento' && (
+                    <p className="flex items-center gap-2 rounded-[3px] border border-violet-300 bg-violet-50 px-3 py-2 text-[13px] dark:border-violet-800 dark:bg-violet-950/40">
+                        O mecânico enviou o diagnóstico. Lance os valores na aba <b>Peças e serviços</b>, imprima a via do cliente e clique em <b>Orçamento enviado ao cliente</b>.
+                    </p>
+                )}
 
-                        <Panel title="Diagnóstico do mecânico">
-                            <form
-                                onSubmit={(e) => {
-                                    e.preventDefault();
-                                    diag.patch(route('os.diagnosis', os.id), { preserveScroll: true });
-                                }}
-                                className="grid gap-3"
-                            >
-                                <textarea
-                                    rows={5}
-                                    value={diag.data.diagnosis}
-                                    onChange={(e) => diag.setData('diagnosis', e.target.value)}
-                                    placeholder="O que foi encontrado no carro, testes feitos, o que precisa trocar…"
-                                    className="border-input bg-card focus-visible:ring-ring rounded-xl border px-3 py-3 text-base leading-relaxed outline-none focus-visible:ring-2"
-                                />
-                                {diag.isDirty && (
-                                    <Button type="submit" disabled={diag.processing} className="justify-self-start">
-                                        <Check className="size-4" /> Salvar diagnóstico
-                                    </Button>
+                <Block title="Dados da ordem de serviço">
+                    <div className="grid grid-cols-2 gap-x-3 gap-y-2.5 md:grid-cols-4 xl:grid-cols-6">
+                        <Field label="Nº OS">
+                            <ReadOnly className="font-bold">{os.number}</ReadOnly>
+                        </Field>
+                        <Field label="Situação">
+                            <ReadOnly>
+                                <Situacao status={os.status} />
+                            </ReadOnly>
+                        </Field>
+                        <Field label="Agendado para">
+                            <ReadOnly>{os.scheduled_at ? date(os.scheduled_at, true) : '—'}</ReadOnly>
+                        </Field>
+                        <Field label="Abertura">
+                            <ReadOnly>{date(os.created_at, true)}</ReadOnly>
+                        </Field>
+                        <Field label="Placa">
+                            <ReadOnly>
+                                <Placa value={v?.plate} />
+                            </ReadOnly>
+                        </Field>
+                        <Field label="Km entrada">
+                            <ReadOnly className="font-semibold tabular-nums">{km(os.km_in)}</ReadOnly>
+                        </Field>
+                        <Field label="Veículo" className="col-span-2">
+                            <ReadOnly>
+                                {v?.title}
+                                {v?.color ? ` · ${v.color}` : ''}
+                            </ReadOnly>
+                        </Field>
+                        <Field label="Cliente" className="col-span-2">
+                            <ReadOnly>
+                                {sensitive && os.client ? (
+                                    <a href={route('clientes.show', os.client.id)} className="text-[#b51f1f] hover:underline">
+                                        {os.client.name}
+                                    </a>
+                                ) : (
+                                    os.client?.name
                                 )}
-                            </form>
-                        </Panel>
-
-                        <Panel title={sensitive ? 'Serviços e peças' : 'Serviços e peças pedidos'}>
-                            {os.items.length ? (
-                                <ul className="divide-y">
-                                    {os.items.map((i) => (
-                                        <ItemRow key={`${i.id}-${i.unit_price}-${i.quantity}`} item={i} osId={os.id} sensitive={sensitive} />
-                                    ))}
-                                </ul>
-                            ) : (
-                                <p className="text-muted-foreground pb-4 text-[15px]">Nenhum item ainda.</p>
-                            )}
-                            <AddItem osId={os.id} sensitive={sensitive} />
-                        </Panel>
-
-                        <Panel title="Vistoria de entrada">
-                            <dl className="mb-5 grid grid-cols-2 gap-4 md:grid-cols-4">
-                                <Info label="Km na entrada">
-                                    <span className="tabular text-lg font-bold">{km(os.km_in)}</span>
-                                </Info>
-                                <Info label="Combustível">{os.fuel_level !== null ? FUEL[os.fuel_level] : '—'}</Info>
-                                <Info label="Abertura">{date(os.created_at, true)}</Info>
-                                <Info label="Agendado">{os.scheduled_at ? date(os.scheduled_at, true) : '—'}</Info>
-                            </dl>
-                            <div className="mb-5 flex flex-wrap gap-1.5">
-                                {ENTRY_CHECKLIST.filter((c) => os.checklist?.[c.key]).map((c) => (
-                                    <span key={c.key} className="bg-muted inline-flex items-center gap-1 rounded-full px-3 py-1 text-sm font-medium">
-                                        <Check className="size-3.5" /> {c.label}
-                                    </span>
-                                ))}
-                            </div>
-                            <div className="bg-muted/50 rounded-2xl p-2 md:p-4">
-                                <CarDiagramSvg damages={os.damages} />
-                            </div>
-                            <div className="mt-4">
-                                <DamageLegend damages={os.damages} />
-                            </div>
-                        </Panel>
-                    </div>
-
-                    <div className="grid content-start gap-6">
+                            </ReadOnly>
+                        </Field>
                         {sensitive && (
-                            <Panel title="Valores">
-                                <Payment key={`${os.total}-${os.down_payment}-${os.discount}`} os={os} />
-                            </Panel>
+                            <>
+                                <Field label="WhatsApp">
+                                    <ReadOnly>{phone(os.client?.phone)}</ReadOnly>
+                                </Field>
+                                <Field label="CPF / CNPJ">
+                                    <ReadOnly>{documentFmt(os.client?.document)}</ReadOnly>
+                                </Field>
+                            </>
                         )}
-
-                        <Panel title="Responsável">
+                        <Field label="Mecânico" className="col-span-2">
                             {sensitive ? (
-                                <select
-                                    className="border-input bg-card h-12 w-full rounded-xl border px-3 text-base"
-                                    value={os.mechanic?.id ?? ''}
-                                    onChange={(e) => router.patch(route('os.update', os.id), { mechanic_id: e.target.value || null }, { preserveScroll: true })}
-                                >
-                                    <option value="">Sem mecânico</option>
+                                <select className={selectCls} value={os.mechanic?.id ?? ''} onChange={(e) => router.patch(route('os.update', os.id), { mechanic_id: e.target.value || null }, { preserveScroll: true })}>
+                                    <option value="">— sem mecânico —</option>
                                     {mechanics.map((m) => (
                                         <option key={m.id} value={m.id}>
                                             {m.name}
@@ -417,97 +513,162 @@ export default function OsShow({ os, history, mechanics, statuses }: Props) {
                                     ))}
                                 </select>
                             ) : (
-                                <p className="text-[15px] font-medium">{os.mechanic?.name ?? 'Sem mecânico'}</p>
+                                <ReadOnly>{os.mechanic?.name}</ReadOnly>
                             )}
-                        </Panel>
+                        </Field>
+                        <Field label="Combustível">
+                            <ReadOnly>{os.fuel_level !== null ? FUEL[os.fuel_level] : '—'}</ReadOnly>
+                        </Field>
+                    </div>
+                </Block>
 
-                        {sensitive && os.client && (
-                            <Panel
-                                title="Cliente"
-                                action={
-                                    <Link href={route('clientes.show', os.client.id)} className="text-primary text-sm font-semibold">
-                                        Abrir ficha
-                                    </Link>
-                                }
-                            >
-                                <dl className="grid gap-3">
-                                    <Info label="Nome">{os.client.name}</Info>
-                                    <Info label="WhatsApp">{phone(os.client.phone)}</Info>
-                                    <Info label="CPF / CNPJ">{documentFmt(os.client.document)}</Info>
-                                </dl>
-                            </Panel>
+                <div className="bg-card overflow-hidden rounded-[4px] border border-[#c9cdd3]">
+                    <div className="bg-[#f3f4f6] px-2 pt-2 dark:bg-zinc-800">
+                        <Tabs<Tab>
+                            value={tab}
+                            onChange={setTab}
+                            tabs={[
+                                { value: 'diag', label: 'Solicitação e diagnóstico' },
+                                { value: 'revisao', label: 'Revisão', badge: Object.keys(os.revision ?? {}).length ? <span className="rounded-[2px] bg-zinc-200 px-1 text-[10px] dark:bg-zinc-700">{Object.keys(os.revision).length}</span> : null },
+                                {
+                                    value: 'itens',
+                                    label: 'Peças e serviços',
+                                    badge: os.items.length ? <span className={cn('rounded-[2px] px-1 text-[10px]', sensitive && pendingPrice ? 'bg-amber-400 text-black' : 'bg-zinc-200 dark:bg-zinc-700')}>{os.items.length}</span> : null,
+                                },
+                                { value: 'vistoria', label: 'Vistoria de entrada' },
+                                { value: 'historico', label: 'Histórico' },
+                            ]}
+                        />
+                    </div>
+
+                    <div className="p-3">
+                        {tab === 'diag' && (
+                            <div className="grid gap-3 lg:grid-cols-2">
+                                <Field label="Solicitação do cliente (pré-atendimento)">
+                                    {sensitive ? (
+                                        <textarea rows={8} className={textareaCls} value={diag.data.complaint} onChange={(e) => diag.setData('complaint', e.target.value)} />
+                                    ) : (
+                                        <div className="min-h-40 rounded-[3px] border border-[#d7dade] bg-[#f7f8f9] px-3 py-2 text-[16px] leading-relaxed whitespace-pre-line md:text-[14px] dark:bg-zinc-800">
+                                            {os.complaint || '—'}
+                                        </div>
+                                    )}
+                                </Field>
+                                <Field label="Diagnóstico do mecânico">
+                                    <textarea
+                                        rows={8}
+                                        className={textareaCls}
+                                        placeholder="O que foi encontrado, testes feitos, o que precisa trocar…"
+                                        value={diag.data.diagnosis}
+                                        onChange={(e) => diag.setData('diagnosis', e.target.value)}
+                                    />
+                                </Field>
+                                {diag.isDirty && (
+                                    <div className="lg:col-span-2">
+                                        <Tool primary icon={<Save />} label="Gravar" onClick={saveDiag} disabled={diag.processing} />
+                                    </div>
+                                )}
+                            </div>
                         )}
 
-                        <Panel
-                            title="Histórico do carro"
-                            action={
-                                v && (
-                                    <Link href={route('veiculos.show', v.id)} className="text-primary text-sm font-semibold">
-                                        Ver tudo
-                                    </Link>
-                                )
-                            }
-                        >
-                            {history.length ? (
-                                <ul className="grid gap-1">
-                                    {history.map((h) => (
-                                        <li key={h.id}>
-                                            <Link href={route('os.show', h.id)} className="hover:bg-muted -mx-2 flex items-center gap-2 rounded-xl px-2 py-2">
-                                                <div className="min-w-0 flex-1">
-                                                    <p className="text-sm font-semibold">
-                                                        {date(h.date)} <span className="text-muted-foreground font-normal">· {km(h.km_in)}</span>
-                                                    </p>
-                                                    <p className="text-muted-foreground truncate text-sm">{h.summary || '—'}</p>
-                                                </div>
-                                                <ChevronRight className="text-muted-foreground size-4" />
-                                            </Link>
-                                        </li>
-                                    ))}
-                                </ul>
-                            ) : (
-                                <p className="text-muted-foreground text-sm">Primeira vez deste carro na oficina.</p>
-                            )}
-                        </Panel>
+                        {tab === 'revisao' && <Revisao os={os} />}
 
-                        <Panel title="Movimentação">
-                            <ol className="grid gap-3">
-                                {os.events.map((e) => (
-                                    <li key={e.id} className="flex gap-3 text-sm">
-                                        <span className={cn('mt-1.5 size-2 shrink-0 rounded-full', e.status ? STATUS[e.status].dot : 'bg-zinc-300')} />
-                                        <div>
-                                            <p className="font-medium">
-                                                {e.note || (e.status ? STATUS[e.status].label : '')}
-                                            </p>
-                                            <p className="text-muted-foreground">
-                                                {date(e.created_at, true)}
-                                                {e.user ? ` · ${e.user}` : ''}
-                                            </p>
+                        {tab === 'itens' && (
+                            <div className={cn('grid gap-3', sensitive && 'xl:grid-cols-[1fr_260px]')}>
+                                <div className="min-w-0 overflow-hidden rounded-[4px] border border-[#c9cdd3]">
+                                    {sensitive ? (
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full min-w-[560px] text-[13px]">
+                                                <thead>
+                                                    <tr className="border-b border-[#c9cdd3] bg-[#eceef1] text-left text-[11px] font-bold text-zinc-600 uppercase dark:bg-zinc-800">
+                                                        <th className="h-8 w-20 px-2.5">Tipo</th>
+                                                        <th className="px-2.5">Descrição</th>
+                                                        <th className="px-2.5 text-right">Qtd</th>
+                                                        <th className="px-2.5 text-right">Vl. unit.</th>
+                                                        <th className="px-2.5 text-right">Total</th>
+                                                        <th />
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {os.items.map((i) => (
+                                                        <ItemRow key={`${i.id}-${i.unit_price}-${i.quantity}`} item={i} osId={os.id} />
+                                                    ))}
+                                                    {!os.items.length && (
+                                                        <tr>
+                                                            <td colSpan={6} className="text-muted-foreground px-3 py-6 text-center">
+                                                                Nenhuma peça ou serviço lançado.
+                                                            </td>
+                                                        </tr>
+                                                    )}
+                                                </tbody>
+                                            </table>
                                         </div>
-                                    </li>
-                                ))}
-                            </ol>
-                        </Panel>
+                                    ) : (
+                                        <Grid
+                                            cols={[
+                                                { label: 'Tipo', render: (r: OsItem) => <span className="text-[11px] font-bold uppercase">{r.type === 'peca' ? 'Peça' : 'Serviço'}</span>, className: 'w-20' },
+                                                { label: 'Descrição', render: (r: OsItem) => r.description },
+                                                { label: 'Qtd', render: (r: OsItem) => r.quantity, align: 'right', className: 'w-16' },
+                                            ]}
+                                            rows={os.items}
+                                            rowKey={(r) => r.id}
+                                            empty="Nenhuma peça ou serviço lançado."
+                                        />
+                                    )}
+                                    {sensitive && pendingPrice && <p className="border-t border-amber-300 bg-amber-50 px-3 py-1.5 text-[12px] dark:bg-amber-950/30">Itens em amarelo estão sem valor.</p>}
+                                    <AddItem osId={os.id} sensitive={sensitive} />
+                                </div>
+                                {sensitive && (
+                                    <div className="grid content-start gap-3">
+                                        <Block title="Totais">
+                                            <Totais key={`${os.total}-${os.down_payment}-${os.discount}`} os={os} />
+                                        </Block>
+                                        <Block title="Pagamentos">
+                                            <Pagamentos key={`${os.total}-${os.billed_total}`} os={os} />
+                                        </Block>
+                                    </div>
+                                )}
+                            </div>
+                        )}
 
-                        {auth.can.master && (
-                            <button
-                                type="button"
-                                className="text-muted-foreground hover:text-destructive justify-self-start text-sm"
-                                onClick={() => confirm(`Excluir a OS ${os.number}? Esta ação não pode ser desfeita.`) && router.delete(route('os.destroy', os.id))}
-                            >
-                                Excluir OS
-                            </button>
+                        {tab === 'vistoria' && (
+                            <div className="grid gap-4 lg:grid-cols-[1fr_280px]">
+                                <div className="rounded-[4px] border border-[#d7dade] bg-white p-2 text-zinc-900">
+                                    <CarDiagramSvg damages={os.damages} />
+                                    <div className="mt-2">
+                                        <DamageLegend damages={os.damages} />
+                                    </div>
+                                </div>
+                                <div className="grid content-start gap-1">
+                                    <p className="text-[11px] font-semibold text-zinc-600 uppercase">Itens no veículo</p>
+                                    {ENTRY_CHECKLIST.map((c) => (
+                                        <div key={c.key} className="flex items-center justify-between border-b border-[#eceef1] py-1 text-[13px]">
+                                            {c.label}
+                                            <b className={os.checklist?.[c.key] ? 'text-green-700' : 'text-zinc-400'}>{os.checklist?.[c.key] ? 'SIM' : 'NÃO'}</b>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {tab === 'historico' && (
+                            <div className="grid gap-3">
+                                <Block title="Passagens anteriores deste veículo" bodyClassName="p-0">
+                                    <Grid cols={histCols} rows={history} rowKey={(r) => r.id} onRowClick={(r) => router.visit(route('os.show', r.id))} empty="Primeira vez deste carro na oficina." />
+                                </Block>
+                                <Block title="Movimentação desta OS" bodyClassName="p-0">
+                                    <Grid cols={evCols} rows={os.events} rowKey={(r) => r.id} />
+                                </Block>
+                            </div>
                         )}
                     </div>
                 </div>
-            </Page>
+            </div>
 
-            {/* Celular: ação principal no rodapé */}
-            {canNext && (
-                <div className={cn('no-print bg-background/95 fixed inset-x-0 z-30 border-t p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur md:hidden', isMechanic ? 'bottom-0' : 'bottom-16')}>
-                    <Button size="lg" className="w-full" disabled={busy} onClick={() => setStatus(next.to)}>
-                        {busy ? <LoaderCircle className="size-5 animate-spin" /> : <ArrowRight className="size-5" />}
-                        {next.label}
-                    </Button>
+            {next && (
+                <div className="no-print bg-background/95 fixed inset-x-0 bottom-0 z-30 border-t border-[#c9cdd3] p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] md:hidden">
+                    <button disabled={busy} onClick={() => setStatus(next.to)} className="flex h-12 w-full items-center justify-center gap-2 rounded-[4px] bg-[#d42a2a] text-[16px] font-semibold text-white disabled:opacity-60">
+                        <ArrowRight className="size-5" /> {next.label}
+                    </button>
                 </div>
             )}
         </AppLayout>

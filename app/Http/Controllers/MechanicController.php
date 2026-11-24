@@ -8,21 +8,24 @@ use App\Support\OsPresenter;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
+/** Agenda da oficina: todos os mecânicos veem todos os carros (sem dados sensíveis). */
 class MechanicController extends Controller
 {
     public function index(Request $request)
     {
         $user = $request->user();
-        $base = fn () => ServiceOrder::with(['client', 'vehicle', 'mechanic'])
-            ->whereIn('status', OsStatus::open())->orderByRaw('scheduled_at is null, scheduled_at')->orderBy('id');
+        $with = ['client', 'vehicle', 'mechanic'];
 
-        $mine = $user->isMechanic()
-            ? $base()->where('mechanic_id', $user->id)->get()
-            : $base()->whereNotNull('mechanic_id')->get();
+        $agenda = ServiceOrder::with($with)->where('status', OsStatus::Aguardando)
+            ->orderByRaw('scheduled_at is null, scheduled_at')->orderBy('id')->get();
+
+        $working = ServiceOrder::with($with)
+            ->whereIn('status', [OsStatus::Diagnostico, OsStatus::Orcamento, OsStatus::Aprovacao, OsStatus::Execucao, OsStatus::Pronto])
+            ->orderBy('updated_at', 'desc')->get();
 
         return Inertia::render('mecanico/index', [
-            'mine' => $mine->map(fn ($os) => OsPresenter::card($os, $user)),
-            'unassigned' => $base()->whereNull('mechanic_id')->get()->map(fn ($os) => OsPresenter::card($os, $user)),
+            'agenda' => $agenda->map(fn ($os) => OsPresenter::card($os, $user)),
+            'working' => $working->map(fn ($os) => OsPresenter::card($os, $user)),
         ]);
     }
 }

@@ -64,7 +64,7 @@ class OsPresenter
 
     public static function full(ServiceOrder $os, User $user): array
     {
-        $os->loadMissing(['client', 'vehicle', 'mechanic', 'items', 'events.user']);
+        $os->loadMissing(['client', 'vehicle', 'mechanic', 'items', 'events.user', 'payments']);
         $sensitive = $user->canSeeSensitive();
 
         return [
@@ -74,6 +74,7 @@ class OsPresenter
             'notes' => $os->notes,
             'damages' => $os->damages ?? [],
             'checklist' => $os->checklist ?? [],
+            'revision' => (object) ($os->revision ?? []),
             'approved_at' => $os->approved_at?->toIso8601String(),
             'delivered_at' => $os->delivered_at?->toIso8601String(),
             'items' => $os->items->map(fn (ServiceOrderItem $i) => [
@@ -96,6 +97,17 @@ class OsPresenter
                 'total' => $os->total(),
                 'down_payment' => $os->down_payment,
                 'payment_method' => $os->payment_method,
+                'payments' => $os->payments->map(fn ($p) => [
+                    'id' => $p->id,
+                    'amount' => $p->amount,
+                    'due_date' => $p->due_date?->toDateString(),
+                    'paid_at' => $p->paid_at?->toDateString(),
+                    'payment_method' => $p->payment_method,
+                    'installment' => $p->installment,
+                    'installments' => $p->installments,
+                ])->values(),
+                'paid_total' => round((float) $os->payments->whereNotNull('paid_at')->sum('amount'), 2),
+                'billed_total' => round((float) $os->payments->sum('amount'), 2),
             ] : []),
         ];
     }

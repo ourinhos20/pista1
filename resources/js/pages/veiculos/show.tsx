@@ -1,11 +1,10 @@
-import { Empty, Info, Page, Panel, PlateBadge, StatusBadge } from '@/components/oficina';
-import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Block, Field, Grid, Placa, ReadOnly, Situacao, Tool, type Col } from '@/components/erp';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import AppLayout from '@/layouts/app-layout';
 import { date, km, money } from '@/lib/os';
 import type { ClientData, OsCard, SharedData, VehicleData } from '@/types';
-import { Head, Link, usePage } from '@inertiajs/react';
-import { Pencil, Plus } from 'lucide-react';
+import { Head, router, usePage } from '@inertiajs/react';
+import { FilePlus2, Pencil } from 'lucide-react';
 import { useState } from 'react';
 import { VehicleForm } from '../clientes/show';
 
@@ -16,100 +15,91 @@ export default function VeiculoShow({ vehicle, client, timeline }: { vehicle: Ve
     const sensitive = auth.can.sensitive;
     const [editing, setEditing] = useState(false);
 
+    const cols: Col<Entry>[] = [
+        { label: 'Data', render: (r) => date(r.date), className: 'w-24' },
+        { label: 'OS', render: (r) => <b>{r.number}</b>, className: 'w-16' },
+        { label: 'Km', render: (r) => km(r.km_in), align: 'right', className: 'w-28' },
+        {
+            label: 'Serviços / peças',
+            render: (r) => (
+                <div className="py-1">
+                    <p className="line-clamp-2">{r.items.map((i) => i.description).join(' · ') || r.complaint}</p>
+                    {r.diagnosis && <p className="text-muted-foreground line-clamp-1 text-[12px]">Diag.: {r.diagnosis}</p>}
+                </div>
+            ),
+        },
+        { label: 'Mecânico', render: (r) => r.mechanic?.name ?? '—', hide: 'lg', className: 'w-36' },
+        { label: 'Situação', render: (r) => <Situacao status={r.status} />, hide: 'md', className: 'w-48' },
+        ...(sensitive ? [{ label: 'Valor', render: (r: Entry) => (r.total ? money(r.total) : '—'), align: 'right' as const, hide: 'sm' as const, className: 'w-28' }] : []),
+    ];
+
     return (
-        <AppLayout breadcrumbs={[{ title: `Veículo ${vehicle.plate}`, href: `/veiculos/${vehicle.id}` }]}>
+        <AppLayout
+            title={`Veículo · ${vehicle.title || vehicle.plate}`}
+            code="CAD020"
+            toolbar={
+                sensitive && (
+                    <>
+                        <Tool primary icon={<FilePlus2 />} label="Nova OS" href={route('os.create', { placa: vehicle.plate })} />
+                        <Tool icon={<Pencil />} label="Alterar" onClick={() => setEditing(true)} />
+                    </>
+                )
+            }
+        >
             <Head title={vehicle.plate} />
-            <Page className="max-w-4xl">
-                <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                    <div className="flex items-start gap-4">
-                        <PlateBadge value={vehicle.plate} size="lg" />
-                        <div>
-                            <h1 className="text-2xl font-bold tracking-tight md:text-3xl">{vehicle.title || 'Veículo'}</h1>
-                            <p className="text-muted-foreground text-[15px]">
-                                {client && sensitive ? (
-                                    <Link href={route('clientes.show', client.id)} className="hover:underline">
+            <div className="grid gap-2 md:gap-3">
+                <Block title="Dados do veículo">
+                    <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">
+                        <Field label="Placa">
+                            <ReadOnly>
+                                <Placa value={vehicle.plate} />
+                            </ReadOnly>
+                        </Field>
+                        <Field label="Marca">
+                            <ReadOnly>{vehicle.brand}</ReadOnly>
+                        </Field>
+                        <Field label="Modelo" className="col-span-2">
+                            <ReadOnly>{vehicle.model}</ReadOnly>
+                        </Field>
+                        <Field label="Ano">
+                            <ReadOnly>{vehicle.year}</ReadOnly>
+                        </Field>
+                        <Field label="Cor">
+                            <ReadOnly>{vehicle.color}</ReadOnly>
+                        </Field>
+                        <Field label="Motor">
+                            <ReadOnly>{vehicle.engine}</ReadOnly>
+                        </Field>
+                        <Field label="Km atual">
+                            <ReadOnly className="font-bold tabular-nums">{km(vehicle.km)}</ReadOnly>
+                        </Field>
+                        <Field label="Proprietário" className="col-span-2 md:col-span-4 xl:col-span-8">
+                            <ReadOnly>
+                                {sensitive && client ? (
+                                    <a href={route('clientes.show', client.id)} className="text-[#b51f1f] hover:underline">
                                         {client.name}
-                                    </Link>
+                                    </a>
                                 ) : (
                                     client?.name
                                 )}
-                            </p>
-                        </div>
+                            </ReadOnly>
+                        </Field>
                     </div>
-                    {sensitive && (
-                        <div className="flex gap-2">
-                            <Dialog open={editing} onOpenChange={setEditing}>
-                                <DialogTrigger asChild>
-                                    <Button variant="outline" size="lg">
-                                        <Pencil className="size-4" /> Editar
-                                    </Button>
-                                </DialogTrigger>
-                                <DialogContent className="max-h-[90svh] overflow-y-auto rounded-2xl sm:max-w-xl">
-                                    <DialogHeader>
-                                        <DialogTitle>Editar veículo</DialogTitle>
-                                    </DialogHeader>
-                                    <VehicleForm vehicle={vehicle} onDone={() => setEditing(false)} />
-                                </DialogContent>
-                            </Dialog>
-                            <Button size="lg" asChild>
-                                <Link href={route('os.create', { placa: vehicle.plate })}>
-                                    <Plus className="size-5" /> Nova OS
-                                </Link>
-                            </Button>
-                        </div>
-                    )}
-                </div>
+                </Block>
 
-                <Panel>
-                    <dl className="grid grid-cols-2 gap-4 md:grid-cols-5">
-                        <Info label="Km atual">
-                            <span className="tabular text-lg font-bold">{km(vehicle.km)}</span>
-                        </Info>
-                        <Info label="Marca">{vehicle.brand}</Info>
-                        <Info label="Ano">{vehicle.year}</Info>
-                        <Info label="Motor">{vehicle.engine}</Info>
-                        <Info label="Cor">{vehicle.color}</Info>
-                    </dl>
-                </Panel>
+                <Block title={`Histórico de serviços · ${timeline.length}`} bodyClassName="p-0">
+                    <Grid cols={cols} rows={timeline} rowKey={(r) => r.id} onRowClick={(r) => router.visit(route('os.show', r.id))} empty="Nenhum serviço registrado." />
+                </Block>
+            </div>
 
-                <section>
-                    <h2 className="mb-4 text-xl font-bold tracking-tight">Linha do tempo</h2>
-                    {timeline.length ? (
-                        <ol className="relative grid gap-4 border-l-2 border-zinc-200 pl-6 dark:border-zinc-800">
-                            {timeline.map((t) => (
-                                <li key={t.id} className="relative">
-                                    <span className="bg-background absolute top-5 -left-[33px] size-4 rounded-full border-4 border-[#ee3c3a]" />
-                                    <Link href={route('os.show', t.id)} className="bg-card block rounded-2xl p-5 ring-1 ring-black/5 transition hover:shadow-md dark:ring-white/10">
-                                        <div className="flex flex-wrap items-center justify-between gap-2">
-                                            <p className="font-semibold">
-                                                {date(t.date)} <span className="text-muted-foreground tabular font-normal">· {km(t.km_in)} · OS {t.number}</span>
-                                            </p>
-                                            <StatusBadge status={t.status} />
-                                        </div>
-                                        {t.complaint && <p className="text-muted-foreground mt-2 text-[15px]">{t.complaint}</p>}
-                                        {t.items.length > 0 && (
-                                            <ul className="mt-3 flex flex-wrap gap-1.5">
-                                                {t.items.map((i, idx) => (
-                                                    <li key={idx} className="bg-muted rounded-full px-3 py-1 text-sm font-medium">
-                                                        {i.description}
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                        )}
-                                        {t.diagnosis && <p className="mt-3 border-l-2 pl-3 text-sm whitespace-pre-line">{t.diagnosis}</p>}
-                                        <p className="text-muted-foreground mt-3 text-sm">
-                                            {t.mechanic?.name ?? 'Sem mecânico'}
-                                            {sensitive && t.total !== undefined ? ` · ${money(t.total)}` : ''}
-                                        </p>
-                                    </Link>
-                                </li>
-                            ))}
-                        </ol>
-                    ) : (
-                        <Empty title="Nenhum serviço registrado" />
-                    )}
-                </section>
-            </Page>
+            <Dialog open={editing} onOpenChange={setEditing}>
+                <DialogContent className="max-h-[90svh] overflow-y-auto rounded-[4px] sm:max-w-2xl">
+                    <DialogHeader>
+                        <DialogTitle>Alterar veículo</DialogTitle>
+                    </DialogHeader>
+                    <VehicleForm vehicle={vehicle} onDone={() => setEditing(false)} />
+                </DialogContent>
+            </Dialog>
         </AppLayout>
     );
 }

@@ -1,13 +1,20 @@
-import AppLayoutTemplate from '@/layouts/app/app-sidebar-layout';
+import { ErpLayout } from '@/components/erp';
 import { type BreadcrumbItem } from '@/types';
+import type { ReactNode } from 'react';
 
 interface AppLayoutProps {
-    children: React.ReactNode;
+    children: ReactNode;
     breadcrumbs?: BreadcrumbItem[];
+    title?: string;
+    code?: string;
+    toolbar?: ReactNode;
 }
 
-export default ({ children, breadcrumbs, ...props }: AppLayoutProps) => (
-    <AppLayoutTemplate breadcrumbs={breadcrumbs} {...props}>
-        {children}
-    </AppLayoutTemplate>
-);
+/** Layout padrão do sistema (estilo ERP). */
+export default function AppLayout({ children, breadcrumbs, title, code, toolbar }: AppLayoutProps) {
+    return (
+        <ErpLayout title={title ?? breadcrumbs?.[breadcrumbs.length - 1]?.title ?? 'Pista 1'} code={code} toolbar={toolbar}>
+            {children}
+        </ErpLayout>
+    );
+}
