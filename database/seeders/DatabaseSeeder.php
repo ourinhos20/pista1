@@ -7,7 +7,7 @@ use App\Models\Client;
 use App\Models\FinanceEntry;
 use App\Models\Partner;
 use App\Models\PartnerMovement;
-use App\Models\PreService;
+use App\Support\OsIntake;
 use App\Models\Purchase;
 use App\Models\Supplier;
 use App\Models\ServiceOrder;
@@ -59,6 +59,7 @@ class DatabaseSeeder extends Seeder
             ['Pedro Santos', '11122233344', '11955554444', 'JKL7M89', 'Fiat', 'Strada Freedom', '2021', 'Vermelho', 61200],
             ['Ana Costa', '55566677788', '11944443333', 'QRS2T34', 'Toyota', 'Corolla XEi', '2019', 'Preto', 98700],
             ['Lucas Almeida', '99988877766', '11933332222', 'UVW5X67', 'Hyundai', 'HB20 1.0', '2022', 'Cinza', 31800],
+            ['Bruno Ferreira', '22233344455', '11922221111', 'MNO3P45', 'Honda', 'Fit EX', '2017', 'Azul', 112400],
         ];
 
         $vehicles = [];
@@ -68,15 +69,22 @@ class DatabaseSeeder extends Seeder
         }
 
         $make = function (Vehicle $v, OsStatus $status, ?User $mech, string $complaint, array $items, array $extra = []) use ($balcao) {
+            $inShop = ! in_array($status, [OsStatus::Aguardando], true);
+            $inspected = ! in_array($status, [OsStatus::Aguardando, OsStatus::Recebido], true);
+            $approved = in_array($status, [OsStatus::Pecas, OsStatus::Execucao, OsStatus::Pronto, OsStatus::Entregue], true);
             $os = ServiceOrder::create([
                 'client_id' => $v->client_id, 'vehicle_id' => $v->id, 'mechanic_id' => $mech?->id, 'created_by' => $balcao->id,
-                'status' => $status, 'km_in' => $v->km, 'fuel_level' => 2, 'complaint' => $complaint,
-                'damages' => [['x' => 22, 'y' => 18, 'type' => 'risco', 'note' => 'Para-choque dianteiro']],
-                'checklist' => ['estepe' => true, 'macaco' => true, 'documento' => true],
+                'status' => $status, 'complaint' => $complaint, 'origin' => 'balcao', 'service_type' => 'defeito',
+                'checked_in_at' => $inShop ? now()->subHours(4) : null,
+                ...($inspected ? [
+                    'km_in' => $v->km, 'fuel_level' => 2, 'inspected_at' => now()->subHours(4), 'inspected_by' => $mech?->id,
+                    'damages' => [['x' => 22, 'y' => 18, 'type' => 'risco', 'note' => 'Para-choque dianteiro']],
+                    'checklist' => ['estepe' => true, 'macaco' => true, 'documento' => true],
+                ] : ['damages' => [], 'checklist' => []]),
                 ...$extra,
             ]);
             foreach ($items as [$type, $desc, $qty, $price]) {
-                $os->items()->create(['type' => $type, 'description' => $desc, 'quantity' => $qty, 'unit_price' => $price]);
+                $os->items()->create(['type' => $type, 'description' => $desc, 'quantity' => $qty, 'unit_price' => $price, 'approval' => $approved ? 'aprovado' : null]);
             }
             $os->logEvent($balcao, 'OS aberta');
 
@@ -91,14 +99,16 @@ class DatabaseSeeder extends Seeder
         $make($vehicles[2], OsStatus::Orcamento, $carlos, 'Revisão dos 60 mil km.', [
             ['peca', 'Óleo 5W30 sintético (L)', 4, 0], ['peca', 'Filtro de óleo', 1, 0], ['peca', 'Filtro de ar', 1, 0], ['servico', 'Revisão completa', 1, 0],
         ], [
+            'service_type' => 'revisao',
             'diagnosis' => "Revisão feita. Pastilhas dianteiras com 30% — trocar na próxima.\nFiltro de ar muito sujo.",
             'revision' => ['oleo_motor' => 'trocar', 'filtro_oleo' => 'trocar', 'filtro_ar' => 'trocar', 'velas' => 'ok', 'pastilhas_diant' => 'atencao', 'bateria' => 'ok', 'calibragem' => 'ok'],
         ]);
         $make($vehicles[3], OsStatus::Aguardando, null, 'Cliente agendou pelo WhatsApp: troca de pastilhas e barulho ao frear.', [], ['scheduled_at' => today()->setTime(14, 0)]);
-        $make($vehicles[1], OsStatus::Aguardando, null, 'Revisão dos 50 mil km + alinhamento.', [], ['scheduled_at' => today()->addDay()->setTime(9, 0), 'damages' => []]);
+        // chegou e está esperando mecânico (check-in feito)
+        $make($vehicles[5], OsStatus::Recebido, null, 'Revisão dos 110 mil km + alinhamento.', [], ['service_type' => 'revisao']);
         $make($vehicles[4], OsStatus::Pronto, $rafael, 'Troca de óleo.', [
             ['peca', 'Óleo 5W30 (L)', 3.5, 42], ['peca', 'Filtro de óleo', 1, 35], ['servico', 'Mão de obra troca de óleo', 1, 60],
-        ]);
+        ], ['approved_at' => now()->subDay()]);
         $delivered = $make($vehicles[0], OsStatus::Entregue, $carlos, 'Troca de óleo e filtros.', [
             ['peca', 'Óleo 5W30 (L)', 4, 42], ['peca', 'Filtro de óleo', 1, 35], ['servico', 'Mão de obra', 1, 60],
         ], ['delivered_at' => now()->subDays(2), 'approved_at' => now()->subDays(3), 'km_in' => 80100]);
@@ -107,9 +117,9 @@ class DatabaseSeeder extends Seeder
 
         $this->seedParts($balcao);
 
-        // Pedidos feitos pelo site (pré-atendimento)
-        PreService::create(['name' => 'Fernanda Rocha', 'phone' => '11977776666', 'plate' => 'BRA2E19', 'vehicle' => 'Renault Kwid 2020', 'complaint' => 'O carro está puxando para a direita e o volante treme acima de 80 km/h.', 'preferred_at' => today()->addDays(2)->setTime(10, 0)]);
-        PreService::create(['name' => 'Ricardo Lima', 'phone' => '11966665555', 'vehicle' => 'VW Polo 2019', 'complaint' => 'Ar-condicionado parou de gelar. Gostaria de um orçamento.']);
+        // Agendamentos que chegaram sozinhos (bot do WhatsApp e site): já são OS "Agendado"
+        OsIntake::create(['name' => 'Fernanda Rocha', 'phone' => '11977776666', 'plate' => 'BRA2E19', 'vehicle_model' => 'Renault Kwid', 'vehicle_year' => '2020', 'service_type' => 'defeito', 'complaint' => 'O carro está puxando para a direita e o volante treme acima de 80 km/h.', 'scheduled_at' => today()->addDays(2)->setTime(10, 0)], 'bot');
+        OsIntake::create(['name' => 'Ricardo Lima', 'phone' => '11966665555', 'vehicle_model' => 'VW Polo', 'vehicle_year' => '2019', 'service_type' => 'outro', 'complaint' => 'Ar-condicionado parou de gelar. Gostaria de um orçamento.'], 'site');
     }
 
     private function seedParts(User $balcao): void

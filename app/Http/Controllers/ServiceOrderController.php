@@ -3,17 +3,15 @@
 namespace App\Http\Controllers;
 
 use App\Enums\OsStatus;
-use App\Models\Client;
-use App\Models\PreService;
 use App\Models\ServiceOrder;
 use App\Models\User;
-use App\Models\Vehicle;
+use App\Support\OsIntake;
 use App\Support\OsPresenter;
 use App\Support\Plate;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -22,7 +20,6 @@ class ServiceOrderController extends Controller
     /**
      * Todos os mecânicos veem a agenda inteira da oficina (decisão do dono).
      * A privacidade (CPF, telefone, valores) é garantida pelo OsPresenter.
-     * Mantido como ponto único caso a regra mude.
      */
     public static function guard(ServiceOrder $os, User $user): void
     {
@@ -53,6 +50,7 @@ class ServiceOrderController extends Controller
     {
         $user = $request->user();
         $status = $request->string('status')->toString();
+        $origem = $request->string('origem')->toString();
         $q = trim($request->string('q')->toString());
 
         $query = ServiceOrder::with(['client', 'vehicle', 'mechanic', 'items'])->latest('id');
@@ -62,11 +60,17 @@ class ServiceOrderController extends Controller
         } elseif ($status !== 'todas') {
             $query->where('status', $status);
         }
+        if ($origem === 'online') {
+            $query->whereIn('origin', ['site', 'bot']);
+        } elseif (in_array($origem, ['balcao', 'site', 'bot'], true)) {
+            $query->where('origin', $origem);
+        }
 
         if ($q !== '') {
             $plate = Plate::normalize($q);
-            $query->where(function ($w) use ($q, $plate) {
-                $w->whereHas('client', fn ($c) => $c->where('name', 'like', "%{$q}%"))
+            $digits = Plate::digits($q);
+            $query->where(function ($w) use ($q, $plate, $digits) {
+                $w->whereHas('client', fn ($c) => $c->where('name', 'like', "%{$q}%")->when($digits && strlen($digits) >= 4, fn ($x) => $x->orWhere('phone', 'like', "%{$digits}%")))
                     ->orWhereHas('vehicle', fn ($v) => $v->where('plate', 'like', "%{$plate}%")->orWhere('model', 'like', "%{$q}%"));
                 if (ctype_digit($q)) {
                     $w->orWhere('id', (int) $q);
@@ -76,118 +80,44 @@ class ServiceOrderController extends Controller
 
         return Inertia::render('os/index', [
             'orders' => $query->limit(100)->get()->map(fn ($os) => OsPresenter::card($os, $user)),
-            'filters' => ['status' => $status ?: 'abertas', 'q' => $q],
+            'filters' => ['status' => $status ?: 'abertas', 'q' => $q, 'origem' => $origem],
         ]);
     }
 
     public function create(Request $request): Response
     {
-        // Vindo de um pré-atendimento do site: já preenche tudo o que o cliente informou
-        $pre = null;
-        if ($request->filled('pre')) {
-            $p = PreService::with('attachments')->where('status', 'novo')->find($request->integer('pre'));
-            if ($p) {
-                $pre = [
-                    'id' => $p->id,
-                    'name' => $p->name,
-                    'phone' => $p->phone,
-                    'plate' => $p->plate,
-                    'vehicle' => $p->vehicle,
-                    'complaint' => $p->complaint,
-                    'preferred_at' => $p->preferred_at?->format('Y-m-d\TH:i'),
-                    'photos' => $p->attachments->map->toRow()->values(),
-                ];
-            }
-        }
-
         return Inertia::render('os/create', [
             'mechanics' => User::where('role', 'mecanico')->where('active', true)->orderBy('name')->get(['id', 'name']),
-            'prefill' => [...$request->only(['placa', 'client_id']), ...($pre ? ['placa' => $pre['plate']] : [])],
-            'pre' => $pre,
+            'prefill' => $request->only(['placa', 'client_id']),
+            'serviceTypes' => ServiceOrder::SERVICE_TYPES,
         ]);
     }
 
+    /** Nova OS pelo balcão: só os dados básicos (o resto é completado na chegada e pelo mecânico). */
     public function store(Request $request): RedirectResponse
     {
+        $arrived = $request->boolean('arrived');
         $data = $request->validate([
-            'plate' => ['required', 'string', 'max:10'],
             'client_id' => ['nullable', 'integer', 'exists:clients,id'],
-            'client.name' => ['required_without:client_id', 'nullable', 'string', 'max:255'],
-            'client.phone' => ['nullable', 'string', 'max:20'],
-            'client.document' => ['nullable', 'string', 'max:20'],
-            'vehicle.brand' => ['nullable', 'string', 'max:60'],
-            'vehicle.model' => ['nullable', 'string', 'max:60'],
-            'vehicle.year' => ['nullable', 'string', 'max:9'],
-            'vehicle.color' => ['nullable', 'string', 'max:30'],
-            'vehicle.engine' => ['nullable', 'string', 'max:30'],
-            'km_in' => ['nullable', 'integer', 'min:0'],
-            'fuel_level' => ['nullable', 'integer', 'between:0,4'],
+            'vehicle_id' => ['nullable', 'integer', 'exists:vehicles,id'],
+            'name' => ['required_without:client_id', 'nullable', 'string', 'max:255'],
+            'phone' => ['required_without:client_id', 'nullable', 'string', 'max:20'],
+            'plate' => [$arrived ? 'required_without:vehicle_id' : 'nullable', 'nullable', 'string', 'max:10'],
+            'vehicle_model' => ['nullable', 'string', 'max:60'],
+            'vehicle_year' => ['nullable', 'string', 'max:9'],
+            'service_type' => ['nullable', Rule::in(array_keys(ServiceOrder::SERVICE_TYPES))],
+            'complaint' => ['required', 'string', 'max:5000'],
             'scheduled_at' => ['nullable', 'date'],
-            'complaint' => ['nullable', 'string', 'max:5000'],
             'mechanic_id' => ['nullable', Rule::exists('users', 'id')->where('role', 'mecanico')],
-            'damages' => ['nullable', 'array', 'max:60'],
-            'damages.*.x' => ['required', 'numeric', 'between:0,100'],
-            'damages.*.y' => ['required', 'numeric', 'between:0,100'],
-            'damages.*.type' => ['required', Rule::in(['risco', 'amassado', 'quebrado', 'falta'])],
-            'damages.*.note' => ['nullable', 'string', 'max:120'],
-            'checklist' => ['nullable', 'array'],
-            'checklist.*' => ['boolean'],
-            'pre_service_id' => ['nullable', Rule::exists('pre_services', 'id')->where('status', 'novo')],
+            'arrived' => ['boolean'],
         ], [
-            'plate.required' => 'Informe a placa.',
-            'pre_service_id.exists' => 'Este pedido do site já foi transformado em OS ou descartado.',
-            'client.name.required_without' => 'Informe o nome do cliente.',
+            'name.required_without' => 'Informe o nome do cliente.',
+            'phone.required_without' => 'Informe o telefone (WhatsApp) do cliente.',
+            'plate.required_without' => 'Com o cliente na oficina, a placa é obrigatória.',
+            'complaint.required' => 'Descreva o defeito ou o serviço pedido.',
         ]);
 
-        $user = $request->user();
-
-        $os = DB::transaction(function () use ($data, $user) {
-            $plate = Plate::normalize($data['plate']);
-            $vehicle = Vehicle::where('plate', $plate)->first();
-
-            if (! $vehicle) {
-                $clientId = $data['client_id'] ?? Client::create([
-                    'name' => $data['client']['name'],
-                    'phone' => Plate::digits($data['client']['phone'] ?? null),
-                    'document' => Plate::digits($data['client']['document'] ?? null),
-                ])->id;
-
-                $vehicle = Vehicle::create([
-                    'client_id' => $clientId,
-                    'plate' => $plate,
-                    ...array_filter($data['vehicle'] ?? [], fn ($v) => $v !== null && $v !== ''),
-                ]);
-            }
-
-            if (! empty($data['km_in']) && $data['km_in'] > (int) $vehicle->km) {
-                $vehicle->update(['km' => $data['km_in']]);
-            }
-
-            $os = ServiceOrder::create([
-                'client_id' => $vehicle->client_id,
-                'vehicle_id' => $vehicle->id,
-                'mechanic_id' => $data['mechanic_id'] ?? null,
-                'created_by' => $user->id,
-                'status' => OsStatus::Aguardando,
-                'scheduled_at' => $data['scheduled_at'] ?? null,
-                'km_in' => $data['km_in'] ?? null,
-                'fuel_level' => $data['fuel_level'] ?? null,
-                'complaint' => $data['complaint'] ?? null,
-                'damages' => $data['damages'] ?? [],
-                'checklist' => $data['checklist'] ?? [],
-            ]);
-            $os->logEvent($user, 'OS aberta');
-
-            // pré-atendimento do site vira esta OS; as fotos do cliente vêm junto
-            if (! empty($data['pre_service_id'])) {
-                $pre = PreService::lockForUpdate()->find($data['pre_service_id']);
-                $pre->update(['status' => 'convertido', 'service_order_id' => $os->id, 'handled_by' => $user->id]);
-                $pre->attachments()->update(['service_order_id' => $os->id, 'caption' => 'Foto enviada pelo cliente', 'show_to_client' => false]);
-                $os->logEvent($user, 'Criada a partir do pedido feito pelo cliente no site');
-            }
-
-            return $os;
-        });
+        $os = OsIntake::create($data, 'balcao', $request->user());
 
         return to_route('os.show', $os)->with('success', "OS {$os->number()} aberta.");
     }
@@ -196,6 +126,11 @@ class ServiceOrderController extends Controller
     {
         $user = $request->user();
         self::guard($os, $user);
+
+        // agendamento online visto pelo balcão: some do contador de "novos"
+        if ($user->canSeeSensitive() && $os->origin !== 'balcao' && ! $os->online_seen_at) {
+            $os->forceFill(['online_seen_at' => now()])->saveQuietly();
+        }
 
         $history = ServiceOrder::with('items')
             ->where('vehicle_id', $os->vehicle_id)->where('id', '!=', $os->id)
@@ -206,7 +141,7 @@ class ServiceOrderController extends Controller
                 'status' => $h->status->value,
                 'date' => ($h->delivered_at ?? $h->created_at)?->toIso8601String(),
                 'km_in' => $h->km_in,
-                'summary' => $h->items->pluck('description')->take(4)->implode(', ') ?: $h->complaint,
+                'summary' => $h->items->where('approval', '!=', 'recusado')->pluck('description')->take(4)->implode(', ') ?: $h->complaint,
             ]);
 
         return Inertia::render('os/show', [
@@ -216,6 +151,7 @@ class ServiceOrderController extends Controller
                 ? User::where('role', 'mecanico')->where('active', true)->orderBy('name')->get(['id', 'name'])
                 : [],
             'statuses' => OsStatus::options(),
+            'serviceTypes' => ServiceOrder::SERVICE_TYPES,
         ]);
     }
 
@@ -225,19 +161,91 @@ class ServiceOrderController extends Controller
         $data = $request->validate([
             'mechanic_id' => ['nullable', Rule::exists('users', 'id')->where('role', 'mecanico')],
             'scheduled_at' => ['nullable', 'date'],
-            'km_in' => ['nullable', 'integer', 'min:0'],
-            'fuel_level' => ['nullable', 'integer', 'between:0,4'],
+            'service_type' => ['nullable', Rule::in(array_keys(ServiceOrder::SERVICE_TYPES))],
             'complaint' => ['nullable', 'string', 'max:5000'],
             'diagnosis' => ['nullable', 'string', 'max:10000'],
             'notes' => ['nullable', 'string', 'max:5000'],
             'discount' => ['nullable', 'numeric', 'min:0'],
-            'down_payment' => ['nullable', 'numeric', 'min:0'],
-            'payment_method' => ['nullable', Rule::in(['dinheiro', 'pix', 'debito', 'credito', 'parcelado'])],
         ]);
 
         $os->update($data);
 
         return back()->with('success', 'OS atualizada.');
+    }
+
+    private function cadastroRules(bool $plateRequired): array
+    {
+        return [
+            'client.name' => ['sometimes', 'required', 'string', 'max:255'],
+            'client.phone' => ['nullable', 'string', 'max:20'],
+            'client.document' => ['nullable', 'string', 'max:20'],
+            'client.email' => ['nullable', 'email', 'max:255'],
+            'client.address' => ['nullable', 'string', 'max:255'],
+            'client.city' => ['nullable', 'string', 'max:120'],
+            'vehicle.plate' => [$plateRequired ? 'required' : 'nullable', 'string', 'max:10'],
+            'vehicle.brand' => ['nullable', 'string', 'max:60'],
+            'vehicle.model' => ['nullable', 'string', 'max:60'],
+            'vehicle.year' => ['nullable', 'string', 'max:9'],
+            'vehicle.color' => ['nullable', 'string', 'max:30'],
+            'vehicle.engine' => ['nullable', 'string', 'max:30'],
+        ];
+    }
+
+    /** Completar/corrigir cadastro do cliente e do carro a qualquer momento (balcão/master). */
+    public function cadastro(Request $request, ServiceOrder $os): RedirectResponse
+    {
+        $data = $request->validate($this->cadastroRules(false), [], ['vehicle.plate' => 'placa', 'client.name' => 'nome']);
+        OsIntake::updateCadastro($os, $data['client'] ?? [], $data['vehicle'] ?? []);
+
+        return back()->with('success', 'Cadastro atualizado.');
+    }
+
+    /** "Cliente chegou": confere/completa o cadastro (placa obrigatória) e libera para a fila do mecânico. */
+    public function checkin(Request $request, ServiceOrder $os): RedirectResponse
+    {
+        abort_unless($os->status === OsStatus::Aguardando, 422, 'Esta OS já foi recebida.');
+        $data = $request->validate($this->cadastroRules(true), ['vehicle.plate.required' => 'Informe a placa para receber o carro.'], ['vehicle.plate' => 'placa']);
+
+        OsIntake::updateCadastro($os, $data['client'] ?? [], $data['vehicle'] ?? []);
+        $os->refresh()->update(['status' => OsStatus::Recebido, 'checked_in_at' => now()]);
+        $os->logEvent($request->user(), 'Cliente chegou · carro liberado para o mecânico');
+
+        return back()->with('success', 'Carro recebido. Já aparece na fila do mecânico.');
+    }
+
+    /** Vistoria de entrada: primeiro passo do mecânico (km, combustível, itens, avarias). */
+    public function vistoria(Request $request, ServiceOrder $os): RedirectResponse
+    {
+        $user = $request->user();
+        self::guard($os, $user);
+        abort_if(in_array($os->status, [OsStatus::Aguardando, OsStatus::Entregue, OsStatus::Cancelada], true), 422, 'A vistoria é feita com o carro na oficina.');
+
+        $data = $request->validate([
+            'km_in' => ['required', 'integer', 'min:0', 'max:9999999'],
+            'fuel_level' => ['required', 'integer', 'between:0,4'],
+            'checklist' => ['nullable', 'array'],
+            'checklist.*' => ['boolean'],
+            'damages' => ['nullable', 'array', 'max:60'],
+            'damages.*.x' => ['required', 'numeric', 'between:0,100'],
+            'damages.*.y' => ['required', 'numeric', 'between:0,100'],
+            'damages.*.type' => ['required', Rule::in(['risco', 'amassado', 'quebrado', 'falta'])],
+            'damages.*.note' => ['nullable', 'string', 'max:120'],
+        ], ['km_in.required' => 'Informe o km do painel.', 'fuel_level.required' => 'Marque o nível de combustível.'], ['km_in' => 'km']);
+
+        $first = ! $os->inspected_at;
+        $os->update([
+            ...$data,
+            'checklist' => $data['checklist'] ?? [],
+            'damages' => $data['damages'] ?? [],
+            'inspected_at' => $os->inspected_at ?? now(),
+            'inspected_by' => $os->inspected_by ?? $user->id,
+        ]);
+        if ($data['km_in'] > (int) $os->vehicle?->km) {
+            $os->vehicle?->update(['km' => $data['km_in']]);
+        }
+        $os->logEvent($user, $first ? 'Vistoria de entrada concluída' : 'Vistoria de entrada alterada');
+
+        return back()->with('success', $first ? 'Vistoria concluída. Pode seguir com o diagnóstico.' : 'Vistoria alterada.');
     }
 
     /** Diagnóstico: mecânico e balcão. */
@@ -255,28 +263,57 @@ class ServiceOrderController extends Controller
         $user = $request->user();
         self::guard($os, $user);
 
-        $allowed = $user->isMechanic() ? OsStatus::mechanicAllowed() : OsStatus::cases();
         $data = $request->validate([
-            'status' => ['required', Rule::in(array_map(fn ($s) => $s->value, $allowed))],
+            'status' => ['required', Rule::in(array_map(fn ($s) => $s->value, OsStatus::cases()))],
             'note' => ['nullable', 'string', 'max:255'],
         ]);
-
         $new = OsStatus::from($data['status']);
-        $os->status = $new;
-        if ($new === OsStatus::Execucao && ! $os->approved_at) {
-            $os->approved_at = now();
+        $fail = fn (string $msg) => throw ValidationException::withMessages(['status' => $msg]);
+
+        // mecânico só anda nas etapas dele
+        if ($user->isMechanic() && ! in_array($new->value, OsStatus::mechanicTransitions()[$os->status->value] ?? [], true)) {
+            $fail('Esta etapa é com o balcão.');
         }
+
+        // travas do fluxo (o sócio pode passar por cima, mas fica registrado)
+        if (! $user->isMaster()) {
+            $os->loadMissing(['vehicle', 'items']);
+            if ($new === OsStatus::Recebido && ! $os->vehicle?->plate) {
+                $fail('Use "Cliente chegou" e informe a placa.');
+            }
+            if ($new === OsStatus::Orcamento && ! $os->inspected_at) {
+                $fail('Faça a vistoria de entrada antes de enviar para o balcão.');
+            }
+            if ($new === OsStatus::Aprovacao) {
+                $active = $os->items->where('approval', '!=', 'recusado');
+                if ($active->isEmpty()) {
+                    $fail('Inclua as peças e serviços antes de enviar o orçamento.');
+                }
+                if ($active->contains(fn ($i) => $i->unit_price <= 0)) {
+                    $fail('Há itens sem valor. Lance todos os valores antes de enviar o orçamento.');
+                }
+            }
+        }
+
+        // "Cliente aprovou" pelo balcão: o que ainda estava pendente conta como aprovado
+        if (in_array($new, [OsStatus::Execucao, OsStatus::Pecas], true) && $os->status === OsStatus::Aprovacao) {
+            $os->items()->whereNull('approval')->where('extra', false)->update(['approval' => 'aprovado']);
+            $os->approved_at ??= now();
+            $os->rejected_at = null;
+        }
+
+        $os->status = $new;
         if ($new === OsStatus::Entregue) {
             $os->delivered_at = now();
         }
-        // mecânico que mexe numa OS sem dono passa a ser o responsável
+        // mecânico que começa uma OS sem dono passa a ser o responsável
         if ($user->isMechanic() && ! $os->mechanic_id) {
             $os->mechanic_id = $user->id;
         }
         $os->save();
         $os->logEvent($user, $data['note'] ?? null);
 
-        return back()->with('success', 'Status: '.$new->label());
+        return back()->with('success', 'Etapa: '.$new->label());
     }
 
     public function assume(Request $request, ServiceOrder $os): RedirectResponse
@@ -303,7 +340,8 @@ class ServiceOrderController extends Controller
         $user = $request->user();
         self::guard($os, $user);
 
-        $mechanicTypes = ['diagnostico', 'revisao'];
+        // mecânico pode imprimir a vistoria e a ficha dele (sem dados sensíveis: o presenter já filtra)
+        $mechanicTypes = ['entrada', 'diagnostico', 'revisao'];
         abort_unless(in_array($tipo, ['cliente', 'entrada', 'diagnostico', 'revisao'], true), 404);
         abort_if(! $user->canSeeSensitive() && ! in_array($tipo, $mechanicTypes, true), 403);
 

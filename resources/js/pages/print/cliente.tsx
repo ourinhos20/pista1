@@ -6,7 +6,10 @@ import type { OsFull, Shop } from '@/types';
 export default function PrintCliente({ os, shop }: { os: OsFull; shop: Shop }) {
     const c = os.client;
     const v = os.vehicle;
-    const rows = Math.max(9, os.items.length);
+    // itens recusados pelo cliente saem da conta e aparecem só como recomendação
+    const items = os.items.filter((i) => i.approval !== 'recusado');
+    const refused = os.items.filter((i) => i.approval === 'recusado');
+    const rows = Math.max(refused.length ? 8 : 9, items.length);
     // Pagamentos reais registrados na OS (financeiro)
     const paid = os.paid_total ?? 0;
     const remaining = Math.max(0, (os.total ?? 0) - paid);
@@ -56,7 +59,7 @@ export default function PrintCliente({ os, shop }: { os: OsFull; shop: Shop }) {
                     </thead>
                     <tbody>
                         {Array.from({ length: rows }).map((_, i) => {
-                            const it = os.items[i];
+                            const it = items[i];
                             return (
                                 <tr key={i} className="h-[7.5mm] border-b border-black">
                                     <td className="border-r-[1.5px] border-black text-center tabular-nums">{it ? it.quantity.toLocaleString('pt-BR') : ''}</td>
@@ -68,6 +71,11 @@ export default function PrintCliente({ os, shop }: { os: OsFull; shop: Shop }) {
                         })}
                     </tbody>
                 </table>
+                {refused.length > 0 && (
+                    <p className="border-b border-black px-2 py-1 text-[11px] leading-snug">
+                        <b>Recomendados e não aprovados pelo cliente:</b> {refused.map((i) => `${i.description} (${money(i.total)})`).join('; ')}
+                    </p>
+                )}
                 <div className="flex items-center justify-end gap-6 px-4 py-2">
                     {!!os.discount && <span className="text-[12.5px]">Desconto: {money(os.discount)}</span>}
                     <span className="text-[16px] font-extrabold">Valor Total: {money(os.total)}</span>

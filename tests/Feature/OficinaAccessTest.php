@@ -64,11 +64,14 @@ class OficinaAccessTest extends TestCase
         $this->actingAs($this->carlos)->get($this->p("/os/{$this->osRafael->id}"))->assertOk()
             ->assertInertia(fn (Assert $page) => $page->missing('os.client.phone')->missing('os.total'));
 
+        $agendados = ServiceOrder::where('status', OsStatus::Aguardando)->count();
         $this->get($this->p('/mecanico'))->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('mecanico/index')
-                ->has('agenda', 2)
+                ->has('agenda', $agendados)
+                ->has('fila', 1)
                 ->missing('agenda.0.client.phone')
+                ->missing('fila.0.client.phone')
             );
     }
 
@@ -91,7 +94,9 @@ class OficinaAccessTest extends TestCase
         $this->get($this->p("/os/{$this->osCarlos->id}/imprimir/diagnostico"))->assertOk();
         $this->get($this->p("/os/{$this->osCarlos->id}/imprimir/revisao"))->assertOk();
         $this->get($this->p("/os/{$this->osCarlos->id}/imprimir/cliente"))->assertForbidden();
-        $this->get($this->p("/os/{$this->osCarlos->id}/imprimir/entrada"))->assertForbidden();
+        // a vistoria de entrada é dele, mas sai sem telefone/CPF
+        $this->get($this->p("/os/{$this->osCarlos->id}/imprimir/entrada"))->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->missing('os.client.phone')->missing('os.client.document'));
     }
 
     public function test_mecanico_nao_define_preco_nem_marca_como_entregue(): void
@@ -116,19 +121,18 @@ class OficinaAccessTest extends TestCase
     public function test_balcao_abre_os_para_carro_novo_criando_cliente_e_veiculo(): void
     {
         $this->actingAs($this->balcao)->post($this->p('/os'), [
-            'plate' => 'xyz-9a87',
-            'client' => ['name' => 'Cliente Novo', 'phone' => '(11) 91111-2222'],
-            'vehicle' => ['brand' => 'Honda', 'model' => 'Civic'],
-            'km_in' => 45000,
-            'complaint' => 'Barulho no motor',
-            'damages' => [['x' => 10, 'y' => 20, 'type' => 'amassado']],
+            'name' => 'Cliente Novo', 'phone' => '(11) 91111-2222',
+            'plate' => 'xyz-9a87', 'vehicle_model' => 'Honda Civic', 'vehicle_year' => '2018',
+            'service_type' => 'defeito', 'complaint' => 'Barulho no motor', 'arrived' => true,
         ])->assertRedirect();
 
         $v = Vehicle::where('plate', 'XYZ9A87')->first();
         $this->assertNotNull($v);
-        $this->assertSame(45000, $v->km);
         $this->assertSame('11911112222', $v->client->phone);
-        $this->assertCount(1, ServiceOrder::where('vehicle_id', $v->id)->first()->damages);
+        $os = ServiceOrder::where('vehicle_id', $v->id)->first();
+        $this->assertSame(OsStatus::Recebido, $os->status);
+        $this->assertSame('balcao', $os->origin);
+        $this->assertNotNull($os->checked_in_at);
     }
 
     public function test_so_master_acessa_usuarios_e_exclui_os(): void

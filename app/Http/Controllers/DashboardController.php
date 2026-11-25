@@ -17,15 +17,27 @@ class DashboardController extends Controller
             return to_route('mecanico.index');
         }
 
-        $counts = ServiceOrder::selectRaw('status, count(*) as total')
-            ->whereIn('status', OsStatus::open())->groupBy('status')->pluck('total', 'status');
+        // quantas OS em cada etapa e desde quando está parada a mais antiga (acusa gargalo)
+        $stats = ServiceOrder::selectRaw('status, count(*) as total, min(status_changed_at) as oldest')
+            ->whereIn('status', OsStatus::open())->groupBy('status')->get();
+        // a coluna status vira Enum no model: a chave do array precisa ser o texto (->value)
+        $counts = $stats->mapWithKeys(fn ($r) => [$r->status->value => (int) $r->total]);
+        $oldest = $stats->mapWithKeys(fn ($r) => [$r->status->value => $r->oldest ? \Illuminate\Support\Carbon::parse($r->oldest)->toIso8601String() : null]);
 
-        $today = ServiceOrder::with(['client', 'vehicle', 'mechanic', 'items'])
+        $with = ['client', 'vehicle', 'mechanic', 'items'];
+
+        // agenda do dia: quem marcou para hoje e ainda não chegou
+        $today = ServiceOrder::with($with)->where('status', OsStatus::Aguardando)
             ->whereDate('scheduled_at', today())->orderBy('scheduled_at')->get()
             ->map(fn ($os) => OsPresenter::card($os, $user));
 
-        $open = ServiceOrder::with(['client', 'vehicle', 'mechanic', 'items'])
-            ->whereIn('status', OsStatus::open())->where('status', '!=', OsStatus::Aguardando)->latest('updated_at')->limit(40)->get()
+        // agendamentos que chegaram pelo site/bot e o balcão ainda não abriu
+        $online = ServiceOrder::with($with)->whereIn('origin', ['site', 'bot'])->whereNull('online_seen_at')
+            ->where('status', OsStatus::Aguardando)->latest('id')->limit(8)->get()
+            ->map(fn ($os) => OsPresenter::card($os, $user));
+
+        $open = ServiceOrder::with($with)->whereIn('status', OsStatus::inShop())
+            ->orderBy('status_changed_at')->limit(60)->get()
             ->map(fn ($os) => OsPresenter::card($os, $user));
 
         $month = null;
@@ -39,13 +51,11 @@ class DashboardController extends Controller
             ];
         }
 
-        $pre = \App\Models\PreService::where('status', 'novo')->latest('id')->limit(5)->get()
-            ->map(fn ($p) => ['id' => $p->id, 'name' => $p->name, 'plate' => $p->plate, 'vehicle' => $p->vehicle, 'complaint' => $p->complaint, 'created_at' => $p->created_at->toIso8601String()]);
-
         return Inertia::render('dashboard', [
-            'pre' => $pre,
             'counts' => $counts,
+            'oldest' => $oldest,
             'today' => $today,
+            'online' => $online,
             'open' => $open,
             'month' => $month,
         ]);

@@ -4,7 +4,6 @@ namespace Tests\Feature;
 
 use App\Enums\OsStatus;
 use App\Models\Attachment;
-use App\Models\PreService;
 use App\Models\ServiceOrder;
 use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
@@ -14,7 +13,7 @@ use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
-class PhotosPreServiceBudgetTest extends TestCase
+class PhotosAgendarBudgetTest extends TestCase
 {
     use RefreshDatabase;
 
@@ -74,105 +73,120 @@ class PhotosPreServiceBudgetTest extends TestCase
         Storage::disk('local')->assertMissing($a->path);
     }
 
-    /* ----------------------------------------------- pré-atendimento site */
+    /* --------------------------------------------- agendamento pelo site */
 
     private function stamp(int $secondsAgo = 10): string
     {
         return Crypt::encryptString((string) (now()->timestamp - $secondsAgo));
     }
 
-    public function test_cliente_pede_agendamento_com_foto(): void
+    public function test_cliente_agenda_pelo_site_e_ja_vira_os(): void
     {
-        $this->get(route('agendar'))->assertOk()->assertSee('Agendar atendimento');
+        $this->get(route('agendar'))->assertOk()->assertSee('Agendar atendimento')->assertSee('Revisão');
 
         $this->post(route('agendar.submit'), [
             '_t' => $this->stamp(),
-            'name' => 'Cliente do Site', 'phone' => '(11) 95555-1234', 'plate' => 'abc-9z99', 'vehicle' => 'Gol 2015',
-            'complaint' => 'Barulho na suspensão', 'consent' => '1',
+            'name' => 'Cliente do Site', 'phone' => '(11) 95555-1234', 'plate' => 'abc-9z99', 'vehicle' => 'VW Gol', 'year' => '2015',
+            'service_type' => 'defeito', 'complaint' => 'Barulho na suspensão', 'consent' => '1',
             'photos' => [UploadedFile::fake()->image('roda.jpg', 2000, 1500)],
         ])->assertRedirect(route('agendar.ok'));
 
-        $pre = PreService::where('name', 'Cliente do Site')->first();
-        $this->assertSame('11955551234', $pre->phone);
-        $this->assertSame('ABC9Z99', $pre->plate);
-        $this->assertCount(1, $pre->attachments);
+        $os = ServiceOrder::whereHas('client', fn ($c) => $c->where('name', 'Cliente do Site'))->first();
+        $this->assertNotNull($os);
+        $this->assertSame('site', $os->origin);
+        $this->assertSame(OsStatus::Aguardando, $os->status);
+        $this->assertSame('defeito', $os->service_type);
+        $this->assertSame('11955551234', $os->client->phone);
+        $this->assertSame('ABC9Z99', $os->vehicle->plate);
+        $this->assertSame('2015', (string) $os->vehicle->year);
+        $this->assertCount(1, $os->attachments);
+        $this->assertFalse((bool) $os->attachments->first()->show_to_client);
+
+        // aparece como novo para o balcão até alguém abrir a OS
+        $novos = ServiceOrder::whereIn('origin', ['site', 'bot'])->whereNull('online_seen_at')->where('status', OsStatus::Aguardando)->count();
+        $this->actingAs($this->balcao)->get($this->p('/dashboard'))->assertOk()->assertInertia(fn ($page) => $page->where('onlineNew', $novos)->has('online', $novos));
+        $this->get($this->p("/os/{$os->id}"))->assertOk();
+        $this->assertNotNull($os->fresh()->online_seen_at);
     }
 
     public function test_robos_sao_ignorados(): void
     {
+        $before = ServiceOrder::count();
         $base = ['name' => 'Robo', 'phone' => '11955551234', 'complaint' => 'spam spam', 'consent' => '1'];
         $this->post(route('agendar.submit'), [...$base, '_t' => $this->stamp(), 'website' => 'http://spam'])->assertRedirect(route('agendar.ok'));
         $this->post(route('agendar.submit'), [...$base, '_t' => $this->stamp(0)])->assertRedirect(route('agendar.ok'));
         $this->post(route('agendar.submit'), [...$base, '_t' => 'invalido'])->assertRedirect(route('agendar.ok'));
-        $this->assertSame(0, PreService::where('name', 'Robo')->count());
-    }
-
-    public function test_pedido_vira_os_com_as_fotos(): void
-    {
-        $pre = PreService::create(['name' => 'Novo Cliente', 'phone' => '11944443333', 'plate' => 'NEW1A23', 'complaint' => 'Freio rangendo']);
-        $pre->attachments()->create(['path' => 'pre/x.jpg', 'thumb_path' => 'pre/x_mini.jpg']);
-
-        $this->actingAs($this->carlos)->get($this->p('/pre-atendimentos'))->assertForbidden();
-        $this->actingAs($this->balcao)->get($this->p('/pre-atendimentos'))->assertOk();
-        $this->get($this->p("/os/nova?pre={$pre->id}"))->assertOk();
-
-        $this->post($this->p('/os'), [
-            'plate' => 'NEW1A23', 'client' => ['name' => 'Novo Cliente', 'phone' => '11944443333'], 'complaint' => 'Freio rangendo', 'pre_service_id' => $pre->id,
-        ])->assertRedirect();
-
-        $pre->refresh();
-        $this->assertSame('convertido', $pre->status);
-        $this->assertNotNull($pre->service_order_id);
-        $this->assertSame($pre->service_order_id, $pre->attachments()->first()->service_order_id);
-
-        // não dá para converter duas vezes
-        $this->post($this->p('/os'), ['plate' => 'NEW1A23', 'pre_service_id' => $pre->id])->assertSessionHasErrors('pre_service_id');
+        $this->assertSame($before, ServiceOrder::count());
     }
 
     /* ------------------------------------------------ link do orçamento */
 
+    private function emAprovacao(): void
+    {
+        $this->os->items()->update(['unit_price' => 100, 'approval' => null]);
+        $this->os->update(['status' => OsStatus::Aprovacao]);
+    }
+
     public function test_link_do_orcamento_nao_mostra_dados_sensiveis(): void
     {
-        $this->os->items()->update(['unit_price' => 100]);
-        $this->os->update(['status' => OsStatus::Aprovacao]);
+        $this->emAprovacao();
         $this->os->load('client');
 
         $res = $this->get(route('orcamento.show', $this->os->public_token))->assertOk();
-        $res->assertSee($this->os->client->firstName())->assertSee('Aprovar orçamento');
+        $res->assertSee($this->os->client->firstName())->assertSee('Aprovar itens marcados');
         $res->assertDontSee($this->os->client->phone)->assertDontSee($this->os->client->document);
         $res->assertHeader('X-Robots-Tag', 'noindex, nofollow, noarchive');
 
         $this->get(route('orcamento.show', str_repeat('x', 40)))->assertNotFound();
     }
 
-    public function test_cliente_aprova_pelo_link(): void
+    public function test_cliente_aprova_tudo_pelo_link(): void
     {
-        $this->os->update(['status' => OsStatus::Aprovacao]);
-        $this->post(route('orcamento.decide', $this->os->public_token), ['decision' => 'aprovar', 'name' => 'Pedro Santos', 'agree' => '1'])->assertRedirect();
+        $this->emAprovacao();
+        $ids = $this->os->items()->pluck('id')->all();
+        $this->post(route('orcamento.decide', $this->os->public_token), ['decision' => 'aprovar', 'items' => $ids, 'name' => 'Pedro Santos', 'agree' => '1'])->assertRedirect();
 
         $os = $this->os->fresh();
         $this->assertSame(OsStatus::Execucao, $os->status);
         $this->assertNotNull($os->approved_at);
         $this->assertSame('Pedro Santos', $os->approval_name);
-        $this->assertStringContainsString('APROVOU', $os->events()->first()->note);
+        $this->assertSame(0, $os->items()->where('approval', '!=', 'aprovado')->count());
+        $this->assertStringContainsString('APROVOU', $os->events()->latest('id')->first()->note);
+    }
+
+    public function test_cliente_aprova_so_alguns_itens(): void
+    {
+        $this->os->items()->delete();
+        $freio = $this->os->items()->create(['type' => 'peca', 'description' => 'Pastilha de freio', 'quantity' => 1, 'unit_price' => 200]);
+        $susp = $this->os->items()->create(['type' => 'peca', 'description' => 'Amortecedor', 'quantity' => 2, 'unit_price' => 300]);
+        $this->os->update(['status' => OsStatus::Aprovacao, 'discount' => 0]);
+
+        $this->post(route('orcamento.decide', $this->os->public_token), ['decision' => 'aprovar', 'items' => [$freio->id], 'name' => 'Pedro', 'agree' => '1', 'note' => 'O resto no mês que vem']);
+
+        $os = $this->os->fresh();
+        $this->assertSame(OsStatus::Execucao, $os->status);
+        $this->assertSame('aprovado', $freio->fresh()->approval);
+        $this->assertSame('recusado', $susp->fresh()->approval);
+        $this->assertEqualsWithDelta(200, $os->subtotal(), 0.001);
     }
 
     public function test_aprovar_exige_concordar(): void
     {
-        $this->os->update(['status' => OsStatus::Aprovacao]);
-        $this->post(route('orcamento.decide', $this->os->public_token), ['decision' => 'aprovar', 'name' => 'Pedro'])->assertSessionHasErrors('agree');
+        $this->emAprovacao();
+        $this->post(route('orcamento.decide', $this->os->public_token), ['decision' => 'aprovar', 'items' => $this->os->items()->pluck('id')->all(), 'name' => 'Pedro'])->assertSessionHasErrors('agree');
         $this->assertSame(OsStatus::Aprovacao, $this->os->fresh()->status);
     }
 
-    public function test_cliente_recusa_e_volta_para_o_balcao(): void
+    public function test_cliente_nao_aprova_nada_e_volta_para_o_balcao(): void
     {
-        $this->os->update(['status' => OsStatus::Aprovacao]);
-        $this->post(route('orcamento.decide', $this->os->public_token), ['decision' => 'recusar', 'name' => 'Pedro', 'note' => 'Só os freios'])->assertRedirect();
+        $this->emAprovacao();
+        $this->post(route('orcamento.decide', $this->os->public_token), ['decision' => 'recusar', 'name' => 'Pedro', 'note' => 'Vou pensar'])->assertRedirect();
 
         $os = $this->os->fresh();
         $this->assertSame(OsStatus::Orcamento, $os->status);
         $this->assertNotNull($os->rejected_at);
-        $this->assertSame('Só os freios', $os->approval_note);
+        $this->assertSame('Vou pensar', $os->approval_note);
+        $this->assertSame(0, $os->items()->where('approval', '!=', 'recusado')->count());
     }
 
     public function test_link_nao_aceita_decisao_fora_da_etapa_de_aprovacao(): void

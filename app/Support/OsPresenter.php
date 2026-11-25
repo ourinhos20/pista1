@@ -50,6 +50,11 @@ class OsPresenter
             'created_at' => $os->created_at?->toIso8601String(),
             'complaint' => $os->complaint,
             'km_in' => $os->km_in,
+            'origin' => $os->origin,
+            'service_type' => $os->service_type,
+            'status_since' => ($os->status_changed_at ?? $os->updated_at)?->toIso8601String(),
+            'inspected' => (bool) $os->inspected_at,
+            'online_new' => $os->origin !== 'balcao' && ! $os->online_seen_at && $os->status->value === 'aguardando',
             'client' => self::client($os->client, $user),
             'vehicle' => self::vehicle($os->vehicle),
             'mechanic' => $os->mechanic ? ['id' => $os->mechanic->id, 'name' => $os->mechanic->name] : null,
@@ -64,7 +69,7 @@ class OsPresenter
 
     public static function full(ServiceOrder $os, User $user): array
     {
-        $os->loadMissing(['client', 'vehicle', 'mechanic', 'items','events.user', 'payments', 'attachments.uploader']);
+        $os->loadMissing(['client', 'vehicle', 'mechanic', 'items', 'events.user', 'payments', 'attachments.uploader', 'inspector']);
         $sensitive = $user->canSeeSensitive();
 
         return [
@@ -75,6 +80,9 @@ class OsPresenter
             'damages' => $os->damages ?? [],
             'checklist' => $os->checklist ?? [],
             'revision' => (object) ($os->revision ?? []),
+            'checked_in_at' => $os->checked_in_at?->toIso8601String(),
+            'inspected_at' => $os->inspected_at?->toIso8601String(),
+            'inspected_by' => $os->inspector?->name,
             'approved_at' => $os->approved_at?->toIso8601String(),
             'rejected_at' => $os->rejected_at?->toIso8601String(),
             'approval_name' => $os->approval_name,
@@ -86,6 +94,8 @@ class OsPresenter
                 'type' => $i->type,
                 'description' => $i->description,
                 'quantity' => $i->quantity,
+                'approval' => $i->approval,
+                'extra' => $i->extra,
                 ...($sensitive ? ['unit_price' => $i->unit_price, 'total' => $i->total()] : []),
             ])->values(),
             // custo e margem: só os sócios

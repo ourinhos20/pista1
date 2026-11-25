@@ -17,4 +17,10 @@ return [
      * Em produção, troque por algo difícil de adivinhar (ex.: PAINEL_PATH=p1-gestao-7k2).
      */
     'panel_path' => trim(env('PAINEL_PATH', 'sistema'), '/'),
+
+    /*
+     * Senha (token) do bot de WhatsApp para criar agendamentos em POST /api/bot/agendamento.
+     * Vazio = entrada do bot desligada. Use um texto longo e aleatório.
+     */
+    'bot_token' => env('BOT_TOKEN', ''),
 ];

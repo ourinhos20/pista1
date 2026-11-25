@@ -28,11 +28,6 @@ class Attachment extends Model
         return $this->belongsTo(ServiceOrder::class);
     }
 
-    public function preService(): BelongsTo
-    {
-        return $this->belongsTo(PreService::class);
-    }
-
     public function uploader(): BelongsTo
     {
         return $this->belongsTo(User::class, 'uploaded_by');

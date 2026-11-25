@@ -109,12 +109,19 @@ class PurchaseController extends Controller
                         'description' => $i['description'],
                         'quantity' => $i['quantity'],
                         'unit_price' => $i['sale_price'] ?? 0,
+                        // depois do orçamento aprovado, peça nova é complemento: o cliente aprova pelo link
+                        'extra' => in_array($os->status, [\App\Enums\OsStatus::Pecas, \App\Enums\OsStatus::Execucao, \App\Enums\OsStatus::Pronto], true),
                     ]);
                 }
             }
 
             if ($os) {
                 $os->logEvent($user, "Compra de peças lançada: {$supplier->name}".($purchase->invoice ? " NF {$purchase->invoice}" : '').' · R$ '.number_format($total, 2, ',', '.'));
+                // carro esperando peça volta sozinho para a fila do mecânico
+                if ($os->status === \App\Enums\OsStatus::Pecas) {
+                    $os->update(['status' => \App\Enums\OsStatus::Execucao]);
+                    $os->logEvent($user, 'Peças chegaram · carro liberado para execução');
+                }
             }
 
             // conta a pagar ao fornecedor (à vista ou parcelada)

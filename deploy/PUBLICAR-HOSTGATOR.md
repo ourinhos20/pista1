@@ -38,6 +38,7 @@ Pelo *Gerenciador de Arquivos* do cPanel (ou FTP):
    - `DB_DATABASE`, `DB_USERNAME` e `DB_PASSWORD`: os dados do banco criado no cPanel;
    - `PAINEL_PATH`: um endereço secreto, só com letras, números e hífen (ex.: `p1-gestao-7k2q`). **Anote esse endereço.**
    - `OFICINA_ENDERECO` e os demais dados da oficina.
+   - `BOT_TOKEN`: só se for usar o bot do WhatsApp (veja "Bot do WhatsApp" mais abaixo). Pode ficar vazio.
 3. Confira que `APP_DEBUG=false`. Com `true`, um erro mostraria senhas na tela.
 
 ## 4. Instalar (pelo Terminal/SSH)
@@ -86,9 +87,22 @@ php artisan up
 
 ## Links públicos (para divulgar)
 
-- `https://seudominio.com.br/agendar`: o cliente pede um horário e manda fotos. O pedido aparece em **Atendimento › Pedidos do site**. Vale colocar esse link na bio do Instagram e na mensagem automática do WhatsApp Business.
+- `https://seudominio.com.br/agendar`: o cliente pede um horário e manda fotos. O pedido já vira uma OS "Agendado" e aparece em **Atendimento › Agendamentos online (bot/site)** e no painel inicial. Vale colocar esse link na bio do Instagram e na mensagem automática do WhatsApp Business.
 - `https://seudominio.com.br/orcamento/...`: link individual de cada OS, que o próprio sistema monta ao clicar em **Orçamento no WhatsApp**. Não precisa divulgar.
 - As fotos são reduzidas no próprio celular antes do envio (cerca de 300 KB cada), então o limite de upload padrão da HostGator é suficiente.
+
+## Bot do WhatsApp (opcional)
+
+Qualquer plataforma de bot que faça "requisição HTTP" (Botconversa, Typebot, ManyChat, n8n, Z-API...) pode criar o agendamento direto no sistema.
+
+1. No `.env` do servidor, preencha `BOT_TOKEN` com uma senha longa e rode `php artisan config:cache`.
+2. No bot, configure a requisição:
+   - Método `POST`, endereço `https://seudominio.com.br/api/bot/agendamento`;
+   - Cabeçalho `Authorization: Bearer <BOT_TOKEN>`;
+   - Corpo JSON com: `nome`, `telefone` (com DDD), `carro`, `ano`, `placa` (opcional), `tipo` (defeito, revisao, preventiva ou outro), `descricao` e `data_hora` (ex.: `10/12/2026 09:00`, opcional).
+3. A resposta traz `mensagem` (ex.: "Agendamento registrado para 10/12 às 09:00"), que o bot pode repetir ao cliente.
+
+Com `BOT_TOKEN` vazio, esse endereço fica desligado.
 
 ## Segurança já configurada no sistema
 

@@ -1,15 +1,16 @@
-import { CarDiagramSvg, DamageLegend } from '@/components/car-diagram';
+import { CarDiagramEditor, CarDiagramSvg, DamageLegend } from '@/components/car-diagram';
+import { Block, Field, Grid, OriginTag, Placa, ReadOnly, Since, Situacao, Tabs, Tool, selectCls, textareaCls, type Col } from '@/components/erp';
 import { PhotoGallery, PhotoUpload } from '@/components/photo-gallery';
-import { Block, Field, Grid, Placa, ReadOnly, Situacao, Tabs, Tool, selectCls, textareaCls, type Col } from '@/components/erp';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
-import { ENTRY_CHECKLIST, FLOW, FUEL, PAYMENT, STATUS, WAITING_FOR, date, documentFmt, km, money, nextStep, phone, plate, whatsapp } from '@/lib/os';
+import { ENTRY_CHECKLIST, FLOW, FUEL, ORIGIN, PAYMENT, SERVICE_TYPE, STATUS, WAITING_FOR, date, documentFmt, km, money, nextStep, phone, plate, whatsapp } from '@/lib/os';
 import { REVISION_GROUPS, REVISION_TOTAL, REVISION_VALUES, type RevisionValue } from '@/lib/revisao';
 import { cn } from '@/lib/utils';
-import type { OsEvent, OsFull, OsItem, OsStatus, SharedData } from '@/types';
+import type { Damage, OsEvent, OsFull, OsItem, OsStatus, SharedData } from '@/types';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
-import { ArrowRight, ChevronDown, CircleCheck, Hourglass, Link2, MessageCircle, Plus, Printer, Save, ShoppingCart, Trash2 } from 'lucide-react';
+import { ArrowRight, Check, ChevronDown, CircleCheck, ClipboardCheck, Hourglass, Link2, MessageCircle, PackageSearch, Pencil, Plus, Printer, Save, ShoppingCart, Trash2, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 type Hist = { id: number; number: string; status: OsStatus; date: string; km_in: number | null; summary: string | null };
@@ -18,8 +19,213 @@ interface Props {
     history: Hist[];
     mechanics: { id: number; name: string }[];
     statuses: { value: OsStatus; label: string }[];
+    serviceTypes: Record<string, string>;
 }
-type Tab = 'diag' | 'revisao' | 'itens' | 'fotos' | 'vistoria' | 'historico';
+type Tab = 'vistoria' | 'diag' | 'revisao' | 'itens' | 'fotos' | 'historico';
+
+/** Mostra o motivo quando o servidor recusa mudar de etapa (ex.: falta vistoria). */
+const showError = (errors: Record<string, string>) => {
+    const msg = Object.values(errors)[0];
+    if (msg) alert(msg);
+};
+
+/* ---------------------------------------------------- vistoria de entrada */
+function Vistoria({ os, canEdit }: { os: OsFull; canEdit: boolean }) {
+    const [editing, setEditing] = useState(!os.inspected_at && canEdit);
+    const { data, setData, patch, processing, errors } = useForm({
+        km_in: os.km_in ? String(os.km_in) : '',
+        fuel_level: os.fuel_level as number | null,
+        checklist: (os.checklist ?? {}) as Record<string, boolean>,
+        damages: (os.damages ?? []) as Damage[],
+    });
+    const err = errors as Record<string, string>;
+
+    if (!editing) {
+        return (
+            <div className="grid gap-3">
+                {os.inspected_at ? (
+                    <p className="flex flex-wrap items-center gap-2 text-[13px]">
+                        <CircleCheck className="size-4 text-green-700" /> Vistoria feita em <b>{date(os.inspected_at, true)}</b>
+                        {os.inspected_by && <span>por {os.inspected_by}</span>}
+                        {canEdit && (
+                            <button type="button" onClick={() => setEditing(true)} className="ml-auto inline-flex items-center gap-1 text-[12px] font-semibold text-[#b51f1f] hover:underline">
+                                <Pencil className="size-3.5" /> Alterar
+                            </button>
+                        )}
+                    </p>
+                ) : (
+                    <p className="rounded-[3px] border border-amber-300 bg-amber-50 px-3 py-2 text-[13px]">A vistoria é feita pelo mecânico quando o carro chega (km, combustível, itens e avarias).</p>
+                )}
+                {os.inspected_at && (
+                    <div className="grid gap-4 lg:grid-cols-[minmax(0,560px)_260px]">
+                        <div className="max-w-xl">
+                            <CarDiagramEditorReadOnly damages={os.damages} />
+                        </div>
+                        <dl className="grid content-start gap-1 text-[13px]">
+                            <div className="flex justify-between border-b border-[#eceef1] py-1">
+                                <dt>Km</dt>
+                                <dd className="font-bold tabular-nums">{km(os.km_in)}</dd>
+                            </div>
+                            <div className="flex justify-between border-b border-[#eceef1] py-1">
+                                <dt>Combustível</dt>
+                                <dd className="font-bold">{os.fuel_level !== null ? FUEL[os.fuel_level] : '—'}</dd>
+                            </div>
+                            {ENTRY_CHECKLIST.map((c) => (
+                                <div key={c.key} className="flex justify-between border-b border-[#eceef1] py-1">
+                                    <dt>{c.label}</dt>
+                                    <dd className={os.checklist?.[c.key] ? 'font-bold text-green-700' : 'text-zinc-400'}>{os.checklist?.[c.key] ? 'SIM' : 'NÃO'}</dd>
+                                </div>
+                            ))}
+                        </dl>
+                    </div>
+                )}
+            </div>
+        );
+    }
+
+    return (
+        <form
+            className="grid gap-4"
+            onSubmit={(e) => {
+                e.preventDefault();
+                patch(route('os.vistoria', os.id), { preserveScroll: true, onSuccess: () => setEditing(false) });
+            }}
+        >
+            <p className="text-[13px] text-zinc-600">
+                <b>Primeiro passo, antes do diagnóstico:</b> registre como o carro chegou. Isso protege a oficina se aparecer um risco depois. Tire fotos das avarias na aba <b>Fotos</b>.
+            </p>
+            <div className="grid gap-3 sm:grid-cols-[180px_1fr]">
+                <Field label="Km do painel *" error={err.km_in}>
+                    <Input value={data.km_in} onChange={(e) => setData('km_in', e.target.value.replace(/\D/g, ''))} inputMode="numeric" className="text-lg font-bold tabular-nums" />
+                </Field>
+                <Field label="Combustível *" error={err.fuel_level}>
+                    <div className="grid grid-cols-5 overflow-hidden rounded-[3px] border border-[#b9bec6]">
+                        {FUEL.map((f, i) => (
+                            <button
+                                key={f}
+                                type="button"
+                                onClick={() => setData('fuel_level', i)}
+                                className={cn('h-11 border-r border-[#d7dade] text-[13px] font-semibold last:border-r-0 md:h-8', data.fuel_level === i ? 'bg-zinc-900 text-white' : 'bg-card')}
+                            >
+                                {f}
+                            </button>
+                        ))}
+                    </div>
+                </Field>
+            </div>
+            <Field label="Itens no veículo">
+                <div className="grid grid-cols-2 gap-x-3 gap-y-1 sm:grid-cols-5">
+                    {ENTRY_CHECKLIST.map((c) => (
+                        <label key={c.key} className="flex h-10 items-center gap-2 text-[14px] md:h-7 md:text-[13px]">
+                            <input type="checkbox" className="size-5 accent-[#d42a2a] md:size-4" checked={!!data.checklist[c.key]} onChange={(e) => setData('checklist', { ...data.checklist, [c.key]: e.target.checked })} />
+                            {c.label}
+                        </label>
+                    ))}
+                </div>
+            </Field>
+            <Field label="Avarias na lataria (toque no desenho)">
+                <div className="max-w-3xl">
+                    <CarDiagramEditor value={data.damages} onChange={(v) => setData('damages', v)} />
+                </div>
+            </Field>
+            <div className="flex flex-wrap gap-2">
+                <button type="submit" disabled={processing} className="inline-flex h-12 items-center gap-2 rounded-[3px] bg-[#d42a2a] px-5 text-[15px] font-semibold text-white disabled:opacity-60 md:h-9 md:text-[13px]">
+                    <ClipboardCheck className="size-5 md:size-4" /> {os.inspected_at ? 'Gravar alterações' : 'Concluir vistoria'}
+                </button>
+                {os.inspected_at && (
+                    <button type="button" onClick={() => setEditing(false)} className="inline-flex h-12 items-center gap-1 rounded-[3px] border border-[#c9cdd3] px-4 text-[13px] font-semibold md:h-9">
+                        <X className="size-4" /> Cancelar
+                    </button>
+                )}
+            </div>
+        </form>
+    );
+}
+
+function CarDiagramEditorReadOnly({ damages }: { damages: Damage[] }) {
+    return (
+        <div className="rounded-[4px] border border-[#d7dade] bg-white p-2 text-zinc-900">
+            <CarDiagramSvg damages={damages} />
+            <div className="mt-2">
+                <DamageLegend damages={damages} />
+            </div>
+        </div>
+    );
+}
+
+/* --------------------------------------- cadastro do cliente e do carro */
+function CadastroForm({ os, checkin, onDone }: { os: OsFull; checkin: boolean; onDone: () => void }) {
+    const c = os.client;
+    const v = os.vehicle;
+    const { data, setData, put, post, processing, errors } = useForm({
+        client: { name: c?.name ?? '', phone: c?.phone ?? '', document: c?.document ?? '', email: c?.email ?? '', address: c?.address ?? '', city: c?.city ?? '' },
+        vehicle: { plate: v?.plate ?? '', brand: v?.brand ?? '', model: v?.model ?? '', year: v?.year ?? '', color: v?.color ?? '', engine: v?.engine ?? '' },
+    });
+    const err = errors as Record<string, string>;
+    const setC = (k: keyof typeof data.client, val: string) => setData('client', { ...data.client, [k]: val });
+    const setV = (k: keyof typeof data.vehicle, val: string) => setData('vehicle', { ...data.vehicle, [k]: val });
+
+    return (
+        <form
+            className="grid gap-3"
+            onSubmit={(e) => {
+                e.preventDefault();
+                const opts = { preserveScroll: true, onSuccess: onDone };
+                if (checkin) post(route('os.checkin', os.id), opts);
+                else put(route('os.cadastro', os.id), opts);
+            }}
+        >
+            {checkin && <p className="rounded-[3px] bg-cyan-50 px-3 py-2 text-[13px] text-cyan-900">Confira os dados e complete o que faltar. Só a <b>placa</b> é obrigatória agora; o resto pode ficar para depois.</p>}
+            <p className="text-[11px] font-bold tracking-wide text-zinc-600 uppercase">Carro</p>
+            <div className="grid gap-3 sm:grid-cols-6">
+                <Field label={checkin ? 'Placa *' : 'Placa'} className="sm:col-span-2" error={err['vehicle.plate']}>
+                    <Input value={data.vehicle.plate} onChange={(e) => setV('plate', e.target.value.toUpperCase())} maxLength={8} className="font-mono text-lg font-bold tracking-widest uppercase" autoFocus={checkin} />
+                </Field>
+                <Field label="Marca" className="sm:col-span-2">
+                    <Input value={data.vehicle.brand} onChange={(e) => setV('brand', e.target.value)} />
+                </Field>
+                <Field label="Modelo" className="sm:col-span-2">
+                    <Input value={data.vehicle.model} onChange={(e) => setV('model', e.target.value)} />
+                </Field>
+                <Field label="Ano" className="sm:col-span-2">
+                    <Input value={data.vehicle.year} onChange={(e) => setV('year', e.target.value)} inputMode="numeric" />
+                </Field>
+                <Field label="Cor" className="sm:col-span-2">
+                    <Input value={data.vehicle.color} onChange={(e) => setV('color', e.target.value)} />
+                </Field>
+                <Field label="Motor" className="sm:col-span-2">
+                    <Input value={data.vehicle.engine} onChange={(e) => setV('engine', e.target.value)} />
+                </Field>
+            </div>
+            <p className="mt-1 text-[11px] font-bold tracking-wide text-zinc-600 uppercase">Cliente</p>
+            <div className="grid gap-3 sm:grid-cols-6">
+                <Field label="Nome" className="sm:col-span-4" error={err['client.name']}>
+                    <Input value={data.client.name} onChange={(e) => setC('name', e.target.value)} />
+                </Field>
+                <Field label="WhatsApp" className="sm:col-span-2">
+                    <Input value={data.client.phone} onChange={(e) => setC('phone', e.target.value)} inputMode="tel" />
+                </Field>
+                <Field label="CPF / CNPJ" className="sm:col-span-2">
+                    <Input value={data.client.document} onChange={(e) => setC('document', e.target.value)} inputMode="numeric" />
+                </Field>
+                <Field label="E-mail" className="sm:col-span-4" error={err['client.email']}>
+                    <Input type="email" value={data.client.email} onChange={(e) => setC('email', e.target.value)} />
+                </Field>
+                <Field label="Endereço" className="sm:col-span-4">
+                    <Input value={data.client.address} onChange={(e) => setC('address', e.target.value)} />
+                </Field>
+                <Field label="Cidade" className="sm:col-span-2">
+                    <Input value={data.client.city} onChange={(e) => setC('city', e.target.value)} />
+                </Field>
+            </div>
+            <div className="flex justify-end">
+                <button type="submit" disabled={processing} className="inline-flex h-11 items-center gap-1.5 rounded-[3px] border border-[#b51f1f] bg-[#d42a2a] px-4 text-[13px] font-semibold text-white disabled:opacity-60 md:h-9">
+                    <Save className="size-4" /> {checkin ? 'Confirmar chegada e liberar para o mecânico' : 'Gravar cadastro'}
+                </button>
+            </div>
+        </form>
+    );
+}
 
 /* --------------------------------------------------------------- etapas */
 function Etapas({ status }: { status: OsStatus }) {
@@ -37,7 +243,7 @@ function Etapas({ status }: { status: OsStatus }) {
                     <span className={cn('grid size-4 place-items-center rounded-[2px] text-[10px]', i === cur ? 'bg-[#d42a2a]' : i < cur ? STATUS[s].dot + ' text-white' : 'border border-zinc-300')}>
                         {i < cur ? '✓' : i + 1}
                     </span>
-                    {STATUS[s].label}
+                    {STATUS[s].short ?? STATUS[s].label}
                 </li>
             ))}
         </ol>
@@ -125,11 +331,43 @@ function ItemRow({ item, osId }: { item: OsItem; osId: number }) {
         if (p === item.unit_price && q === item.quantity) return;
         router.put(route('os.items.update', [osId, item.id]), { ...item, unit_price: p, quantity: q }, { preserveScroll: true });
     };
-    const noPrice = !item.unit_price;
+    const noPrice = !item.unit_price && item.approval !== 'recusado';
+    const setApproval = (approval: 'aprovado' | 'recusado' | null) =>
+        router.patch(route('os.items.approval', [osId, item.id]), { approval }, { preserveScroll: true });
     return (
-        <tr className={cn('border-b border-[#e3e5e8] even:bg-[#f8f9fa] dark:even:bg-zinc-900/60', noPrice && 'bg-amber-50/70 even:bg-amber-50/70 dark:bg-amber-950/20')}>
+        <tr
+            className={cn(
+                'border-b border-[#e3e5e8] even:bg-[#f8f9fa] dark:even:bg-zinc-900/60',
+                noPrice && 'bg-amber-50/70 even:bg-amber-50/70 dark:bg-amber-950/20',
+                item.approval === 'recusado' && 'text-zinc-400',
+            )}
+        >
             <td className="px-2.5 py-1 text-[11px] font-bold uppercase">{item.type === 'peca' ? 'Peça' : 'Serviço'}</td>
-            <td className="px-2.5 py-1">{item.description}</td>
+            <td className="px-2.5 py-1">
+                <span className={item.approval === 'recusado' ? 'line-through' : ''}>{item.description}</span>
+                {item.extra && <span className="ml-1.5 rounded-[2px] bg-amber-400 px-1 text-[10px] font-bold text-black uppercase">complementar</span>}
+            </td>
+            <td className="w-36 px-1.5 py-1">
+                <span className="flex items-center gap-1">
+                    <button
+                        type="button"
+                        title="Cliente aprovou"
+                        onClick={() => setApproval(item.approval === 'aprovado' ? null : 'aprovado')}
+                        className={cn('grid size-8 place-items-center rounded-[3px] border md:size-7', item.approval === 'aprovado' ? 'border-green-700 bg-green-700 text-white' : 'border-[#c9cdd3] text-zinc-400')}
+                    >
+                        <Check className="size-4" />
+                    </button>
+                    <button
+                        type="button"
+                        title="Cliente recusou"
+                        onClick={() => setApproval(item.approval === 'recusado' ? null : 'recusado')}
+                        className={cn('grid size-8 place-items-center rounded-[3px] border md:size-7', item.approval === 'recusado' ? 'border-zinc-700 bg-zinc-700 text-white' : 'border-[#c9cdd3] text-zinc-400')}
+                    >
+                        <X className="size-4" />
+                    </button>
+                    <span className="text-[11px] text-zinc-500">{item.approval === 'aprovado' ? 'aprovado' : item.approval === 'recusado' ? 'recusado' : 'pendente'}</span>
+                </span>
+            </td>
             <td className="w-20 px-1.5 py-1">
                 <Input value={qty} onChange={(e) => setQty(e.target.value)} onBlur={save} inputMode="decimal" className="text-right tabular-nums" aria-label="Quantidade" />
             </td>
@@ -349,22 +587,47 @@ function Pagamentos({ os }: { os: OsFull }) {
 }
 
 /* ----------------------------------------------------------------- tela */
-export default function OsShow({ os, history, mechanics, statuses }: Props) {
+export default function OsShow({ os, history, mechanics, statuses, serviceTypes }: Props) {
     const { auth } = usePage<SharedData>().props;
     const sensitive = auth.can.sensitive;
     const isMechanic = auth.user.role === 'mecanico';
     const [busy, setBusy] = useState(false);
-    const [tab, setTab] = useState<Tab>(() => (sensitive && ['orcamento', 'aprovacao'].includes(os.status) ? 'itens' : 'diag'));
+    const [cadastro, setCadastro] = useState<'checkin' | 'edit' | null>(null);
+    const needsInspection = ['recebido', 'diagnostico'].includes(os.status) && !os.inspected_at;
+    const [tab, setTab] = useState<Tab>(() => {
+        if (needsInspection && !sensitive) return 'vistoria';
+        if (sensitive && ['orcamento', 'aprovacao', 'pecas', 'execucao'].includes(os.status)) return 'itens';
+        return 'diag';
+    });
     const diag = useForm({ diagnosis: os.diagnosis ?? '', complaint: os.complaint ?? '' });
 
     const next = nextStep(os.status, auth.user.role);
     const v = os.vehicle;
-    const pendingPrice = os.items.some((i) => !i.unit_price);
+    const active = os.items.filter((i) => i.approval !== 'recusado');
+    const pendingPrice = active.some((i) => !i.unit_price);
+    const pendingExtras = os.items.filter((i) => i.extra && i.approval === null);
+    const extrasPriced = pendingExtras.length > 0 && pendingExtras.every((i) => (i.unit_price ?? 0) > 0);
+    const canInspect = !['aguardando', 'entregue', 'cancelada'].includes(os.status);
 
     const setStatus = (status: OsStatus) => {
         setBusy(true);
-        router.patch(route('os.status', os.id), { status }, { preserveScroll: true, onFinish: () => setBusy(false) });
+        router.patch(route('os.status', os.id), { status }, { preserveScroll: true, onError: showError, onFinish: () => setBusy(false) });
     };
+
+    /** Ação principal da etapa (botão vermelho). Algumas abrem um passo antes de mudar. */
+    const primary = (() => {
+        if (os.status === 'aguardando' && sensitive) return { label: 'Cliente chegou', run: () => setCadastro('checkin') };
+        if (os.status === 'diagnostico' && !os.inspected_at)
+            return {
+                label: 'Fazer vistoria de entrada',
+                run: () => {
+                    setTab('vistoria');
+                    requestAnimationFrame(() => document.getElementById('os-abas')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+                },
+            };
+        if (!next) return null;
+        return { label: next.label, run: () => setStatus(next.to) };
+    })();
 
     const saveDiag = () => {
         if (sensitive) diag.patch(route('os.update', os.id), { preserveScroll: true });
@@ -382,19 +645,39 @@ export default function OsShow({ os, history, mechanics, statuses }: Props) {
         return () => window.removeEventListener('keydown', onKey);
     }, [os.id, sensitive]);
 
+    // mensagens de WhatsApp prontas para cada etapa
     const first = os.client?.name?.split(' ')[0];
+    const car = `${v?.title ?? 'carro'}${v?.plate ? ` (${plate(v.plate)})` : ''}`;
     const budgetText = [
         `Olá, ${first}! Aqui é da Pista 1 Mecânica Automotiva.`,
-        `Orçamento da OS ${os.number} — ${v?.title} (${plate(v?.plate)}):`,
+        `Orçamento da OS ${os.number} — ${car}:`,
         '',
-        ...os.items.map((i) => `• ${i.description}${i.quantity !== 1 ? ` (${i.quantity}x)` : ''} — ${money(i.total)}`),
+        ...active.map((i) => `• ${i.description}${i.quantity !== 1 ? ` (${i.quantity}x)` : ''} — ${money(i.total)}`),
         '',
         `*Total: ${money(os.total)}*`,
         '',
-        os.public_url ? `Veja o orçamento completo, com fotos, e aprove por aqui:\n${os.public_url}` : 'Podemos seguir com o serviço? Responda SIM para autorizar.',
+        os.public_url ? `Veja os detalhes, as fotos e aprove item por item por aqui:\n${os.public_url}` : 'Podemos seguir com o serviço? Responda SIM para autorizar.',
     ].join('\n');
-    const readyText = `Olá, ${first}! Seu ${v?.title} (${plate(v?.plate)}) está pronto para retirada na Pista 1. Total: ${money(os.total)}.`;
-    const wa = sensitive ? whatsapp(os.client?.phone, os.status === 'pronto' ? readyText : budgetText) : null;
+    const extraText = [
+        `Olá, ${first}! Durante o serviço no seu ${car} encontramos mais um item:`,
+        '',
+        ...pendingExtras.map((i) => `• ${i.description} — ${money(i.total)}`),
+        '',
+        `O que você já aprovou continua sendo feito. Aprove ou recuse este item aqui:\n${os.public_url}`,
+    ].join('\n');
+    const readyText = `Olá, ${first}! Seu ${car} está pronto para retirada na Pista 1. Total: ${money(os.total)}.`;
+    const arrivedText = `Olá, ${first}! Recebemos seu ${car} na Pista 1. Assim que o diagnóstico ficar pronto, mandamos o orçamento por aqui.`;
+    const scheduledText = `Olá, ${first}! Aqui é da Pista 1. Confirmando seu agendamento${os.scheduled_at ? ` para ${date(os.scheduled_at, true)}` : ''}. Qualquer coisa, é só chamar.`;
+    const waFor: Partial<Record<OsStatus, [string, string]>> = {
+        aguardando: ['Confirmar agendamento', scheduledText],
+        recebido: ['Avisar que recebemos', arrivedText],
+        orcamento: ['Orçamento no WhatsApp', budgetText],
+        aprovacao: ['Reenviar orçamento', budgetText],
+        pronto: ['Avisar que está pronto', readyText],
+    };
+    const waStep = sensitive ? waFor[os.status] : undefined;
+    const wa = waStep && (os.status !== 'orcamento' || active.length > 0) ? whatsapp(os.client?.phone, waStep[1]) : null;
+    const waExtra = sensitive && extrasPriced && os.public_url ? whatsapp(os.client?.phone, extraText) : null;
 
     const printTypes: [string, string][] = sensitive
         ? [
@@ -404,6 +687,7 @@ export default function OsShow({ os, history, mechanics, statuses }: Props) {
               ['revisao', 'Checklist de revisão'],
           ]
         : [
+              ['entrada', 'Vistoria de entrada (em branco/preenchida)'],
               ['diagnostico', 'Ficha do mecânico'],
               ['revisao', 'Checklist de revisão'],
           ];
@@ -424,11 +708,13 @@ export default function OsShow({ os, history, mechanics, statuses }: Props) {
 
     return (
         <AppLayout
-            title={`OS ${os.number} · ${plate(v?.plate)} · ${v?.title ?? ''}`}
+            title={`OS ${os.number} · ${v?.plate ? plate(v.plate) : 'sem placa'} · ${v?.title ?? ''}`}
             code="ATD030"
             toolbar={
                 <>
-                    {next && <Tool primary icon={<ArrowRight />} label={next.label} onClick={() => setStatus(next.to)} disabled={busy} className="hidden md:inline-flex" />}
+                    {primary && <Tool primary icon={<ArrowRight />} label={primary.label} onClick={primary.run} disabled={busy} className="hidden md:inline-flex" />}
+                    {sensitive && os.status === 'aprovacao' && <Tool icon={<PackageSearch />} label="Aprovado · aguardar peças" onClick={() => setStatus('pecas')} disabled={busy} />}
+                    {sensitive && os.status === 'execucao' && <Tool icon={<PackageSearch />} label="Aguardando peças" onClick={() => setStatus('pecas')} disabled={busy} className="hidden lg:inline-flex" />}
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <button className="inline-flex h-11 items-center gap-1.5 rounded-[3px] border border-[#c9cdd3] bg-white px-3 text-[13px] font-semibold md:h-8 md:px-2.5 dark:bg-zinc-900">
@@ -436,7 +722,7 @@ export default function OsShow({ os, history, mechanics, statuses }: Props) {
                                 <ChevronDown className="size-3.5" />
                             </button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-64 rounded-[4px] p-1">
+                        <DropdownMenuContent align="end" className="w-72 rounded-[4px] p-1">
                             {printTypes.map(([k, label]) => (
                                 <DropdownMenuItem key={k} asChild className="h-9 rounded-[3px] text-[13px]">
                                     <a href={route('os.print', [os.id, k])} target="_blank" rel="noreferrer">
@@ -444,22 +730,24 @@ export default function OsShow({ os, history, mechanics, statuses }: Props) {
                                     </a>
                                 </DropdownMenuItem>
                             ))}
+                            {isMechanic && <p className="px-2 py-1.5 text-[11px] text-zinc-500">Preencheu no papel? Tire uma foto da ficha e anexe na aba Fotos.</p>}
                         </DropdownMenuContent>
                     </DropdownMenu>
-                    {wa && ['orcamento', 'aprovacao', 'pronto'].includes(os.status) && os.items.length > 0 && (
+                    {wa && waStep && (
                         <Tool
                             icon={<MessageCircle className="text-green-600" />}
-                            label={os.status === 'pronto' ? 'Avisar cliente' : 'Orçamento no WhatsApp'}
+                            label={waStep[0]}
                             href={wa}
                             external
                             // enviar o orçamento já marca a OS como "aguardando aprovação" (o link passa a aceitar a resposta)
-                            onClick={() => os.status === 'orcamento' && !os.items.some((i) => !i.unit_price) && setStatus('aprovacao')}
+                            onClick={() => os.status === 'orcamento' && !pendingPrice && setStatus('aprovacao')}
                         />
                     )}
-                    {sensitive && !['entregue', 'cancelada'].includes(os.status) && (
+                    {waExtra && <Tool icon={<MessageCircle className="text-amber-600" />} label="Enviar item complementar" href={waExtra} external />}
+                    {sensitive && !['entregue', 'cancelada', 'aguardando'].includes(os.status) && (
                         <Tool icon={<ShoppingCart />} label="Comprar peças" href={route('compras.index', { os: os.id })} className="hidden lg:inline-flex" />
                     )}
-                    {sensitive && os.public_url && ['orcamento', 'aprovacao'].includes(os.status) && (
+                    {sensitive && os.public_url && ['orcamento', 'aprovacao', 'pecas', 'execucao'].includes(os.status) && (
                         <Tool
                             icon={<Link2 />}
                             label="Copiar link"
@@ -467,12 +755,12 @@ export default function OsShow({ os, history, mechanics, statuses }: Props) {
                                 navigator.clipboard?.writeText(os.public_url!);
                                 alert('Link do orçamento copiado. Cole na conversa com o cliente.');
                             }}
-                            className="hidden md:inline-flex"
+                            className="hidden xl:inline-flex"
                         />
                     )}
                     {sensitive && (
-                        <select aria-label="Alterar situação" className={cn(selectCls, 'w-auto md:w-44')} value="" onChange={(e) => e.target.value && setStatus(e.target.value as OsStatus)}>
-                            <option value="">Alterar situação…</option>
+                        <select aria-label="Alterar etapa" className={cn(selectCls, 'w-auto md:w-40')} value="" onChange={(e) => e.target.value && setStatus(e.target.value as OsStatus)}>
+                            <option value="">Alterar etapa…</option>
                             {statuses
                                 .filter((s) => s.value !== os.status)
                                 .map((s) => (
@@ -483,18 +771,42 @@ export default function OsShow({ os, history, mechanics, statuses }: Props) {
                         </select>
                     )}
                     {auth.can.master && (
-                        <Tool danger icon={<Trash2 />} label="Excluir" onClick={() => confirm(`Excluir a OS ${os.number}? Não pode ser desfeito.`) && router.delete(route('os.destroy', os.id))} className="hidden lg:inline-flex" />
+                        <Tool danger icon={<Trash2 />} label="Excluir" onClick={() => confirm(`Excluir a OS ${os.number}? Não pode ser desfeito.`) && router.delete(route('os.destroy', os.id))} className="hidden xl:inline-flex" />
                     )}
                 </>
             }
         >
-            <Head title={`OS ${os.number} · ${plate(v?.plate)}`} />
+            <Head title={`OS ${os.number} · ${v?.plate ? plate(v.plate) : 'sem placa'}`} />
             <div className="grid gap-2 md:gap-3">
                 <Etapas status={os.status} />
 
+                <p className="-mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 px-0.5 text-[12px] text-zinc-600">
+                    <span>
+                        Nesta etapa <Since iso={os.status_since} status={os.status} className="text-[12px]" />
+                    </span>
+                    <span>· Origem: {ORIGIN[os.origin] ?? os.origin}</span>
+                    {os.service_type && <span>· {SERVICE_TYPE[os.service_type]}</span>}
+                </p>
+
+                {/* avisos: o que fazer agora nesta etapa */}
                 {isMechanic && WAITING_FOR[os.status] && (
                     <p className="flex items-center gap-2 rounded-[3px] border border-amber-300 bg-amber-50 px-3 py-2 text-[14px] font-medium dark:border-amber-800 dark:bg-amber-950/40">
                         <Hourglass className="size-4" /> {WAITING_FOR[os.status]}
+                    </p>
+                )}
+                {sensitive && os.status === 'aguardando' && (
+                    <p className="flex flex-wrap items-center gap-2 rounded-[3px] border border-zinc-300 bg-white px-3 py-2 text-[13px] dark:bg-zinc-900">
+                        <span>
+                            Quando o cliente chegar, clique em <b>Cliente chegou</b>: confira a placa e complete o cadastro. O carro entra na fila do mecânico.
+                        </span>
+                    </p>
+                )}
+                {needsInspection && os.status === 'diagnostico' && (
+                    <p className="flex items-center gap-2 rounded-[3px] border border-red-300 bg-red-50 px-3 py-2 text-[13px] font-medium dark:border-red-800 dark:bg-red-950/40">
+                        <ClipboardCheck className="size-4 shrink-0 text-red-700" />
+                        <span>
+                            Faça a <b>vistoria de entrada</b> antes do diagnóstico (km, combustível, itens e avarias).
+                        </span>
                     </p>
                 )}
                 {os.approval_name && os.approved_at && !['orcamento', 'aprovacao'].includes(os.status) && (
@@ -504,25 +816,48 @@ export default function OsShow({ os, history, mechanics, statuses }: Props) {
                         {os.approval_note && <span>· “{os.approval_note}”</span>}
                     </p>
                 )}
+                {pendingExtras.length > 0 && (
+                    <p className="flex flex-wrap items-center gap-2 rounded-[3px] border border-amber-300 bg-amber-50 px-3 py-2 text-[13px] dark:border-amber-800 dark:bg-amber-950/40">
+                        <b>{pendingExtras.length} item(ns) complementar(es) aguardando o cliente.</b>
+                        {sensitive
+                            ? extrasPriced
+                                ? 'Clique em "Enviar item complementar" para o cliente aprovar pelo link.'
+                                : 'Lance o valor na aba Peças e serviços e envie para o cliente.'
+                            : 'Não execute esses itens até o cliente aprovar.'}
+                    </p>
+                )}
                 {os.rejected_at && os.status === 'orcamento' && (
                     <p className="flex flex-wrap items-center gap-2 rounded-[3px] border border-red-300 bg-red-50 px-3 py-2 text-[13px] dark:border-red-800 dark:bg-red-950/40">
-                        <b className="text-red-800">Cliente NÃO aprovou</b> em {date(os.rejected_at, true)} ({os.approval_name})
+                        <b className="text-red-800">Cliente NÃO aprovou nenhum item</b> em {date(os.rejected_at, true)} ({os.approval_name})
                         {os.approval_note && <span>· “{os.approval_note}”</span>}
-                        {sensitive && <span>Ajuste o orçamento e envie de novo.</span>}
+                        {sensitive && <span>Ajuste e reenvie, ou entregue o carro (se cobrar diagnóstico, inclua o item "Taxa de diagnóstico").</span>}
                     </p>
                 )}
                 {sensitive && os.status === 'orcamento' && !os.rejected_at && (
                     <p className="flex items-center gap-2 rounded-[3px] border border-violet-300 bg-violet-50 px-3 py-2 text-[13px] dark:border-violet-800 dark:bg-violet-950/40">
-                        O mecânico enviou o diagnóstico. Lance os valores na aba <b>Peças e serviços</b>, imprima a via do cliente e clique em <b>Orçamento enviado ao cliente</b>.
+                        <span>
+                            O mecânico enviou o diagnóstico. Lance os valores em <b>Peças e serviços</b> e clique em <b>Orçamento no WhatsApp</b> (ou imprima a via do cliente).
+                        </span>
                     </p>
                 )}
 
-                <Block title="Dados da ordem de serviço">
+                <Block
+                    title="Dados da ordem de serviço"
+                    actions={
+                        sensitive && (
+                            <button type="button" onClick={() => setCadastro('edit')} className="inline-flex items-center gap-1 text-[12px] font-semibold text-[#b51f1f] hover:underline">
+                                <Pencil className="size-3.5" /> Completar / corrigir cadastro
+                            </button>
+                        )
+                    }
+                >
                     <div className="grid grid-cols-2 gap-x-3 gap-y-2.5 md:grid-cols-4 xl:grid-cols-6">
                         <Field label="Nº OS">
-                            <ReadOnly className="font-bold">{os.number}</ReadOnly>
+                            <ReadOnly className="font-bold">
+                                {os.number} <OriginTag origin={os.origin} />
+                            </ReadOnly>
                         </Field>
-                        <Field label="Situação">
+                        <Field label="Etapa">
                             <ReadOnly>
                                 <Situacao status={os.status} />
                             </ReadOnly>
@@ -530,20 +865,18 @@ export default function OsShow({ os, history, mechanics, statuses }: Props) {
                         <Field label="Agendado para">
                             <ReadOnly>{os.scheduled_at ? date(os.scheduled_at, true) : '—'}</ReadOnly>
                         </Field>
-                        <Field label="Abertura">
-                            <ReadOnly>{date(os.created_at, true)}</ReadOnly>
+                        <Field label="Chegou em">
+                            <ReadOnly>{os.checked_in_at ? date(os.checked_in_at, true) : '—'}</ReadOnly>
                         </Field>
                         <Field label="Placa">
-                            <ReadOnly>
-                                <Placa value={v?.plate} />
-                            </ReadOnly>
+                            <ReadOnly>{v?.plate ? <Placa value={v.plate} /> : <span className="text-amber-700">informar na chegada</span>}</ReadOnly>
                         </Field>
                         <Field label="Km entrada">
                             <ReadOnly className="font-semibold tabular-nums">{km(os.km_in)}</ReadOnly>
                         </Field>
                         <Field label="Veículo" className="col-span-2">
                             <ReadOnly>
-                                {v?.title}
+                                {v?.title || '—'}
                                 {v?.color ? ` · ${v.color}` : ''}
                             </ReadOnly>
                         </Field>
@@ -564,14 +897,14 @@ export default function OsShow({ os, history, mechanics, statuses }: Props) {
                                     <ReadOnly>{phone(os.client?.phone)}</ReadOnly>
                                 </Field>
                                 <Field label="CPF / CNPJ">
-                                    <ReadOnly>{documentFmt(os.client?.document)}</ReadOnly>
+                                    <ReadOnly>{documentFmt(os.client?.document) || <span className="text-zinc-400">completar</span>}</ReadOnly>
                                 </Field>
                             </>
                         )}
                         <Field label="Mecânico" className="col-span-2">
                             {sensitive ? (
                                 <select className={selectCls} value={os.mechanic?.id ?? ''} onChange={(e) => router.patch(route('os.update', os.id), { mechanic_id: e.target.value || null }, { preserveScroll: true })}>
-                                    <option value="">— sem mecânico —</option>
+                                    <option value="">— quem estiver livre —</option>
                                     {mechanics.map((m) => (
                                         <option key={m.id} value={m.id}>
                                             {m.name}
@@ -582,19 +915,39 @@ export default function OsShow({ os, history, mechanics, statuses }: Props) {
                                 <ReadOnly>{os.mechanic?.name}</ReadOnly>
                             )}
                         </Field>
-                        <Field label="Combustível">
-                            <ReadOnly>{os.fuel_level !== null ? FUEL[os.fuel_level] : '—'}</ReadOnly>
+                        <Field label="Tipo">
+                            {sensitive ? (
+                                <select className={selectCls} value={os.service_type ?? ''} onChange={(e) => router.patch(route('os.update', os.id), { service_type: e.target.value || null }, { preserveScroll: true })}>
+                                    <option value="">—</option>
+                                    {Object.entries(serviceTypes).map(([k, l]) => (
+                                        <option key={k} value={k}>
+                                            {l}
+                                        </option>
+                                    ))}
+                                </select>
+                            ) : (
+                                <ReadOnly>{os.service_type ? SERVICE_TYPE[os.service_type] : '—'}</ReadOnly>
+                            )}
                         </Field>
                     </div>
                 </Block>
 
-                <div className="bg-card overflow-hidden rounded-[4px] border border-[#c9cdd3]">
+                <div id="os-abas" className="bg-card scroll-mt-16 overflow-hidden rounded-[4px] border border-[#c9cdd3]">
                     <div className="bg-[#f3f4f6] px-2 pt-2 dark:bg-zinc-800">
                         <Tabs<Tab>
                             value={tab}
                             onChange={setTab}
                             tabs={[
-                                { value: 'diag', label: 'Solicitação e diagnóstico' },
+                                {
+                                    value: 'vistoria',
+                                    label: 'Vistoria de entrada',
+                                    badge: os.inspected_at ? (
+                                        <CircleCheck className="size-3.5 text-green-700" />
+                                    ) : canInspect ? (
+                                        <span className="rounded-[2px] bg-[#d42a2a] px-1 text-[10px] text-white">fazer</span>
+                                    ) : null,
+                                },
+                                { value: 'diag', label: 'Relato e diagnóstico' },
                                 { value: 'revisao', label: 'Revisão', badge: Object.keys(os.revision ?? {}).length ? <span className="rounded-[2px] bg-zinc-200 px-1 text-[10px] dark:bg-zinc-700">{Object.keys(os.revision).length}</span> : null },
                                 {
                                     value: 'itens',
@@ -606,7 +959,6 @@ export default function OsShow({ os, history, mechanics, statuses }: Props) {
                                     label: 'Fotos',
                                     badge: os.photos.length ? <span className="rounded-[2px] bg-zinc-200 px-1 text-[10px] dark:bg-zinc-700">{os.photos.length}</span> : null,
                                 },
-                                { value: 'vistoria', label: 'Vistoria de entrada' },
                                 { value: 'historico', label: 'Histórico' },
                             ]}
                         />
@@ -615,7 +967,7 @@ export default function OsShow({ os, history, mechanics, statuses }: Props) {
                     <div className="p-3">
                         {tab === 'diag' && (
                             <div className="grid gap-3 lg:grid-cols-2">
-                                <Field label="Solicitação do cliente (pré-atendimento)">
+                                <Field label="O que o cliente relatou">
                                     {sensitive ? (
                                         <textarea rows={8} className={textareaCls} value={diag.data.complaint} onChange={(e) => diag.setData('complaint', e.target.value)} />
                                     ) : (
@@ -648,11 +1000,12 @@ export default function OsShow({ os, history, mechanics, statuses }: Props) {
                                 <div className="min-w-0 overflow-hidden rounded-[4px] border border-[#c9cdd3]">
                                     {sensitive ? (
                                         <div className="overflow-x-auto">
-                                            <table className="w-full min-w-[560px] text-[13px]">
+                                            <table className="w-full min-w-[700px] text-[13px]">
                                                 <thead>
                                                     <tr className="border-b border-[#c9cdd3] bg-[#eceef1] text-left text-[11px] font-bold text-zinc-600 uppercase dark:bg-zinc-800">
                                                         <th className="h-8 w-20 px-2.5">Tipo</th>
                                                         <th className="px-2.5">Descrição</th>
+                                                        <th className="px-2.5">Cliente</th>
                                                         <th className="px-2.5 text-right">Qtd</th>
                                                         <th className="px-2.5 text-right">Vl. unit.</th>
                                                         <th className="px-2.5 text-right">Total</th>
@@ -665,7 +1018,7 @@ export default function OsShow({ os, history, mechanics, statuses }: Props) {
                                                     ))}
                                                     {!os.items.length && (
                                                         <tr>
-                                                            <td colSpan={6} className="text-muted-foreground px-3 py-6 text-center">
+                                                            <td colSpan={7} className="text-muted-foreground px-3 py-6 text-center">
                                                                 Nenhuma peça ou serviço lançado.
                                                             </td>
                                                         </tr>
@@ -677,7 +1030,27 @@ export default function OsShow({ os, history, mechanics, statuses }: Props) {
                                         <Grid
                                             cols={[
                                                 { label: 'Tipo', render: (r: OsItem) => <span className="text-[11px] font-bold uppercase">{r.type === 'peca' ? 'Peça' : 'Serviço'}</span>, className: 'w-20' },
-                                                { label: 'Descrição', render: (r: OsItem) => r.description },
+                                                {
+                                                    label: 'Descrição',
+                                                    render: (r: OsItem) => (
+                                                        <span className={r.approval === 'recusado' ? 'text-zinc-400 line-through' : ''}>
+                                                            {r.description}
+                                                            {r.extra && <span className="ml-1.5 rounded-[2px] bg-amber-400 px-1 text-[10px] font-bold text-black uppercase">complementar</span>}
+                                                        </span>
+                                                    ),
+                                                },
+                                                {
+                                                    label: 'Cliente',
+                                                    render: (r: OsItem) =>
+                                                        r.approval === 'aprovado' ? (
+                                                            <b className="text-green-700">✓ pode fazer</b>
+                                                        ) : r.approval === 'recusado' ? (
+                                                            <span className="text-zinc-500">não fazer</span>
+                                                        ) : (
+                                                            <span className="text-amber-700">aguardando</span>
+                                                        ),
+                                                    className: 'w-28',
+                                                },
                                                 { label: 'Qtd', render: (r: OsItem) => r.quantity, align: 'right', className: 'w-16' },
                                             ]}
                                             rows={os.items}
@@ -714,25 +1087,7 @@ export default function OsShow({ os, history, mechanics, statuses }: Props) {
                             </div>
                         )}
 
-                        {tab === 'vistoria' && (
-                            <div className="grid gap-4 lg:grid-cols-[1fr_280px]">
-                                <div className="rounded-[4px] border border-[#d7dade] bg-white p-2 text-zinc-900">
-                                    <CarDiagramSvg damages={os.damages} />
-                                    <div className="mt-2">
-                                        <DamageLegend damages={os.damages} />
-                                    </div>
-                                </div>
-                                <div className="grid content-start gap-1">
-                                    <p className="text-[11px] font-semibold text-zinc-600 uppercase">Itens no veículo</p>
-                                    {ENTRY_CHECKLIST.map((c) => (
-                                        <div key={c.key} className="flex items-center justify-between border-b border-[#eceef1] py-1 text-[13px]">
-                                            {c.label}
-                                            <b className={os.checklist?.[c.key] ? 'text-green-700' : 'text-zinc-400'}>{os.checklist?.[c.key] ? 'SIM' : 'NÃO'}</b>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
+                        {tab === 'vistoria' && <Vistoria os={os} canEdit={canInspect} />}
 
                         {tab === 'historico' && (
                             <div className="grid gap-3">
@@ -748,13 +1103,22 @@ export default function OsShow({ os, history, mechanics, statuses }: Props) {
                 </div>
             </div>
 
-            {next && (
+            {primary && (
                 <div className="no-print bg-background/95 fixed inset-x-0 bottom-0 z-30 border-t border-[#c9cdd3] p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] md:hidden">
-                    <button disabled={busy} onClick={() => setStatus(next.to)} className="flex h-12 w-full items-center justify-center gap-2 rounded-[4px] bg-[#d42a2a] text-[16px] font-semibold text-white disabled:opacity-60">
-                        <ArrowRight className="size-5" /> {next.label}
+                    <button disabled={busy} onClick={primary.run} className="flex h-12 w-full items-center justify-center gap-2 rounded-[4px] bg-[#d42a2a] text-[16px] font-semibold text-white disabled:opacity-60">
+                        <ArrowRight className="size-5" /> {primary.label}
                     </button>
                 </div>
             )}
+
+            <Dialog open={cadastro !== null} onOpenChange={(o) => !o && setCadastro(null)}>
+                <DialogContent className="max-h-[92vh] overflow-y-auto rounded-[4px] sm:max-w-2xl">
+                    <DialogHeader>
+                        <DialogTitle>{cadastro === 'checkin' ? 'Cliente chegou: confira os dados' : 'Cadastro do cliente e do veículo'}</DialogTitle>
+                    </DialogHeader>
+                    {cadastro && <CadastroForm os={os} checkin={cadastro === 'checkin'} onDone={() => setCadastro(null)} />}
+                </DialogContent>
+            </Dialog>
         </AppLayout>
     );
 }

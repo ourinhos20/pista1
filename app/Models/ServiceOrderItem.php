@@ -6,11 +6,11 @@ use Illuminate\Database\Eloquent\Model;
 
 class ServiceOrderItem extends Model
 {
-    protected $fillable = ['type', 'description', 'quantity', 'unit_price'];
+    protected $fillable = ['type', 'description', 'quantity', 'unit_price', 'approval', 'extra'];
 
     protected function casts(): array
     {
-        return ['quantity' => 'float', 'unit_price' => 'float'];
+        return ['quantity' => 'float', 'unit_price' => 'float', 'extra' => 'boolean'];
     }
 
     public function total(): float

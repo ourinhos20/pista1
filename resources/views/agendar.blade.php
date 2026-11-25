@@ -46,11 +46,31 @@
                     <span class="text-sm font-semibold">Placa</span>
                     <input name="plate" value="{{ old('plate') }}" maxlength="8" placeholder="ABC1D23" class="h-12 rounded-md border border-zinc-300 px-3 font-mono text-base tracking-widest uppercase focus:border-brand-dark focus:ring-2 focus:ring-brand/20 focus:outline-none">
                 </label>
-                <label class="grid gap-1.5">
-                    <span class="text-sm font-semibold">Carro (marca, modelo, ano)</span>
-                    <input name="vehicle" value="{{ old('vehicle') }}" maxlength="120" placeholder="Ex.: Fiat Strada 2021" class="h-12 rounded-md border border-zinc-300 px-3 text-base focus:border-brand-dark focus:ring-2 focus:ring-brand/20 focus:outline-none">
-                </label>
+                <div class="grid grid-cols-[1fr_96px] gap-2">
+                    <label class="grid gap-1.5">
+                        <span class="text-sm font-semibold">Carro (marca e modelo)</span>
+                        <input name="vehicle" value="{{ old('vehicle') }}" maxlength="120" placeholder="Ex.: Fiat Strada" class="h-12 rounded-md border border-zinc-300 px-3 text-base focus:border-brand-dark focus:ring-2 focus:ring-brand/20 focus:outline-none">
+                    </label>
+                    <label class="grid gap-1.5">
+                        <span class="text-sm font-semibold">Ano</span>
+                        <input name="year" value="{{ old('year') }}" maxlength="9" inputmode="numeric" placeholder="2021" class="h-12 rounded-md border border-zinc-300 px-3 text-base focus:border-brand-dark focus:ring-2 focus:ring-brand/20 focus:outline-none">
+                    </label>
+                </div>
             </div>
+
+            @if (! empty($types))
+                <fieldset class="grid gap-1.5">
+                    <legend class="mb-1.5 text-sm font-semibold">O que você precisa?</legend>
+                    <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                        @foreach ($types as $key => $label)
+                            <label class="flex h-12 cursor-pointer items-center justify-center rounded-md border border-zinc-300 px-2 text-center text-sm font-semibold has-[:checked]:border-zinc-900 has-[:checked]:bg-zinc-900 has-[:checked]:text-white">
+                                <input type="radio" name="service_type" value="{{ $key }}" class="sr-only" @checked(old('service_type', 'defeito') === $key)>
+                                {{ $label }}
+                            </label>
+                        @endforeach
+                    </div>
+                </fieldset>
+            @endif
 
             <label class="grid gap-1.5">
                 <span class="text-sm font-semibold">O que está acontecendo? *</span>

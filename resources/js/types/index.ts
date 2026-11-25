@@ -28,7 +28,7 @@ export interface SharedData {
     name: string;
     auth: Auth;
     flash: { success?: string | null; error?: string | null };
-    preNew: number;
+    onlineNew: number;
     [key: string]: unknown;
 }
 
@@ -41,7 +41,7 @@ export interface User {
     [key: string]: unknown; // This allows for additional properties...
 }
 
-export type OsStatus = 'aguardando' | 'diagnostico' | 'orcamento' | 'aprovacao' | 'execucao' | 'pronto' | 'entregue' | 'cancelada';
+export type OsStatus = 'aguardando' | 'recebido' | 'diagnostico' | 'orcamento' | 'aprovacao' | 'pecas' | 'execucao' | 'pronto' | 'entregue' | 'cancelada';
 
 export interface ClientData {
     id: number;
@@ -81,6 +81,8 @@ export interface OsItem {
     type: 'servico' | 'peca';
     description: string;
     quantity: number;
+    approval: 'aprovado' | 'recusado' | null;
+    extra: boolean;
     unit_price?: number;
     total?: number;
 }
@@ -97,6 +99,11 @@ export interface OsCard {
     vehicle: VehicleData | null;
     mechanic: { id: number; name: string } | null;
     total?: number;
+    origin: 'balcao' | 'site' | 'bot';
+    service_type: string | null;
+    status_since: string | null;
+    inspected: boolean;
+    online_new: boolean;
 }
 
 export interface OsEvent {
@@ -114,6 +121,9 @@ export interface OsFull extends OsCard {
     damages: Damage[];
     checklist: Record<string, boolean>;
     revision: Record<string, 'ok' | 'atencao' | 'trocar'>;
+    checked_in_at: string | null;
+    inspected_at: string | null;
+    inspected_by: string | null;
     approved_at: string | null;
     rejected_at: string | null;
     approval_name: string | null;

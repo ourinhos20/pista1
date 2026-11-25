@@ -1,9 +1,10 @@
 <?php
 
+use App\Http\Controllers\AgendarController;
 use App\Http\Controllers\AttachmentController;
+use App\Http\Controllers\BotController;
 use App\Http\Controllers\BudgetController;
 use App\Http\Controllers\ClientController;
-use App\Http\Controllers\PreServiceController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\FinanceController;
 use App\Http\Controllers\MechanicController;
@@ -24,14 +25,17 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', SiteController::class)->name('site');
 
 // Cliente: pedir agendamento pelo site (com fotos)
-Route::get('agendar', [PreServiceController::class, 'form'])->name('agendar');
-Route::post('agendar', [PreServiceController::class, 'submit'])->middleware('throttle:5,10')->name('agendar.submit');
-Route::get('agendar/enviado', [PreServiceController::class, 'thanks'])->name('agendar.ok');
+Route::get('agendar', [AgendarController::class, 'form'])->name('agendar');
+Route::post('agendar', [AgendarController::class, 'submit'])->middleware('throttle:5,10')->name('agendar.submit');
+Route::get('agendar/enviado', [AgendarController::class, 'thanks'])->name('agendar.ok');
 
 // Cliente: ver e aprovar o orçamento pelo link secreto enviado no WhatsApp
 Route::get('orcamento/{token}', [BudgetController::class, 'show'])->middleware('throttle:60,1')->name('orcamento.show');
 Route::post('orcamento/{token}', [BudgetController::class, 'decide'])->middleware('throttle:10,1')->name('orcamento.decide');
 Route::get('orcamento/{token}/foto/{attachment}', [AttachmentController::class, 'showPublic'])->middleware('throttle:120,1')->name('orcamento.foto');
+
+// Bot do WhatsApp: cria o agendamento (OS) direto no sistema. Protegido pelo BOT_TOKEN.
+Route::post('api/bot/agendamento', [BotController::class, 'agendamento'])->middleware('throttle:30,1')->name('bot.agendamento');
 
 /*
 | Sistema da oficina, num endereço escondido configurável (PAINEL_PATH).
@@ -51,6 +55,7 @@ Route::prefix(config('oficina.panel_path'))->group(function () {
         Route::patch('os/{os}/status', [ServiceOrderController::class, 'status'])->name('os.status');
         Route::patch('os/{os}/diagnostico', [ServiceOrderController::class, 'diagnosis'])->name('os.diagnosis');
         Route::patch('os/{os}/revisao', [ServiceOrderController::class, 'revision'])->name('os.revision');
+        Route::patch('os/{os}/vistoria', [ServiceOrderController::class, 'vistoria'])->name('os.vistoria');
         Route::post('os/{os}/assumir', [ServiceOrderController::class, 'assume'])->name('os.assume');
         Route::post('os/{os}/itens', [ServiceOrderItemController::class, 'store'])->name('os.items.store');
         Route::get('os/{os}/imprimir/{tipo}', [ServiceOrderController::class, 'print'])->name('os.print');
@@ -65,14 +70,14 @@ Route::prefix(config('oficina.panel_path'))->group(function () {
             Route::get('os/nova', [ServiceOrderController::class, 'create'])->name('os.create');
             Route::post('os', [ServiceOrderController::class, 'store'])->name('os.store');
             Route::patch('os/{os}', [ServiceOrderController::class, 'update'])->name('os.update');
+            Route::put('os/{os}/cadastro', [ServiceOrderController::class, 'cadastro'])->name('os.cadastro');
+            Route::post('os/{os}/chegou', [ServiceOrderController::class, 'checkin'])->name('os.checkin');
+            Route::patch('os/{os}/itens/{item}/aprovacao', [ServiceOrderItemController::class, 'approval'])->name('os.items.approval');
+            Route::get('clientes/buscar', [ClientController::class, 'lookup'])->name('clientes.lookup');
             Route::put('os/{os}/itens/{item}', [ServiceOrderItemController::class, 'update'])->name('os.items.update');
             Route::delete('os/{os}/itens/{item}', [ServiceOrderItemController::class, 'destroy'])->name('os.items.destroy');
             Route::post('os/{os}/pagamentos', [OsPaymentController::class, 'store'])->name('os.payments.store');
             Route::delete('os/{os}/pagamentos/{entry}', [OsPaymentController::class, 'destroy'])->name('os.payments.destroy');
-
-            Route::get('pre-atendimentos', [PreServiceController::class, 'index'])->name('pre.index');
-            Route::post('pre-atendimentos/{pre}/descartar', [PreServiceController::class, 'discard'])->name('pre.discard');
-            Route::post('pre-atendimentos/{pre}/restaurar', [PreServiceController::class, 'restore'])->name('pre.restore');
 
             // Fornecedores e compras de peças
             Route::get('fornecedores', [SupplierController::class, 'index'])->name('fornecedores.index');

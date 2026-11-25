@@ -22,7 +22,7 @@ npx tsc --noEmit                # checagem de tipos do frontend
 Publicação: `deploy/empacotar.ps1` gera o zip; passo a passo em `deploy/PUBLICAR-HOSTGATOR.md`.
 
 ## Onde fica cada coisa
-- `routes/web.php`: o site fica em `/`, mais `/agendar` (pedido do cliente com fotos) e `/orcamento/{token}` (o cliente aprova o orçamento). **Todo o sistema** fica sob o prefixo escondido `PAINEL_PATH` (local: `/sistema`). No frontend, use sempre `route('nome')` e nunca caminhos fixos.
+- `routes/web.php`: o site fica em `/`, mais `/agendar` (o cliente agenda e já vira OS), `/orcamento/{token}` (o cliente aprova item por item) e `/api/bot/agendamento` (bot). **Todo o sistema** fica sob o prefixo escondido `PAINEL_PATH` (local: `/sistema`). No frontend, use sempre `route('nome')` e nunca caminhos fixos.
 - `app/Support/OsPresenter.php`: **é aqui que se esconde dos mecânicos** o que eles não podem ver.
 - `app/Enums/OsStatus.php` e `resources/js/lib/os.ts`: as etapas da OS e quem faz cada uma.
 - `resources/js/components/erp.tsx`: componentes visuais (Block, Grid, Field, ReadOnly, Tool, Tabs, Situacao, Placa) e o menu.
@@ -33,14 +33,18 @@ Publicação: `deploy/empacotar.ps1` gera o zip; passo a passo em `deploy/PUBLIC
 - **Perfis:** `master` (sócios: tudo, inclusive financeiro e usuários), `balcao` (atendimento) e `mecanico`.
 - **O mecânico nunca recebe** CPF, telefone, endereço, e-mail nem valores. O cliente aparece só pelo primeiro nome. Essa filtragem acontece **no servidor**, não basta esconder na tela.
 - **Todos os mecânicos veem a agenda inteira** da oficina.
-- **Fluxo da OS:**
-  1. Agendado (balcão).
-  2. Em diagnóstico (mecânico).
-  3. Aguardando orçamento: o mecânico "envia para o balcão".
-  4. Aguardando aprovação: o balcão lança os valores e manda o link pelo WhatsApp.
-  5. Em execução: o cliente aprova pelo link ou o balcão marca.
-  6. Pronto.
-  7. Entregue (balcão).
+- **Fluxo da OS (sem gargalos):**
+  1. Agendado: pelo bot, pelo site (`/agendar`) ou pelo balcão. Só dados básicos (nome, telefone, carro/ano, placa opcional, tipo, relato, horário). **O agendamento já cria a OS**; cliente e carro entram no cadastro sozinhos (`app/Support/OsIntake.php`). Na Nova OS dá para achar o cliente que já veio por nome, CPF, telefone ou placa.
+  2. Recebido: o balcão clica em "Cliente chegou", confere a **placa (obrigatória aqui)** e completa o cadastro. O cadastro pode ser editado a qualquer momento. Se a placa já existir, a OS passa para o carro já cadastrado.
+  3. Em diagnóstico: o mecânico faz **primeiro a vistoria de entrada** (km, combustível, itens, avarias) e só depois consegue "Enviar para o balcão".
+  4. Aguardando orçamento: o balcão lança os valores e manda o link pelo WhatsApp (ou imprime a via do cliente).
+  5. Aguardando aprovação: o cliente aprova **item por item** no link. Não aprovou nada → volta para o balcão (se cobrar diagnóstico, o balcão inclui o item "Taxa de diagnóstico").
+  6. Aguardando peças (opcional): ao lançar a compra ligada à OS, ela volta sozinha para execução.
+  7. Em execução: item novo vira **complementar**; o cliente aprova pelo link sem parar o que já foi aprovado.
+  8. Pronto. 9. Entregue (balcão).
+  - Cada OS guarda desde quando está na etapa (`status_changed_at`); o painel acusa o que está parado há muito tempo.
+  - O master faz e altera tudo.
+- **Bot do WhatsApp:** `POST /api/bot/agendamento` com `Authorization: Bearer <BOT_TOKEN>`. Com `BOT_TOKEN` vazio, a rota fica desligada. Detalhes em `deploy/PUBLICAR-HOSTGATOR.md`.
 - **Só o balcão ou o master lançam valores.** O mecânico pode pedir peça, mas sem preço.
 - **Revisão:** o checklist é preenchido no celular e grava sozinho a cada toque.
 - **Financeiro:**

@@ -35,6 +35,35 @@ class ClientController extends Controller
         ]);
     }
 
+    /** Nova OS: acha o cliente já cadastrado por nome, CPF/CNPJ, telefone ou placa. */
+    public function lookup(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $q = trim($request->string('q')->toString());
+        if (mb_strlen($q) < 3) {
+            return response()->json([]);
+        }
+        $digits = Plate::digits($q);
+        $plate = Plate::normalize($q);
+
+        $clients = Client::with('vehicles')
+            ->where(function ($w) use ($q, $digits, $plate) {
+                $w->where('name', 'like', "%{$q}%")
+                    ->orWhereHas('vehicles', fn ($v) => $v->where('plate', 'like', "%{$plate}%"));
+                if ($digits && strlen($digits) >= 4) {
+                    $w->orWhere('document', 'like', "%{$digits}%")->orWhere('phone', 'like', "%{$digits}%");
+                }
+            })
+            ->orderBy('name')->limit(8)->get();
+
+        return response()->json($clients->map(fn (Client $c) => [
+            'id' => $c->id,
+            'name' => $c->name,
+            'phone' => $c->phone,
+            'document' => $c->document,
+            'vehicles' => $c->vehicles->map(fn ($v) => ['id' => $v->id, 'plate' => $v->plate, 'title' => $v->title() ?: 'Veículo']),
+        ]));
+    }
+
     private function validated(Request $request): array
     {
         $data = $request->validate([

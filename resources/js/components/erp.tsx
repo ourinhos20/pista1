@@ -6,7 +6,7 @@ import { FlashToast } from '@/components/flash-toast';
 import { PlateSearch } from '@/components/plate-search';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
-import { STATUS } from '@/lib/os';
+import { STATUS, since } from '@/lib/os';
 import { cn } from '@/lib/utils';
 import type { OsStatus, Role, SharedData } from '@/types';
 import { Link, router, usePage } from '@inertiajs/react';
@@ -32,8 +32,8 @@ export function menusFor(role: Role, preNew = 0): MenuGroup[] {
             label: 'Atendimento',
             items: [
                 item('Painel de atendimento', 'dashboard', 'ATD001', 'F1'),
-                { ...item('Pedidos do site (pré-atendimento)', 'pre.index', 'ATD005'), badge: preNew },
                 item('Nova ordem de serviço', 'os.create', 'ATD010', 'F2'),
+                { label: 'Agendamentos online (bot/site)', href: path('os.index') + '?origem=online&status=aguardando', code: 'ATD005', badge: preNew },
                 item('Ordens de serviço', 'os.index', 'ATD020', 'F4'),
             ],
         },
@@ -113,7 +113,7 @@ function UserMenu() {
 }
 
 function MenuBar() {
-    const { auth, preNew } = usePage<SharedData>().props;
+    const { auth, onlineNew: preNew } = usePage<SharedData>().props;
     const page = usePage();
     const current = page.url.split('?')[0];
     const groups = menusFor(auth.user.role, preNew);
@@ -372,12 +372,12 @@ export function Tabs<T extends string>({ tabs, value, onChange }: { tabs: { valu
     );
 }
 
-export function Situacao({ status, className }: { status: OsStatus; className?: string }) {
+export function Situacao({ status, className, short = false }: { status: OsStatus; className?: string; short?: boolean }) {
     const s = STATUS[status];
     return (
         <span className={cn('inline-flex h-6 items-center gap-1.5 rounded-[3px] px-2 text-[11px] font-bold whitespace-nowrap uppercase ring-1 ring-inset md:h-5 md:px-1.5', s.badge, className)}>
             <span className={cn('size-2 rounded-[1px]', s.dot)} />
-            {s.label}
+            {short ? s.short : s.label}
         </span>
     );
 }
@@ -467,6 +467,27 @@ export function Grid<T>({
             </table>
             {footer && <div className="flex items-center justify-between border-t border-[#d7dade] bg-[#f3f4f6] px-3 py-1.5 text-[12px] text-zinc-600 dark:border-zinc-700 dark:bg-zinc-800">{footer}</div>}
         </div>
+    );
+}
+
+/** Há quanto tempo a OS está na etapa atual; vermelho quando passou do limite (gargalo). */
+export function Since({ iso, status, className }: { iso?: string | null; status: OsStatus; className?: string }) {
+    const s = since(iso, status);
+    if (!s.text || ['entregue', 'cancelada'].includes(status)) return null;
+    return (
+        <span className={cn('text-[11px] whitespace-nowrap tabular-nums', s.stale ? 'font-bold text-[#b51f1f]' : 'text-zinc-500', className)} title="Tempo nesta etapa">
+            {s.stale ? '⚠ ' : ''}
+            {s.text}
+        </span>
+    );
+}
+
+export function OriginTag({ origin }: { origin: string }) {
+    if (origin === 'balcao') return null;
+    return (
+        <span className="rounded-[2px] bg-emerald-600 px-1 py-px text-[10px] font-bold text-white uppercase" title="Agendamento feito pelo cliente">
+            {origin === 'bot' ? 'bot' : 'site'}
+        </span>
     );
 }
 

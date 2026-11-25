@@ -52,8 +52,10 @@ class HandleInertiaRequests extends Middleware
                     'master' => (bool) $user?->isMaster(),
                 ],
             ],
-            // pedidos novos do site (badge no menu do balcão)
-            'preNew' => fn () => $user?->canSeeSensitive() ? \App\Models\PreService::where('status', 'novo')->count() : 0,
+            // agendamentos novos do site/bot que o balcão ainda não abriu (contador no menu)
+            'onlineNew' => fn () => $user?->canSeeSensitive()
+                ? \App\Models\ServiceOrder::whereIn('origin', ['site', 'bot'])->whereNull('online_seen_at')->where('status', 'aguardando')->count()
+                : 0,
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),
                 'error' => fn () => $request->session()->get('error'),

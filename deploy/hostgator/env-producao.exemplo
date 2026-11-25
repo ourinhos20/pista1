@@ -46,6 +46,10 @@ MAIL_MAILER=log
 # O sistema vai ficar em https://<seu-dominio>/<PAINEL_PATH>/login
 PAINEL_PATH=<endereco-secreto>
 
+# Bot do WhatsApp (opcional). Deixe vazio enquanto não tiver bot.
+# Quando tiver, coloque uma senha longa e cadastre a mesma no bot (veja PUBLICAR-HOSTGATOR.md).
+BOT_TOKEN=
+
 # Dados da oficina (site e fichas impressas)
 OFICINA_TELEFONE="(11) 96029-1342"
 OFICINA_WHATSAPP=5511960291342

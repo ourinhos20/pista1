@@ -19,6 +19,8 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
         // cookies de tema não precisam de criptografia (lidos pelo navegador)
         $middleware->encryptCookies(except: ['appearance']);
+        // o bot não tem sessão/CSRF: ele se autentica pelo BOT_TOKEN
+        $middleware->validateCsrfTokens(except: ['api/bot/*']);
         $middleware->alias([
             'role' => \App\Http\Middleware\EnsureRole::class,
         ]);

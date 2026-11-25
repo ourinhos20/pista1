@@ -1,28 +1,49 @@
-import { Block, Field, Grid, Placa, Situacao, Tool, selectCls, type Col } from '@/components/erp';
+import { Block, Field, Grid, OriginTag, Placa, Since, Situacao, Tool, selectCls, type Col } from '@/components/erp';
 import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
-import { STATUS, date, money, time } from '@/lib/os';
+import { SERVICE_TYPE, STATUS, date, money, time } from '@/lib/os';
 import type { OsCard, OsStatus } from '@/types';
 import { Head, router } from '@inertiajs/react';
 import { FilePlus2, Search } from 'lucide-react';
 import { useState } from 'react';
 
-const STATUSES: OsStatus[] = ['aguardando', 'diagnostico', 'orcamento', 'aprovacao', 'execucao', 'pronto', 'entregue', 'cancelada'];
+const STATUSES: OsStatus[] = ['aguardando', 'recebido', 'diagnostico', 'orcamento', 'aprovacao', 'pecas', 'execucao', 'pronto', 'entregue', 'cancelada'];
 
-export default function OsIndex({ orders, filters }: { orders: OsCard[]; filters: { status: string; q: string } }) {
+type Filters = { status: string; q: string; origem: string };
+
+export default function OsIndex({ orders, filters }: { orders: OsCard[]; filters: Filters }) {
     const [q, setQ] = useState(filters.q);
     const [status, setStatus] = useState(filters.status);
-    const search = (params?: Partial<typeof filters>) => router.get(route('os.index'), { status, q, ...params }, { preserveState: true, replace: true });
+    const [origem, setOrigem] = useState(filters.origem ?? '');
+    const search = (params?: Partial<Filters>) => router.get(route('os.index'), { status, q, origem, ...params }, { preserveState: true, replace: true });
 
     const cols: Col<OsCard>[] = [
-        { label: 'Nº OS', render: (r) => <b className="tabular-nums">{r.number}</b>, className: 'w-20' },
-        { label: 'Abertura', render: (r) => date(r.created_at), hide: 'md', className: 'w-24' },
+        {
+            label: 'Nº OS',
+            render: (r) => (
+                <span className="flex items-center gap-1.5">
+                    <b className="tabular-nums">{r.number}</b>
+                    <OriginTag origin={r.origin} />
+                    {r.online_new && <span className="rounded-[2px] bg-[#d42a2a] px-1 text-[10px] font-bold text-white">NOVO</span>}
+                </span>
+            ),
+            className: 'w-28',
+        },
         { label: 'Agendado', render: (r) => (r.scheduled_at ? `${date(r.scheduled_at)} ${time(r.scheduled_at)}` : '—'), hide: 'lg', className: 'w-36' },
-        { label: 'Placa', render: (r) => <Placa value={r.vehicle?.plate} />, className: 'w-24' },
+        { label: 'Placa', render: (r) => (r.vehicle?.plate ? <Placa value={r.vehicle.plate} /> : <span className="text-[12px] text-zinc-400">sem placa</span>), className: 'w-24' },
         { label: 'Veículo', render: (r) => r.vehicle?.title },
         { label: 'Cliente', render: (r) => r.client?.name, hide: 'md' },
+        { label: 'Tipo', render: (r) => (r.service_type ? SERVICE_TYPE[r.service_type] : '—'), hide: 'lg', className: 'w-36' },
         { label: 'Mecânico', render: (r) => r.mechanic?.name ?? '—', hide: 'lg' },
-        { label: 'Situação', render: (r) => <Situacao status={r.status} /> },
+        {
+            label: 'Situação',
+            render: (r) => (
+                <span className="flex flex-wrap items-center gap-x-2">
+                    <Situacao status={r.status} />
+                    <Since iso={r.status_since} status={r.status} />
+                </span>
+            ),
+        },
         { label: 'Valor', render: (r) => (r.total ? money(r.total) : '—'), align: 'right', hide: 'sm' },
     ];
 
@@ -32,7 +53,7 @@ export default function OsIndex({ orders, filters }: { orders: OsCard[]; filters
             <div className="grid gap-2 md:gap-3">
                 <Block title="Filtros">
                     <form
-                        className="grid items-end gap-2 sm:grid-cols-[220px_1fr_auto]"
+                        className="grid items-end gap-2 sm:grid-cols-[220px_180px_1fr_auto]"
                         onSubmit={(e) => {
                             e.preventDefault();
                             search();
@@ -56,8 +77,24 @@ export default function OsIndex({ orders, filters }: { orders: OsCard[]; filters
                                 <option value="todas">Todas as OS</option>
                             </select>
                         </Field>
+                        <Field label="Origem">
+                            <select
+                                className={selectCls}
+                                value={origem}
+                                onChange={(e) => {
+                                    setOrigem(e.target.value);
+                                    search({ origem: e.target.value });
+                                }}
+                            >
+                                <option value="">Todas</option>
+                                <option value="online">Online (bot + site)</option>
+                                <option value="bot">Bot do WhatsApp</option>
+                                <option value="site">Site</option>
+                                <option value="balcao">Balcão</option>
+                            </select>
+                        </Field>
                         <Field label="Pesquisa">
-                            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Placa, nome do cliente, modelo ou nº da OS" />
+                            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Placa, nome, telefone, modelo ou nº da OS" />
                         </Field>
                         <Tool icon={<Search />} label="Pesquisar" onClick={() => search()} />
                     </form>

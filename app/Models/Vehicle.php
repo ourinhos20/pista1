@@ -18,7 +18,8 @@ class Vehicle extends Model
 
     public function setPlateAttribute($value): void
     {
-        $this->attributes['plate'] = Plate::normalize($value);
+        // placa pode ficar vazia no agendamento (o cliente não sabe de cabeça); é exigida no check-in
+        $this->attributes['plate'] = Plate::normalize($value) ?: null;
     }
 
     public function client(): BelongsTo
