@@ -20,7 +20,7 @@ export default function PrintDiagnostico({ os, shop }: { os: OsFull; shop: Shop 
                     <div className="grid grid-cols-4 gap-4">
                         <Line label="Placa" value={<b className="font-mono tracking-wider">{plate(v?.plate)}</b>} />
                         <Line label="Cor" value={v?.color} />
-                        <Line label="Km" value={km(os.km_in)} />
+                        <Line label="Km" value={os.km_in ? km(os.km_in) : ''} />
                         <Line label="Comb." value={os.fuel_level !== null ? FUEL[os.fuel_level] : ''} />
                     </div>
                     <div className="grid grid-cols-2 gap-4">

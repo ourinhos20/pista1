@@ -15,29 +15,42 @@ import { type ReactNode, useEffect, useState } from 'react';
 
 /* ------------------------------------------------------------------ menus */
 
-type MenuItem = { label: string; href: string; key?: string; code: string; badge?: number };
+type MenuItem = { label: string; href: string; key?: string; code: string; badge?: number; newTab?: boolean };
 type MenuGroup = { label: string; items: MenuItem[] };
 
 /** Caminho relativo da rota (o sistema fica num prefixo escondido, ex.: /sistema). */
 const path = (name: string) => route(name, undefined, false);
 const item = (label: string, name: string, code: string, key?: string): MenuItem => ({ label, href: path(name), code, key });
 
+/** Fichas em branco para imprimir e preencher à mão (abrem em outra aba). */
+function fichasFor(role: Role): MenuGroup {
+    const ficha = (label: string, tipo: string, code: string): MenuItem => ({ label, href: route('fichas.branco', tipo, false), code, newTab: true });
+    const items = [
+        ficha('Vistoria de entrada', 'entrada', 'FIC010'),
+        ficha('Diagnóstico (defeito)', 'diagnostico', 'FIC020'),
+        ficha('Checklist de revisão / preventiva', 'revisao', 'FIC030'),
+    ];
+    if (role !== 'mecanico') items.push(ficha('Orçamento / via do cliente', 'cliente', 'FIC040'));
+    return { label: 'Fichas', items };
+}
+
 export function menusFor(role: Role, preNew = 0): MenuGroup[] {
     const oficina: MenuGroup = { label: 'Oficina', items: [item('Agenda da oficina', 'mecanico.index', 'OFI010', 'F9')] };
     const conta: MenuGroup = { label: 'Sistema', items: [item('Minha conta', 'profile.edit', 'SIS020')] };
-    if (role === 'mecanico') return [oficina, conta];
+    if (role === 'mecanico') return [oficina, fichasFor(role), conta];
 
+    // "Nova OS" não fica no menu: é o botão + na tela de Ordens de serviço (ou a tecla F2)
     const groups: MenuGroup[] = [
         {
             label: 'Atendimento',
             items: [
                 item('Painel de atendimento', 'dashboard', 'ATD001', 'F1'),
-                item('Nova ordem de serviço', 'os.create', 'ATD010', 'F2'),
-                { label: 'Agendamentos online (bot/site)', href: path('os.index') + '?origem=online&status=aguardando', code: 'ATD005', badge: preNew },
                 item('Ordens de serviço', 'os.index', 'ATD020', 'F4'),
+                { label: 'Agendamentos online (bot/site)', href: path('os.index') + '?origem=online&status=aguardando', code: 'ATD005', badge: preNew },
             ],
         },
         oficina,
+        fichasFor(role),
         {
             label: 'Cadastros',
             items: [item('Clientes e veículos', 'clientes.index', 'CAD010', 'F6'), item('Fornecedores', 'fornecedores.index', 'CAD020')],
@@ -65,6 +78,7 @@ function useShortcuts(role: Role) {
     useEffect(() => {
         const map: Record<string, string> = {};
         menusFor(role).forEach((g) => g.items.forEach((i) => i.key && (map[i.key] = i.href)));
+        if (role !== 'mecanico') map.F2 = path('os.create');
         const onKey = (e: KeyboardEvent) => {
             if (e.key === 'F3') {
                 e.preventDefault();
@@ -140,17 +154,23 @@ function MenuBar() {
                         {groups.map((g) => (
                             <div key={g.label} className="mb-2">
                                 <p className="px-3 py-2 text-[11px] font-bold tracking-wider text-zinc-500 uppercase">{g.label}</p>
-                                {g.items.map((i) => (
-                                    <Link
-                                        key={i.href}
-                                        href={i.href}
-                                        onClick={() => setOpen(false)}
-                                        className={cn('flex h-12 items-center rounded-[4px] px-3 text-[15px]', current === i.href ? 'bg-white/10 font-semibold' : 'text-zinc-300')}
-                                    >
-                                        {i.label}
-                                        <Badge n={i.badge} />
-                                    </Link>
-                                ))}
+                                {g.items.map((i) =>
+                                    i.newTab ? (
+                                        <a key={i.href} href={i.href} target="_blank" rel="noreferrer" onClick={() => setOpen(false)} className="flex h-12 items-center rounded-[4px] px-3 text-[15px] text-zinc-300">
+                                            {i.label}
+                                        </a>
+                                    ) : (
+                                        <Link
+                                            key={i.href}
+                                            href={i.href}
+                                            onClick={() => setOpen(false)}
+                                            className={cn('flex h-12 items-center rounded-[4px] px-3 text-[15px]', current === i.href ? 'bg-white/10 font-semibold' : 'text-zinc-300')}
+                                        >
+                                            {i.label}
+                                            <Badge n={i.badge} />
+                                        </Link>
+                                    ),
+                                )}
                             </div>
                         ))}
                     </nav>
@@ -163,7 +183,7 @@ function MenuBar() {
 
             <nav className="hidden items-stretch md:flex">
                 {groups.map((g) => {
-                    const active = g.items.some((i) => current === i.href || (i.href !== dash && current.startsWith(i.href + '/')));
+                    const active = g.items.some((i) => !i.newTab && (current === i.href || (i.href !== dash && current.startsWith(i.href + '/'))));
                     return (
                         <DropdownMenu key={g.label}>
                             <DropdownMenuTrigger
@@ -179,12 +199,20 @@ function MenuBar() {
                             <DropdownMenuContent align="start" sideOffset={0} className="min-w-64 rounded-none rounded-b-[4px] p-1">
                                 {g.items.map((i) => (
                                     <DropdownMenuItem key={i.href} asChild className="h-9 rounded-[3px] text-[13px]">
-                                        <Link href={i.href} className="flex w-full items-center">
-                                            <span className="text-muted-foreground w-14 font-mono text-[11px]">{i.code}</span>
-                                            <span className="flex-1">{i.label}</span>
-                                            <Badge n={i.badge} />
-                                            {i.key && <kbd className="text-muted-foreground ml-4 rounded-[2px] border px-1 font-mono text-[10px]">{i.key}</kbd>}
-                                        </Link>
+                                        {i.newTab ? (
+                                            <a href={i.href} target="_blank" rel="noreferrer" className="flex w-full items-center">
+                                                <span className="text-muted-foreground w-14 font-mono text-[11px]">{i.code}</span>
+                                                <span className="flex-1">{i.label}</span>
+                                                <span className="text-muted-foreground ml-4 text-[10px]">em branco</span>
+                                            </a>
+                                        ) : (
+                                            <Link href={i.href} className="flex w-full items-center">
+                                                <span className="text-muted-foreground w-14 font-mono text-[11px]">{i.code}</span>
+                                                <span className="flex-1">{i.label}</span>
+                                                <Badge n={i.badge} />
+                                                {i.key && <kbd className="text-muted-foreground ml-4 rounded-[2px] border px-1 font-mono text-[10px]">{i.key}</kbd>}
+                                            </Link>
+                                        )}
                                     </DropdownMenuItem>
                                 ))}
                             </DropdownMenuContent>

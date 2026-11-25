@@ -4,7 +4,7 @@ import AppLayout from '@/layouts/app-layout';
 import { SERVICE_TYPE, STATUS, date, money, time } from '@/lib/os';
 import type { OsCard, OsStatus } from '@/types';
 import { Head, router } from '@inertiajs/react';
-import { FilePlus2, Search } from 'lucide-react';
+import { Plus, Search } from 'lucide-react';
 import { useState } from 'react';
 
 const STATUSES: OsStatus[] = ['aguardando', 'recebido', 'diagnostico', 'orcamento', 'aprovacao', 'pecas', 'execucao', 'pronto', 'entregue', 'cancelada'];
@@ -48,7 +48,7 @@ export default function OsIndex({ orders, filters }: { orders: OsCard[]; filters
     ];
 
     return (
-        <AppLayout title="Ordens de Serviço" code="ATD020" toolbar={<Tool primary icon={<FilePlus2 />} label="Nova OS" fkey="F2" href={route('os.create')} />}>
+        <AppLayout title="Ordens de Serviço" code="ATD020" toolbar={<Tool primary icon={<Plus />} label="Nova OS" fkey="F2" href={route('os.create')} />}>
             <Head title="Ordens de serviço" />
             <div className="grid gap-2 md:gap-3">
                 <Block title="Filtros">

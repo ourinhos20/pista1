@@ -59,6 +59,7 @@ Route::prefix(config('oficina.panel_path'))->group(function () {
         Route::post('os/{os}/assumir', [ServiceOrderController::class, 'assume'])->name('os.assume');
         Route::post('os/{os}/itens', [ServiceOrderItemController::class, 'store'])->name('os.items.store');
         Route::get('os/{os}/imprimir/{tipo}', [ServiceOrderController::class, 'print'])->name('os.print');
+        Route::get('fichas/{tipo}', [ServiceOrderController::class, 'blankForm'])->name('fichas.branco');
         Route::post('os/{os}/fotos', [AttachmentController::class, 'store'])->middleware('throttle:30,1')->name('os.photos.store');
         Route::patch('os/{os}/fotos/{attachment}', [AttachmentController::class, 'update'])->name('os.photos.update');
         Route::delete('os/{os}/fotos/{attachment}', [AttachmentController::class, 'destroy'])->name('os.photos.destroy');

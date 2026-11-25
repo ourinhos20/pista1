@@ -25,12 +25,12 @@ export default function PrintRevisao({ os, shop }: { os: OsFull; shop: Shop }) {
     const cols = [by('Motor', 'Arrefecimento', 'Pneus e rodas'), by('Freios', 'Suspensão e direção'), by('Elétrica', 'Outros')];
 
     return (
-        <PrintShell title="Checklist de Revisão" os={os} shop={shop}>
+        <PrintShell title={os.service_type === 'preventiva' ? 'Checklist Preventivo' : 'Checklist de Revisão'} os={os} shop={shop}>
             <Box label="Dados do Veículo">
                 <div className="grid grid-cols-[2fr_1fr_1fr_1fr] gap-4">
                     <Line label="Veículo" value={v?.title} />
                     <Line label="Placa" value={<b className="font-mono tracking-wider">{plate(v?.plate)}</b>} />
-                    <Line label="Km" value={km(os.km_in)} />
+                    <Line label="Km" value={os.km_in ? km(os.km_in) : ''} />
                     <Line label="Mecânico" value={os.mechanic?.name?.split(' ')[0]} />
                 </div>
             </Box>

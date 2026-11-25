@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
-import { ENTRY_CHECKLIST, FLOW, FUEL, ORIGIN, PAYMENT, SERVICE_TYPE, STATUS, WAITING_FOR, date, documentFmt, km, money, nextStep, phone, plate, whatsapp } from '@/lib/os';
+import { ENTRY_CHECKLIST, FLOW, FUEL, ORIGIN, PAYMENT, SERVICE_TYPE, STATUS, WAITING_FOR, date, documentFmt, km, money, nextStep, phone, plate, whatsapp, workFor } from '@/lib/os';
 import { REVISION_GROUPS, REVISION_TOTAL, REVISION_VALUES, type RevisionValue } from '@/lib/revisao';
 import { cn } from '@/lib/utils';
 import type { Damage, OsEvent, OsFull, OsItem, OsStatus, SharedData } from '@/types';
@@ -22,6 +22,7 @@ interface Props {
     serviceTypes: Record<string, string>;
 }
 type Tab = 'vistoria' | 'diag' | 'revisao' | 'itens' | 'fotos' | 'historico';
+
 
 /** Mostra o motivo quando o servidor recusa mudar de etapa (ex.: falta vistoria). */
 const showError = (errors: Record<string, string>) => {
@@ -594,11 +595,18 @@ export default function OsShow({ os, history, mechanics, statuses, serviceTypes 
     const [busy, setBusy] = useState(false);
     const [cadastro, setCadastro] = useState<'checkin' | 'edit' | null>(null);
     const needsInspection = ['recebido', 'diagnostico'].includes(os.status) && !os.inspected_at;
+    // o tipo de serviço define a ficha de trabalho: revisão/preventiva = checklist; defeito/outro = diagnóstico
+    const work = workFor(os.service_type);
     const [tab, setTab] = useState<Tab>(() => {
         if (needsInspection && !sensitive) return 'vistoria';
         if (sensitive && ['orcamento', 'aprovacao', 'pecas', 'execucao'].includes(os.status)) return 'itens';
-        return 'diag';
+        return work.checklist ? 'revisao' : 'diag';
     });
+    // se o balcão trocar o tipo, a aba que sumiu dá lugar à que ficou
+    useEffect(() => {
+        if (tab === 'diag' && !work.diag) setTab('revisao');
+        if (tab === 'revisao' && !work.checklist) setTab('diag');
+    }, [work.diag, work.checklist, tab]);
     const diag = useForm({ diagnosis: os.diagnosis ?? '', complaint: os.complaint ?? '' });
 
     const next = nextStep(os.status, auth.user.role);
@@ -638,12 +646,12 @@ export default function OsShow({ os, history, mechanics, statuses, serviceTypes 
         const onKey = (e: KeyboardEvent) => {
             if (e.key === 'F8') {
                 e.preventDefault();
-                window.open(route('os.print', [os.id, sensitive ? 'cliente' : 'diagnostico']), '_blank');
+                window.open(route('os.print', [os.id, sensitive ? 'cliente' : work.print]), '_blank');
             }
         };
         window.addEventListener('keydown', onKey);
         return () => window.removeEventListener('keydown', onKey);
-    }, [os.id, sensitive]);
+    }, [os.id, sensitive, work.print]);
 
     // mensagens de WhatsApp prontas para cada etapa
     const first = os.client?.name?.split(' ')[0];
@@ -679,18 +687,13 @@ export default function OsShow({ os, history, mechanics, statuses, serviceTypes 
     const wa = waStep && (os.status !== 'orcamento' || active.length > 0) ? whatsapp(os.client?.phone, waStep[1]) : null;
     const waExtra = sensitive && extrasPriced && os.public_url ? whatsapp(os.client?.phone, extraText) : null;
 
-    const printTypes: [string, string][] = sensitive
-        ? [
-              ['cliente', 'Via do cliente (orçamento / OS)'],
-              ['entrada', 'Vistoria de entrada'],
-              ['diagnostico', 'Ficha do mecânico'],
-              ['revisao', 'Checklist de revisão'],
-          ]
-        : [
-              ['entrada', 'Vistoria de entrada (em branco/preenchida)'],
-              ['diagnostico', 'Ficha do mecânico'],
-              ['revisao', 'Checklist de revisão'],
-          ];
+    // imprime só a ficha do tipo de serviço desta OS (sem tipo definido, as duas)
+    const printTypes: [string, string][] = [
+        ...(sensitive ? ([['cliente', 'Via do cliente (orçamento / OS)']] as [string, string][]) : []),
+        ['entrada', 'Vistoria de entrada'],
+        ...(work.diag ? ([['diagnostico', 'Ficha de diagnóstico']] as [string, string][]) : []),
+        ...(work.checklist ? ([['revisao', work.checklistTitle]] as [string, string][]) : []),
+    ];
 
     const histCols: Col<Hist>[] = [
         { label: 'Data', render: (r) => date(r.date), className: 'w-24' },
@@ -947,8 +950,16 @@ export default function OsShow({ os, history, mechanics, statuses, serviceTypes 
                                         <span className="rounded-[2px] bg-[#d42a2a] px-1 text-[10px] text-white">fazer</span>
                                     ) : null,
                                 },
-                                { value: 'diag', label: 'Relato e diagnóstico' },
-                                { value: 'revisao', label: 'Revisão', badge: Object.keys(os.revision ?? {}).length ? <span className="rounded-[2px] bg-zinc-200 px-1 text-[10px] dark:bg-zinc-700">{Object.keys(os.revision).length}</span> : null },
+                                ...(work.diag ? [{ value: 'diag' as Tab, label: 'Relato e diagnóstico' }] : []),
+                                ...(work.checklist
+                                    ? [
+                                          {
+                                              value: 'revisao' as Tab,
+                                              label: work.checklistTitle,
+                                              badge: Object.keys(os.revision ?? {}).length ? <span className="rounded-[2px] bg-zinc-200 px-1 text-[10px] dark:bg-zinc-700">{Object.keys(os.revision).length}</span> : null,
+                                          },
+                                      ]
+                                    : []),
                                 {
                                     value: 'itens',
                                     label: 'Peças e serviços',
@@ -993,7 +1004,27 @@ export default function OsShow({ os, history, mechanics, statuses, serviceTypes 
                             </div>
                         )}
 
-                        {tab === 'revisao' && <Revisao os={os} />}
+                        {tab === 'revisao' && (
+                            <div className="grid gap-3">
+                                {!work.diag && (
+                                    <div className="rounded-[3px] border-l-4 border-[#d42a2a] bg-[#f6f7f8] px-3 py-2 text-[15px] whitespace-pre-line md:text-[13px] dark:bg-zinc-800">
+                                        <span className="block text-[11px] font-semibold text-zinc-600 uppercase">O que o cliente pediu</span>
+                                        {os.complaint || '—'}
+                                    </div>
+                                )}
+                                <Revisao os={os} />
+                                {!work.diag && (
+                                    <Field label="Observações do mecânico (o que precisa trocar, o que está no limite…)">
+                                        <textarea rows={4} className={textareaCls} value={diag.data.diagnosis} onChange={(e) => diag.setData('diagnosis', e.target.value)} />
+                                        {diag.isDirty && (
+                                            <div className="mt-2">
+                                                <Tool primary icon={<Save />} label="Gravar observações" onClick={saveDiag} disabled={diag.processing} />
+                                            </div>
+                                        )}
+                                    </Field>
+                                )}
+                            </div>
+                        )}
 
                         {tab === 'itens' && (
                             <div className={cn('grid gap-3', sensitive && 'xl:grid-cols-[1fr_260px]')}>

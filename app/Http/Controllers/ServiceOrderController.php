@@ -335,6 +335,27 @@ class ServiceOrderController extends Controller
         return to_route('os.index')->with('success', 'OS excluída.');
     }
 
+    /** Ficha em branco (sem cliente, carro nem valores) para preencher à mão. */
+    public function blankForm(Request $request, string $tipo): Response
+    {
+        abort_unless(in_array($tipo, ['cliente', 'entrada', 'diagnostico', 'revisao'], true), 404);
+        abort_if($tipo === 'cliente' && ! $request->user()->canSeeSensitive(), 403);
+
+        $os = [
+            'id' => 0, 'number' => '', 'status' => 'aguardando', 'scheduled_at' => null, 'created_at' => null,
+            'complaint' => null, 'km_in' => null, 'origin' => 'balcao', 'service_type' => null, 'status_since' => null,
+            'inspected' => false, 'online_new' => false, 'client' => null, 'vehicle' => null, 'mechanic' => null,
+            'fuel_level' => null, 'diagnosis' => null, 'notes' => null, 'damages' => [], 'checklist' => [],
+            'revision' => (object) [], 'checked_in_at' => null, 'inspected_at' => null, 'inspected_by' => null,
+            'approved_at' => null, 'rejected_at' => null, 'approval_name' => null, 'approval_note' => null,
+            'photos' => [], 'delivered_at' => null, 'items' => [], 'events' => [],
+            'subtotal' => 0, 'discount' => 0, 'total' => 0, 'down_payment' => 0, 'payment_method' => null,
+            'public_url' => null, 'payments' => [], 'paid_total' => 0, 'billed_total' => 0,
+        ];
+
+        return Inertia::render('print/'.$tipo, ['os' => $os, 'shop' => config('oficina'), 'blank' => true]);
+    }
+
     public function print(Request $request, ServiceOrder $os, string $tipo): Response
     {
         $user = $request->user();

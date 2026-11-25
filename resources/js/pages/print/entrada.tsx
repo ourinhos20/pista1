@@ -20,8 +20,8 @@ export default function PrintEntrada({ os, shop }: { os: OsFull; shop: Shop }) {
                         <Line label="Cor" value={v?.color} />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
-                        <Line label="Km" value={km(os.km_in)} />
-                        <Line label="Entrada" value={date(os.created_at, true)} />
+                        <Line label="Km" value={os.km_in ? km(os.km_in) : ''} />
+                        <Line label="Entrada" value={os.created_at ? date(os.created_at, true) : ''} />
                     </div>
                 </div>
             </Box>

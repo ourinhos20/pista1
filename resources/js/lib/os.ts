@@ -214,3 +214,15 @@ export function toLocalInput(iso?: string | null) {
     const pad = (n: number) => String(n).padStart(2, '0');
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
+
+/** Qual ficha de trabalho o mecânico preenche, conforme o tipo de serviço. */
+export function workFor(type: string | null | undefined) {
+    const checklist = type === 'revisao' || type === 'preventiva' || !type;
+    const diag = type === 'defeito' || type === 'outro' || !type;
+    return {
+        checklist,
+        diag,
+        checklistTitle: type === 'preventiva' ? 'Checklist preventivo' : 'Checklist de revisão',
+        print: checklist && !diag ? 'revisao' : 'diagnostico',
+    };
+}

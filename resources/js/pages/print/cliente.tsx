@@ -3,7 +3,7 @@ import { PAYMENT, documentFmt, km, money, phone, plate } from '@/lib/os';
 import type { OsFull, Shop } from '@/types';
 
 /** Ficha que o cliente leva: orçamento / OS com valores. */
-export default function PrintCliente({ os, shop }: { os: OsFull; shop: Shop }) {
+export default function PrintCliente({ os, shop, blank = false }: { os: OsFull; shop: Shop; blank?: boolean }) {
     const c = os.client;
     const v = os.vehicle;
     // itens recusados pelo cliente saem da conta e aparecem só como recomendação
@@ -42,7 +42,7 @@ export default function PrintCliente({ os, shop }: { os: OsFull; shop: Shop }) {
                     <div className="grid grid-cols-3 gap-4">
                         <Line label="Cor" value={v?.color} />
                         <Line label="Placa" value={<b className="font-mono tracking-wider">{plate(v?.plate)}</b>} />
-                        <Line label="Km" value={km(os.km_in)} />
+                        <Line label="Km" value={os.km_in ? km(os.km_in) : ''} />
                     </div>
                 </div>
             </Box>
@@ -78,7 +78,7 @@ export default function PrintCliente({ os, shop }: { os: OsFull; shop: Shop }) {
                 )}
                 <div className="flex items-center justify-end gap-6 px-4 py-2">
                     {!!os.discount && <span className="text-[12.5px]">Desconto: {money(os.discount)}</span>}
-                    <span className="text-[16px] font-extrabold">Valor Total: {money(os.total)}</span>
+                    <span className="text-[16px] font-extrabold">Valor Total: {blank ? <span className="inline-block w-40 border-b border-black" /> : money(os.total)}</span>
                 </div>
             </section>
 

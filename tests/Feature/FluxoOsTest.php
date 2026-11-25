@@ -225,6 +225,20 @@ class FluxoOsTest extends TestCase
         }
     }
 
+    public function test_fichas_em_branco_para_imprimir(): void
+    {
+        $this->actingAs($this->carlos);
+        foreach (['entrada', 'diagnostico', 'revisao'] as $tipo) {
+            $this->get($this->p("/fichas/{$tipo}"))->assertOk()
+                ->assertInertia(fn (Assert $page) => $page->component("print/{$tipo}")->where('os.number', '')->where('os.client', null)->where('blank', true));
+        }
+        // a via do cliente (com valores) é só do balcão
+        $this->get($this->p('/fichas/cliente'))->assertForbidden();
+        $this->get($this->p('/fichas/qualquer'))->assertNotFound();
+
+        $this->actingAs($this->balcao)->get($this->p('/fichas/cliente'))->assertOk();
+    }
+
     /* ------------------------------------------------------------ bot */
 
     public function test_bot_sem_token_configurado_fica_desligado(): void

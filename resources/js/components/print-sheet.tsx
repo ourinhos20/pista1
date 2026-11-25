@@ -9,7 +9,7 @@ import type { ReactNode } from 'react';
 export function PrintShell({ title, os, shop, children }: { title: string; os: OsFull; shop: Shop; children: ReactNode }) {
     return (
         <div className="min-h-svh bg-zinc-200 py-6 text-black print:bg-white print:py-0" style={{ colorScheme: 'light', ['--card' as string]: '#fff' }}>
-            <Head title={`${title} · OS ${os.number} · ${plate(os.vehicle?.plate)}`} />
+            <Head title={os.number ? `${title} · OS ${os.number} · ${plate(os.vehicle?.plate)}` : `${title} (em branco)`} />
 
             <div className="no-print mx-auto mb-4 flex w-[210mm] max-w-full items-center justify-between gap-2 px-2">
                 <button onClick={() => window.close()} className="inline-flex h-11 items-center gap-2 rounded-xl bg-white px-4 font-semibold shadow-sm">
@@ -35,7 +35,7 @@ export function PrintShell({ title, os, shop, children }: { title: string; os: O
                     <h1 className="text-[22px] font-extrabold tracking-tight">{title}</h1>
                     <div className="text-right">
                         <p className="text-[11px] text-zinc-600">Ordem de serviço</p>
-                        <p className="text-[20px] font-extrabold tabular-nums">Nº {os.number}</p>
+                        <p className="text-[20px] font-extrabold tabular-nums">Nº {os.number || '__________'}</p>
                     </div>
                 </div>
 

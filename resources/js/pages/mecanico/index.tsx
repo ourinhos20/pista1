@@ -1,6 +1,6 @@
 import { Block, Grid, Placa, Since, Situacao, Tool, type Col } from '@/components/erp';
 import AppLayout from '@/layouts/app-layout';
-import { SERVICE_TYPE, WAITING_FOR, date, km, nextStep, time } from '@/lib/os';
+import { SERVICE_TYPE, WAITING_FOR, date, km, nextStep, time, workFor } from '@/lib/os';
 import type { OsCard, SharedData } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { ArrowRight, ClipboardCheck, FileText, Printer, RefreshCw } from 'lucide-react';
@@ -77,7 +77,7 @@ function MobileCard({ os, info = false }: { os: OsCard; info?: boolean }) {
                         </Link>
                     )}
                     <a
-                        href={route('os.print', [os.id, 'diagnostico'])}
+                        href={route('os.print', [os.id, workFor(os.service_type).print])}
                         target="_blank"
                         rel="noreferrer"
                         aria-label="Imprimir ficha"

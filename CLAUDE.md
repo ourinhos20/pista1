@@ -26,7 +26,8 @@ Publicação: `deploy/empacotar.ps1` gera o zip; passo a passo em `deploy/PUBLIC
 - `app/Support/OsPresenter.php`: **é aqui que se esconde dos mecânicos** o que eles não podem ver.
 - `app/Enums/OsStatus.php` e `resources/js/lib/os.ts`: as etapas da OS e quem faz cada uma.
 - `resources/js/components/erp.tsx`: componentes visuais (Block, Grid, Field, ReadOnly, Tool, Tabs, Situacao, Placa) e o menu.
-- `resources/js/pages/print/*`: fichas A4 impressas.
+- `resources/js/pages/print/*`: fichas A4 impressas. O menu **Fichas** do topo abre as mesmas fichas em branco (`/fichas/{tipo}`); a via do cliente em branco é só do balcão/master.
+- Menu: **Nova OS não fica no menu** (é o botão + Nova OS na tela Ordens de serviço, ou F2).
 - `config/oficina.php`: dados da oficina (telefone, endereço, termos de garantia) e o `panel_path`.
 
 ## Regras de negócio (decididas pelo dono — não mudar sem ele pedir)
@@ -43,6 +44,7 @@ Publicação: `deploy/empacotar.ps1` gera o zip; passo a passo em `deploy/PUBLIC
   7. Em execução: item novo vira **complementar**; o cliente aprova pelo link sem parar o que já foi aprovado.
   8. Pronto. 9. Entregue (balcão).
   - Cada OS guarda desde quando está na etapa (`status_changed_at`); o painel acusa o que está parado há muito tempo.
+  - **O tipo de serviço define a ficha do mecânico:** revisão/preventiva → só o checklist; defeito/outro → só relato e diagnóstico (sem tipo, as duas). O Imprimir da OS segue a mesma regra (`workFor` em `resources/js/lib/os.ts`).
   - O master faz e altera tudo.
 - **Bot do WhatsApp:** `POST /api/bot/agendamento` com `Authorization: Bearer <BOT_TOKEN>`. Com `BOT_TOKEN` vazio, a rota fica desligada. Detalhes em `deploy/PUBLICAR-HOSTGATOR.md`.
 - **Só o balcão ou o master lançam valores.** O mecânico pode pedir peça, mas sem preço.
