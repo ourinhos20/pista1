@@ -134,7 +134,7 @@ class FluxoOsTest extends TestCase
 
         $this->patch($this->p("/os/{$os->id}/vistoria"), ['fuel_level' => 2])->assertSessionHasErrors('km_in');
         $this->patch($this->p("/os/{$os->id}/vistoria"), [
-            'km_in' => 118000, 'fuel_level' => 2, 'checklist' => ['estepe' => true],
+            'km_in' => 118000, 'fuel_level' => 2, 'checklist' => ['estepe' => true], 'chassis' => '9bwzzz377vt004251',
             'damages' => [['x' => 10, 'y' => 20, 'type' => 'risco']],
         ])->assertSessionHasNoErrors();
 
@@ -143,6 +143,8 @@ class FluxoOsTest extends TestCase
         $this->assertSame($this->carlos->id, $os->inspected_by);
         $this->assertCount(1, $os->damages);
         $this->assertSame(118000, $os->vehicle->fresh()->km);
+        // o mecânico anota o chassi na vistoria
+        $this->assertSame('9BWZZZ377VT004251', $os->vehicle->fresh()->chassis);
 
         $this->patch($this->p("/os/{$os->id}/status"), ['status' => 'orcamento'])->assertSessionHasNoErrors();
         $this->assertSame(OsStatus::Orcamento, $os->fresh()->status);
@@ -237,6 +239,41 @@ class FluxoOsTest extends TestCase
         $this->get($this->p('/fichas/qualquer'))->assertNotFound();
 
         $this->actingAs($this->balcao)->get($this->p('/fichas/cliente'))->assertOk();
+    }
+
+    /* ------------------------------------------------------ catálogo FIPE */
+
+    public function test_catalogo_de_marcas_e_modelos(): void
+    {
+        $this->actingAs($this->balcao);
+        $this->getJson($this->p('/catalogo/marcas'))->assertOk()
+            ->assertJsonFragment(['name' => 'Hyundai', 'popular' => true])
+            ->assertJsonFragment(['name' => 'Chevrolet']);
+
+        // modelos com versão e motor: a Tucson 2.0 é diferente da 2.7 V6
+        $modelos = $this->getJson($this->p('/catalogo/modelos?marca=Hyundai'))->assertOk()->json();
+        $this->assertContains('Tucson 2.0 16V Flex Aut.', $modelos);
+        $this->assertTrue(collect($modelos)->contains(fn ($m) => str_starts_with($m, 'Tucson 2.7')));
+
+        // o site também consulta (sem login), só nomes de modelo
+        auth()->logout();
+        $this->getJson(route('agendar.modelos', ['marca' => 'Fiat']))->assertOk()->assertJsonFragment(['Strada Freedom 1.3 Flex 8V CS Plus']);
+    }
+
+    public function test_nova_os_grava_marca_modelo_cor_e_chassi(): void
+    {
+        $this->actingAs($this->balcao)->post($this->p('/os'), [
+            'name' => 'Paulo Reis', 'phone' => '14991234567',
+            'vehicle_brand' => 'Hyundai', 'vehicle_model' => 'Tucson 2.7 MPFI 24V 175cv Aut.', 'vehicle_year' => '2010',
+            'vehicle_color' => 'Prata', 'vehicle_chassis' => '9bh-a5181 3bb000001', 'plate' => 'TUC2A70', 'arrived' => true,
+            'service_type' => 'defeito', 'complaint' => 'Falhando',
+        ])->assertSessionHasNoErrors();
+
+        $v = Vehicle::where('plate', 'TUC2A70')->first();
+        $this->assertSame('Hyundai', $v->brand);
+        $this->assertSame('Tucson 2.7 MPFI 24V 175cv Aut.', $v->model);
+        $this->assertSame('Prata', $v->color);
+        $this->assertSame('9BHA51813BB000001', $v->chassis);
     }
 
     /* ------------------------------------------------------------ bot */

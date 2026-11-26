@@ -170,8 +170,6 @@ function MenuBar() {
                                         <a
                                             key={i.href}
                                             href={i.href}
-                                            target="_blank"
-                                            rel="noreferrer"
                                             onClick={() => setOpen(false)}
                                             className="flex h-12 items-center rounded-[4px] px-3 text-[15px] text-zinc-300"
                                         >
@@ -221,7 +219,7 @@ function MenuBar() {
                                 {g.items.map((i) => (
                                     <DropdownMenuItem key={i.href} asChild className="h-9 rounded-[3px] text-[13px]">
                                         {i.newTab ? (
-                                            <a href={i.href} target="_blank" rel="noreferrer" className="flex w-full items-center">
+                                            <a href={i.href} className="flex w-full items-center">
                                                 <span className="text-muted-foreground w-14 font-mono text-[11px]">{i.code}</span>
                                                 <span className="flex-1">{i.label}</span>
                                                 <span className="text-muted-foreground ml-4 text-[10px]">em branco</span>

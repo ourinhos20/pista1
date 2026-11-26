@@ -26,7 +26,7 @@ Publicação: `deploy/empacotar.ps1` gera o zip; passo a passo em `deploy/PUBLIC
 - `app/Support/OsPresenter.php`: **é aqui que se esconde dos mecânicos** o que eles não podem ver.
 - `app/Enums/OsStatus.php` e `resources/js/lib/os.ts`: as etapas da OS e quem faz cada uma.
 - `resources/js/components/erp.tsx`: componentes visuais (Block, Grid, Field, ReadOnly, Tool, Tabs, Situacao, Placa) e o menu.
-- `resources/js/pages/print/*`: fichas A4 impressas. O menu **Fichas** do topo abre as mesmas fichas em branco (`/fichas/{tipo}`); a via do cliente em branco é só do balcão/master.
+- `resources/js/pages/print/*`: fichas A4 impressas. O menu **Fichas** do topo abre as mesmas fichas em branco (`/fichas/{tipo}`); a via do cliente em branco é só do balcão/master. As fichas abrem **na mesma aba** e o botão **Voltar** retorna à tela anterior (não usar nova aba nem `window.close`).
 - Menu: **Nova OS não fica no menu** (é o botão + Nova OS na tela Ordens de serviço, ou F2).
 - `config/oficina.php`: dados da oficina (telefone, endereço, termos de garantia) e o `panel_path`.
 
@@ -59,6 +59,7 @@ Publicação: `deploy/empacotar.ps1` gera o zip; passo a passo em `deploy/PUBLIC
   - despesa paga do bolso do sócio vira **aporte** dele, e receita que ficou com o sócio vira **retirada** (ligadas ao lançamento: excluir/estornar desfaz);
   - "Baixar" pede a data e a forma de pagamento.
 - **Sem catálogo de peças e sem controle de estoque** (foram removidos a pedido). Na compra e na OS, a peça é só uma descrição digitada.
+- **Veículo:** marca e modelo vêm do **catálogo FIPE** (`database/data/veiculos-fipe.json`, carregado pela migração; componente `resources/js/components/vehicle-picker.tsx`). O modelo já traz versão e motor; dá para digitar livre se não estiver no catálogo. Também há **cor** e **chassi** (o mecânico anota o chassi na vistoria; o balcão também pode, pelo documento). Para atualizar o catálogo: `php artisan pista1:catalogo-fipe` (precisa de internet; `--so-importar` só recarrega o arquivo).
 - **Fornecedores** ficam em Cadastros e em Compras. A ficha do fornecedor mostra o histórico de compras por mês.
 - **Compras:** a OS é escolhida numa lista (puxa as peças pedidas). Por padrão **não** lança as peças de novo na OS (já estão no orçamento); só o custo entra na margem. A mesma NF do mesmo fornecedor não entra duas vezes. A tela mostra os carros "aguardando peças" com botão Comprar.
 

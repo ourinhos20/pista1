@@ -28,9 +28,10 @@ export default function PrintDiagnostico({ os, shop }: { os: OsFull; shop: Shop 
                         <Line label="Km" value={os.km_in ? km(os.km_in) : ''} />
                         <Line label="Comb." value={os.fuel_level !== null ? FUEL[os.fuel_level] : ''} />
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-[1fr_1fr_1.4fr] gap-4">
                         <Line label="Cliente" value={firstName} />
-                        <Line label="Mecânico" value={os.mechanic?.name} />
+                        <Line label="Mecânico" value={os.mechanic?.name?.split(' ')[0]} />
+                        <Line label="Chassi" value={<span className="font-mono">{v?.chassis}</span>} />
                     </div>
                 </div>
             </Box>

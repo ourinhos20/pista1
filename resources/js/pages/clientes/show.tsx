@@ -1,6 +1,7 @@
 import { Block, Field, Grid, Placa, ReadOnly, Situacao, Tool, type Col } from '@/components/erp';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { VehiclePicker } from '@/components/vehicle-picker';
 import AppLayout from '@/layouts/app-layout';
 import { date, documentFmt, km, money, phone, whatsapp } from '@/lib/os';
 import type { ClientData, OsCard, VehicleData } from '@/types';
@@ -17,16 +18,13 @@ export function VehicleForm({ clientId, vehicle, onDone }: { clientId?: number; 
         model: vehicle?.model ?? '',
         year: vehicle?.year ?? '',
         color: vehicle?.color ?? '',
-        engine: vehicle?.engine ?? '',
+        chassis: vehicle?.chassis ?? '',
         km: vehicle?.km ? String(vehicle.km) : '',
     });
-    const fields: [Exclude<keyof typeof data, 'client_id'>, string][] = [
-        ['plate', 'Placa *'],
-        ['brand', 'Marca'],
-        ['model', 'Modelo'],
+    const fields: [Exclude<keyof typeof data, 'client_id' | 'brand' | 'model'>, string][] = [
         ['year', 'Ano'],
         ['color', 'Cor'],
-        ['engine', 'Motor'],
+        ['chassis', 'Chassi'],
         ['km', 'Km atual'],
     ];
     return (
@@ -40,19 +38,44 @@ export function VehicleForm({ clientId, vehicle, onDone }: { clientId?: number; 
             }}
         >
             <div className="grid gap-3 sm:grid-cols-4">
+                <Field label="Placa *" error={errors.plate}>
+                    <Input
+                        value={data.plate}
+                        onChange={(e) => setData('plate', e.target.value.toUpperCase())}
+                        className="font-mono font-bold tracking-widest uppercase"
+                    />
+                </Field>
+                <VehiclePicker
+                    brand={data.brand}
+                    model={data.model}
+                    onBrand={(v) => setData('brand', v)}
+                    onModel={(v) => setData('model', v)}
+                    errors={{ brand: errors.brand, model: errors.model }}
+                    modelClassName="sm:col-span-2"
+                />
                 {fields.map(([k, label]) => (
-                    <Field key={k} label={label} error={errors[k]} className={k === 'model' ? 'sm:col-span-2' : ''}>
+                    <Field key={k} label={label} error={errors[k]}>
                         <Input
                             value={data[k]}
-                            onChange={(e) => setData(k, k === 'plate' ? e.target.value.toUpperCase() : k === 'km' ? e.target.value.replace(/\D/g, '') : e.target.value)}
-                            className={k === 'plate' ? 'font-mono font-bold tracking-widest uppercase' : ''}
+                            onChange={(e) =>
+                                setData(
+                                    k,
+                                    k === 'chassis' ? e.target.value.toUpperCase() : k === 'km' ? e.target.value.replace(/\D/g, '') : e.target.value,
+                                )
+                            }
+                            className={k === 'chassis' ? 'font-mono uppercase' : ''}
+                            maxLength={k === 'chassis' ? 17 : undefined}
                             inputMode={k === 'km' ? 'numeric' : undefined}
                         />
                     </Field>
                 ))}
             </div>
             <div className="flex justify-end">
-                <button type="submit" disabled={processing} className="inline-flex h-11 items-center gap-1.5 rounded-[3px] border border-[#b51f1f] bg-[#d42a2a] px-4 text-[13px] font-semibold text-white md:h-8">
+                <button
+                    type="submit"
+                    disabled={processing}
+                    className="inline-flex h-11 items-center gap-1.5 rounded-[3px] border border-[#b51f1f] bg-[#d42a2a] px-4 text-[13px] font-semibold text-white md:h-8"
+                >
                     <Save className="size-4" /> Gravar veículo
                 </button>
             </div>
@@ -127,10 +150,22 @@ export default function ClienteShow({ client, vehicles, orders }: { client: Clie
 
                 <div className="grid gap-2 md:gap-3 xl:grid-cols-[2fr_3fr]">
                     <Block title={`Veículos · ${vehicles.length}`} bodyClassName="p-0">
-                        <Grid cols={vCols} rows={vehicles} rowKey={(r) => r.id} onRowClick={(r) => router.visit(route('veiculos.show', r.id))} empty="Nenhum veículo." />
+                        <Grid
+                            cols={vCols}
+                            rows={vehicles}
+                            rowKey={(r) => r.id}
+                            onRowClick={(r) => router.visit(route('veiculos.show', r.id))}
+                            empty="Nenhum veículo."
+                        />
                     </Block>
                     <Block title={`Ordens de serviço · ${orders.length}`} bodyClassName="p-0">
-                        <Grid cols={oCols} rows={orders} rowKey={(r) => r.id} onRowClick={(r) => router.visit(route('os.show', r.id))} empty="Nenhuma OS." />
+                        <Grid
+                            cols={oCols}
+                            rows={orders}
+                            rowKey={(r) => r.id}
+                            onRowClick={(r) => router.visit(route('os.show', r.id))}
+                            empty="Nenhuma OS."
+                        />
                     </Block>
                 </div>
             </div>
@@ -140,7 +175,11 @@ export default function ClienteShow({ client, vehicles, orders }: { client: Clie
                     <DialogHeader>
                         <DialogTitle>{dialog === 'cliente' ? 'Alterar cliente' : 'Incluir veículo'}</DialogTitle>
                     </DialogHeader>
-                    {dialog === 'cliente' ? <ClientForm client={client} onDone={() => setDialog(null)} /> : <VehicleForm clientId={client.id} onDone={() => setDialog(null)} />}
+                    {dialog === 'cliente' ? (
+                        <ClientForm client={client} onDone={() => setDialog(null)} />
+                    ) : (
+                        <VehicleForm clientId={client.id} onDone={() => setDialog(null)} />
+                    )}
                 </DialogContent>
             </Dialog>
         </AppLayout>

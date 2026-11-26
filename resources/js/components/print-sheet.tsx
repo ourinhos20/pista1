@@ -2,7 +2,7 @@ import { plate } from '@/lib/os';
 import { cn } from '@/lib/utils';
 import type { OsFull, Shop } from '@/types';
 import { Head } from '@inertiajs/react';
-import { Printer, X } from 'lucide-react';
+import { ArrowLeft, Printer } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 /** Folha A4 com cabeçalho preto da Pista 1 (como os modelos de papel). */
@@ -12,8 +12,12 @@ export function PrintShell({ title, os, shop, children }: { title: string; os: O
             <Head title={os.number ? `${title} · OS ${os.number} · ${plate(os.vehicle?.plate)}` : `${title} (em branco)`} />
 
             <div className="no-print mx-auto mb-4 flex w-[210mm] max-w-full items-center justify-between gap-2 px-2">
-                <button onClick={() => window.close()} className="inline-flex h-11 items-center gap-2 rounded-xl bg-white px-4 font-semibold shadow-sm">
-                    <X className="size-4" /> Fechar
+                {/* volta para a tela de onde veio (a ficha abre na mesma aba) */}
+                <button
+                    onClick={() => (window.history.length > 1 ? window.history.back() : window.location.assign(route('dashboard')))}
+                    className="inline-flex h-11 items-center gap-2 rounded-xl bg-white px-4 font-semibold shadow-sm"
+                >
+                    <ArrowLeft className="size-4" /> Voltar
                 </button>
                 <button onClick={() => window.print()} className="inline-flex h-11 items-center gap-2 rounded-xl bg-[#d42a2a] px-5 font-semibold text-white shadow-sm">
                     <Printer className="size-5" /> Imprimir

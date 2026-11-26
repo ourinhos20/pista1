@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Vehicle extends Model
 {
-    protected $fillable = ['client_id', 'plate', 'brand', 'model', 'year', 'engine', 'color', 'km'];
+    protected $fillable = ['client_id', 'plate', 'chassis', 'brand', 'model', 'year', 'engine', 'color', 'km'];
 
     protected function casts(): array
     {
@@ -20,6 +20,12 @@ class Vehicle extends Model
     {
         // placa pode ficar vazia no agendamento (o cliente não sabe de cabeça); é exigida no check-in
         $this->attributes['plate'] = Plate::normalize($value) ?: null;
+    }
+
+    /** Chassi: só letras e números, em maiúsculas. */
+    public function setChassisAttribute($value): void
+    {
+        $this->attributes['chassis'] = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', (string) $value)) ?: null;
     }
 
     public function client(): BelongsTo

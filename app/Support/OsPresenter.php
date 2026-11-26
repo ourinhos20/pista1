@@ -34,7 +34,7 @@ class OsPresenter
         }
 
         return [
-            ...$v->only(['id', 'client_id', 'plate', 'brand', 'model', 'year', 'engine', 'color', 'km']),
+            ...$v->only(['id', 'client_id', 'plate', 'chassis', 'brand', 'model', 'year', 'engine', 'color', 'km']),
             'title' => $v->title(),
         ];
     }

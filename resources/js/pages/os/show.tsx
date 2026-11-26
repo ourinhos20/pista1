@@ -4,6 +4,7 @@ import { PhotoGallery, PhotoUpload } from '@/components/photo-gallery';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
+import { VehiclePicker } from '@/components/vehicle-picker';
 import AppLayout from '@/layouts/app-layout';
 import {
     ENTRY_CHECKLIST,
@@ -72,6 +73,8 @@ function Vistoria({ os, canEdit }: { os: OsFull; canEdit: boolean }) {
         fuel_level: os.fuel_level as number | null,
         checklist: (os.checklist ?? {}) as Record<string, boolean>,
         damages: (os.damages ?? []) as Damage[],
+        // o mecânico confere o chassi no carro (para-brisa, assoalho ou cofre do motor)
+        chassis: os.vehicle?.chassis ?? '',
     });
     const err = errors as Record<string, string>;
 
@@ -108,6 +111,10 @@ function Vistoria({ os, canEdit }: { os: OsFull; canEdit: boolean }) {
                                 <dd className="font-bold tabular-nums">{km(os.km_in)}</dd>
                             </div>
                             <div className="flex justify-between border-b border-[#eceef1] py-1">
+                                <dt>Chassi</dt>
+                                <dd className="font-mono font-bold">{os.vehicle?.chassis || '—'}</dd>
+                            </div>
+                            <div className="flex justify-between border-b border-[#eceef1] py-1">
                                 <dt>Combustível</dt>
                                 <dd className="font-bold">{os.fuel_level !== null ? FUEL[os.fuel_level] : '—'}</dd>
                             </div>
@@ -138,7 +145,7 @@ function Vistoria({ os, canEdit }: { os: OsFull; canEdit: boolean }) {
                 <b>Primeiro passo, antes do diagnóstico:</b> registre como o carro chegou. Isso protege a oficina se aparecer um risco depois. Tire
                 fotos das avarias na aba <b>Fotos</b>.
             </p>
-            <div className="grid gap-3 sm:grid-cols-[180px_1fr]">
+            <div className="grid gap-3 sm:grid-cols-[180px_1fr_220px]">
                 <Field label="Km *" error={err.km_in}>
                     <Input
                         value={data.km_in}
@@ -163,6 +170,9 @@ function Vistoria({ os, canEdit }: { os: OsFull; canEdit: boolean }) {
                             </button>
                         ))}
                     </div>
+                </Field>
+                <Field label="Chassi" error={err.chassis}>
+                    <Input value={data.chassis} onChange={(e) => setData('chassis', e.target.value.toUpperCase())} maxLength={17} className="font-mono uppercase" />
                 </Field>
             </div>
             <Field label="Itens no veículo">
@@ -237,7 +247,7 @@ function CadastroForm({ os, checkin, onDone }: { os: OsFull; checkin: boolean; o
             model: v?.model ?? '',
             year: v?.year ?? '',
             color: v?.color ?? '',
-            engine: v?.engine ?? '',
+            chassis: v?.chassis ?? '',
         },
     });
     const err = errors as Record<string, string>;
@@ -270,20 +280,28 @@ function CadastroForm({ os, checkin, onDone }: { os: OsFull; checkin: boolean; o
                         autoFocus={checkin}
                     />
                 </Field>
-                <Field label="Marca" className="sm:col-span-2">
-                    <Input value={data.vehicle.brand} onChange={(e) => setV('brand', e.target.value)} />
-                </Field>
-                <Field label="Modelo" className="sm:col-span-2">
-                    <Input value={data.vehicle.model} onChange={(e) => setV('model', e.target.value)} />
-                </Field>
+                <VehiclePicker
+                    brand={data.vehicle.brand}
+                    model={data.vehicle.model}
+                    onBrand={(val) => setData('vehicle', { ...data.vehicle, brand: val })}
+                    onModel={(val) => setData((d) => ({ ...d, vehicle: { ...d.vehicle, model: val } }))}
+                    errors={{ model: err['vehicle.model'] }}
+                    brandClassName="sm:col-span-2"
+                    modelClassName="sm:col-span-2"
+                />
                 <Field label="Ano" className="sm:col-span-2">
                     <Input value={data.vehicle.year} onChange={(e) => setV('year', e.target.value)} inputMode="numeric" />
                 </Field>
                 <Field label="Cor" className="sm:col-span-2">
                     <Input value={data.vehicle.color} onChange={(e) => setV('color', e.target.value)} />
                 </Field>
-                <Field label="Motor" className="sm:col-span-2">
-                    <Input value={data.vehicle.engine} onChange={(e) => setV('engine', e.target.value)} />
+                <Field label="Chassi" className="sm:col-span-2" error={err['vehicle.chassis']}>
+                    <Input
+                        value={data.vehicle.chassis}
+                        onChange={(e) => setV('chassis', e.target.value.toUpperCase())}
+                        maxLength={17}
+                        className="font-mono uppercase"
+                    />
                 </Field>
             </div>
             <p className="mt-1 text-[11px] font-bold tracking-wide text-zinc-600 uppercase">Cliente</p>
@@ -857,7 +875,7 @@ export default function OsShow({ os, history, mechanics, statuses, serviceTypes 
         const onKey = (e: KeyboardEvent) => {
             if (e.key === 'F8') {
                 e.preventDefault();
-                window.open(route('os.print', [os.id, sensitive ? 'cliente' : work.print]), '_blank');
+                window.location.href = route('os.print', [os.id, sensitive ? 'cliente' : work.print]);
             }
         };
         window.addEventListener('keydown', onKey);
@@ -961,7 +979,7 @@ export default function OsShow({ os, history, mechanics, statuses, serviceTypes 
                         <DropdownMenuContent align="end" className="w-72 rounded-[4px] p-1">
                             {printTypes.map(([k, label]) => (
                                 <DropdownMenuItem key={k} asChild className="h-9 rounded-[3px] text-[13px]">
-                                    <a href={route('os.print', [os.id, k])} target="_blank" rel="noreferrer">
+                                    <a href={route('os.print', [os.id, k])}>
                                         {label}
                                     </a>
                                 </DropdownMenuItem>

@@ -18,7 +18,8 @@ class OsIntake
 {
     /**
      * @param  array{name?: string, phone?: string, client_id?: int|null, vehicle_id?: int|null, plate?: string|null,
-     *     vehicle_model?: string|null, vehicle_year?: string|null, vehicle_brand?: string|null, service_type?: string|null,
+     *     vehicle_model?: string|null, vehicle_year?: string|null, vehicle_brand?: string|null, vehicle_color?: string|null,
+     *     vehicle_chassis?: string|null, service_type?: string|null,
      *     complaint?: string|null, scheduled_at?: string|null, mechanic_id?: int|null, arrived?: bool}  $d
      */
     public static function create(array $d, string $origin, ?User $user = null): ServiceOrder
@@ -53,6 +54,8 @@ class OsIntake
                     'brand' => $d['vehicle_brand'] ?? null,
                     'model' => $model ?: null,
                     'year' => $d['vehicle_year'] ?? null,
+                    'color' => $d['vehicle_color'] ?? null,
+                    'chassis' => $d['vehicle_chassis'] ?? null,
                 ]);
             }
 

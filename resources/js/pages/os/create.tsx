@@ -1,5 +1,6 @@
 import { Block, Field, Placa, Tool, selectCls, textareaCls } from '@/components/erp';
 import { Input } from '@/components/ui/input';
+import { VehiclePicker } from '@/components/vehicle-picker';
 import AppLayout from '@/layouts/app-layout';
 import { documentFmt, phone } from '@/lib/os';
 import { cn } from '@/lib/utils';
@@ -117,8 +118,11 @@ export default function NovaOs({ mechanics, prefill, serviceTypes }: Props) {
         name: '',
         phone: '',
         plate: prefill.placa ?? '',
+        vehicle_brand: '',
         vehicle_model: '',
         vehicle_year: '',
+        vehicle_color: '',
+        vehicle_chassis: '',
         service_type: 'defeito',
         complaint: '',
         scheduled_at: '',
@@ -246,12 +250,20 @@ export default function NovaOs({ mechanics, prefill, serviceTypes }: Props) {
                             Veículo: <b>{chosenVehicle.title}</b> {chosenVehicle.plate ? `· ${chosenVehicle.plate}` : '· sem placa'}
                         </p>
                     ) : (
-                        <div className="grid gap-3 sm:grid-cols-[2fr_1fr_1fr]">
-                            <Field label="Veículo" error={err.vehicle_model}>
-                                <Input value={data.vehicle_model} onChange={(e) => setData('vehicle_model', e.target.value)} />
-                            </Field>
+                        <div className="grid gap-3 sm:grid-cols-4">
+                            <VehiclePicker
+                                brand={data.vehicle_brand}
+                                model={data.vehicle_model}
+                                onBrand={(v) => setData('vehicle_brand', v)}
+                                onModel={(v) => setData('vehicle_model', v)}
+                                errors={{ brand: err.vehicle_brand, model: err.vehicle_model }}
+                                modelClassName="sm:col-span-3"
+                            />
                             <Field label="Ano" error={err.vehicle_year}>
                                 <Input value={data.vehicle_year} onChange={(e) => setData('vehicle_year', e.target.value)} inputMode="numeric" />
+                            </Field>
+                            <Field label="Cor" error={err.vehicle_color}>
+                                <Input value={data.vehicle_color} onChange={(e) => setData('vehicle_color', e.target.value)} />
                             </Field>
                             <Field label={data.arrived ? 'Placa *' : 'Placa'} error={err.plate}>
                                 <Input
@@ -259,6 +271,14 @@ export default function NovaOs({ mechanics, prefill, serviceTypes }: Props) {
                                     onChange={(e) => setData('plate', e.target.value.toUpperCase())}
                                     maxLength={8}
                                     className="font-mono font-bold tracking-widest uppercase"
+                                />
+                            </Field>
+                            <Field label="Chassi" error={err.vehicle_chassis}>
+                                <Input
+                                    value={data.vehicle_chassis}
+                                    onChange={(e) => setData('vehicle_chassis', e.target.value.toUpperCase())}
+                                    maxLength={17}
+                                    className="font-mono uppercase"
                                 />
                             </Field>
                         </div>

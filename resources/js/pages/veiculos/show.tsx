@@ -30,7 +30,17 @@ export default function VeiculoShow({ vehicle, client, timeline }: { vehicle: Ve
         },
         { label: 'Mecânico', render: (r) => r.mechanic?.name ?? '—', hide: 'lg', className: 'w-36' },
         { label: 'Situação', render: (r) => <Situacao status={r.status} />, hide: 'md', className: 'w-48' },
-        ...(sensitive ? [{ label: 'Valor', render: (r: Entry) => (r.total ? money(r.total) : '—'), align: 'right' as const, hide: 'sm' as const, className: 'w-28' }] : []),
+        ...(sensitive
+            ? [
+                  {
+                      label: 'Valor',
+                      render: (r: Entry) => (r.total ? money(r.total) : '—'),
+                      align: 'right' as const,
+                      hide: 'sm' as const,
+                      className: 'w-28',
+                  },
+              ]
+            : []),
     ];
 
     return (
@@ -67,9 +77,14 @@ export default function VeiculoShow({ vehicle, client, timeline }: { vehicle: Ve
                         <Field label="Cor">
                             <ReadOnly>{vehicle.color}</ReadOnly>
                         </Field>
-                        <Field label="Motor">
-                            <ReadOnly>{vehicle.engine}</ReadOnly>
+                        <Field label="Chassi">
+                            <ReadOnly className="font-mono">{vehicle.chassis}</ReadOnly>
                         </Field>
+                        {vehicle.engine && (
+                            <Field label="Motor">
+                                <ReadOnly>{vehicle.engine}</ReadOnly>
+                            </Field>
+                        )}
                         <Field label="Km atual">
                             <ReadOnly className="font-bold tabular-nums">{km(vehicle.km)}</ReadOnly>
                         </Field>
@@ -88,7 +103,13 @@ export default function VeiculoShow({ vehicle, client, timeline }: { vehicle: Ve
                 </Block>
 
                 <Block title={`Histórico de serviços · ${timeline.length}`} bodyClassName="p-0">
-                    <Grid cols={cols} rows={timeline} rowKey={(r) => r.id} onRowClick={(r) => router.visit(route('os.show', r.id))} empty="Nenhum serviço registrado." />
+                    <Grid
+                        cols={cols}
+                        rows={timeline}
+                        rowKey={(r) => r.id}
+                        onRowClick={(r) => router.visit(route('os.show', r.id))}
+                        empty="Nenhum serviço registrado."
+                    />
                 </Block>
             </div>
 

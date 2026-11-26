@@ -16,6 +16,7 @@ use App\Http\Controllers\ServiceOrderController;
 use App\Http\Controllers\ServiceOrderItemController;
 use App\Http\Controllers\SiteController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\VehicleCatalogController;
 use App\Http\Controllers\VehicleController;
 use Illuminate\Support\Facades\Route;
 
@@ -28,6 +29,7 @@ Route::get('/', SiteController::class)->name('site');
 Route::get('agendar', [AgendarController::class, 'form'])->name('agendar');
 Route::post('agendar', [AgendarController::class, 'submit'])->middleware('throttle:5,10')->name('agendar.submit');
 Route::get('agendar/enviado', [AgendarController::class, 'thanks'])->name('agendar.ok');
+Route::get('agendar/modelos', [VehicleCatalogController::class, 'models'])->middleware('throttle:60,1')->name('agendar.modelos');
 
 // Cliente: ver e aprovar o orçamento pelo link secreto enviado no WhatsApp
 Route::get('orcamento/{token}', [BudgetController::class, 'show'])->middleware('throttle:60,1')->name('orcamento.show');
@@ -50,6 +52,8 @@ Route::prefix(config('oficina.panel_path'))->group(function () {
         // Todos os perfis (o servidor esconde dados sensíveis do mecânico)
         Route::get('mecanico', [MechanicController::class, 'index'])->name('mecanico.index');
         Route::get('buscar-placa', [VehicleController::class, 'lookup'])->name('veiculos.lookup');
+        Route::get('catalogo/marcas', [VehicleCatalogController::class, 'brands'])->name('catalogo.marcas');
+        Route::get('catalogo/modelos', [VehicleCatalogController::class, 'models'])->name('catalogo.modelos');
         Route::get('veiculos/{vehicle}', [VehicleController::class, 'show'])->name('veiculos.show');
         Route::get('os/{os}', [ServiceOrderController::class, 'show'])->name('os.show')->whereNumber('os');
         Route::patch('os/{os}/status', [ServiceOrderController::class, 'status'])->name('os.status');

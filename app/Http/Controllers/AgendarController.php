@@ -24,6 +24,8 @@ class AgendarController extends Controller
         return view('agendar', [
             'shop' => config('oficina'),
             'types' => ServiceOrder::SERVICE_TYPES,
+            // marcas do catálogo FIPE (comuns primeiro) para o cliente escolher
+            'brands' => \Illuminate\Support\Facades\DB::table('vehicle_catalog_brands')->orderBy('rank')->orderBy('name')->get(['name', 'rank']),
             // marca de tempo cifrada: formulário enviado rápido demais = robô
             'stamp' => Crypt::encryptString((string) now()->timestamp),
         ]);
@@ -41,7 +43,9 @@ class AgendarController extends Controller
             'name' => ['required', 'string', 'max:120'],
             'phone' => ['required', 'string', 'min:10', 'max:20'],
             'plate' => ['nullable', 'string', 'max:10'],
+            'brand' => ['nullable', 'string', 'max:60'],
             'vehicle' => ['nullable', 'string', 'max:120'],
+            'color' => ['nullable', 'string', 'max:30'],
             'year' => ['nullable', 'string', 'max:9'],
             'service_type' => ['nullable', Rule::in(array_keys(ServiceOrder::SERVICE_TYPES))],
             'complaint' => ['required', 'string', 'min:5', 'max:3000'],
@@ -69,6 +73,8 @@ class AgendarController extends Controller
             'plate' => $data['plate'] ?? null,
             'vehicle_model' => $data['vehicle'] ?? null,
             'vehicle_year' => $data['year'] ?? null,
+            'vehicle_brand' => $data['brand'] ?? null,
+            'vehicle_color' => $data['color'] ?? null,
             'service_type' => $data['service_type'] ?? null,
             'complaint' => $data['complaint'],
             'scheduled_at' => $data['preferred_at'] ?? null,
@@ -83,6 +89,6 @@ class AgendarController extends Controller
 
     public function thanks(): View
     {
-        return view('agendar', ['shop' => config('oficina'), 'done' => true, 'stamp' => '', 'types' => []]);
+        return view('agendar', ['shop' => config('oficina'), 'done' => true, 'stamp' => '', 'types' => [], 'brands' => collect()]);
     }
 }

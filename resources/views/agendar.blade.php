@@ -43,19 +43,43 @@
                     <input name="phone" value="{{ old('phone') }}" required inputmode="tel" autocomplete="tel" class="h-12 rounded-md border border-zinc-300 px-3 text-base focus:border-brand-dark focus:ring-2 focus:ring-brand/20 focus:outline-none">
                 </label>
                 <label class="grid gap-1.5">
-                    <span class="text-sm font-semibold">Placa</span>
-                    <input name="plate" value="{{ old('plate') }}" maxlength="8" class="h-12 rounded-md border border-zinc-300 px-3 font-mono text-base tracking-widest uppercase focus:border-brand-dark focus:ring-2 focus:ring-brand/20 focus:outline-none">
+                    <span class="text-sm font-semibold">Marca</span>
+                    <select id="marca" name="brand" class="h-12 w-full min-w-0 rounded-md border border-zinc-300 px-3 text-base focus:border-brand-dark focus:ring-2 focus:ring-brand/20 focus:outline-none bg-white">
+                        <option value="">Escolha…</option>
+                        @php($pop = $brands->where('rank', '<', 999))
+                        @if ($pop->isNotEmpty())
+                            <optgroup label="Mais comuns">
+                                @foreach ($pop as $b)
+                                    <option value="{{ $b->name }}" @selected(old('brand') === $b->name)>{{ $b->name }}</option>
+                                @endforeach
+                            </optgroup>
+                        @endif
+                        <optgroup label="Todas">
+                            @foreach ($brands->where('rank', 999) as $b)
+                                <option value="{{ $b->name }}" @selected(old('brand') === $b->name)>{{ $b->name }}</option>
+                            @endforeach
+                        </optgroup>
+                    </select>
                 </label>
-                <div class="grid min-w-0 grid-cols-[minmax(0,1fr)_88px] gap-2">
-                    <label class="grid gap-1.5">
-                        <span class="text-sm font-semibold">Veículo</span>
-                        <input name="vehicle" value="{{ old('vehicle') }}" maxlength="120" class="w-full min-w-0 h-12 rounded-md border border-zinc-300 px-3 text-base focus:border-brand-dark focus:ring-2 focus:ring-brand/20 focus:outline-none">
-                    </label>
+                <label class="grid gap-1.5">
+                    <span class="text-sm font-semibold">Modelo</span>
+                    <input id="modelo" name="vehicle" list="modelos" value="{{ old('vehicle') }}" maxlength="120" autocomplete="off" class="h-12 w-full min-w-0 rounded-md border border-zinc-300 px-3 text-base focus:border-brand-dark focus:ring-2 focus:ring-brand/20 focus:outline-none">
+                    <datalist id="modelos"></datalist>
+                </label>
+                <div class="grid min-w-0 grid-cols-[88px_minmax(0,1fr)] gap-2">
                     <label class="grid gap-1.5">
                         <span class="text-sm font-semibold">Ano</span>
-                        <input name="year" value="{{ old('year') }}" maxlength="9" inputmode="numeric" class="w-full min-w-0 h-12 rounded-md border border-zinc-300 px-3 text-base focus:border-brand-dark focus:ring-2 focus:ring-brand/20 focus:outline-none">
+                        <input name="year" value="{{ old('year') }}" maxlength="9" inputmode="numeric" class="h-12 w-full min-w-0 rounded-md border border-zinc-300 px-3 text-base focus:border-brand-dark focus:ring-2 focus:ring-brand/20 focus:outline-none">
+                    </label>
+                    <label class="grid gap-1.5">
+                        <span class="text-sm font-semibold">Cor</span>
+                        <input name="color" value="{{ old('color') }}" maxlength="30" class="h-12 w-full min-w-0 rounded-md border border-zinc-300 px-3 text-base focus:border-brand-dark focus:ring-2 focus:ring-brand/20 focus:outline-none">
                     </label>
                 </div>
+                <label class="grid gap-1.5">
+                    <span class="text-sm font-semibold">Placa</span>
+                    <input name="plate" value="{{ old('plate') }}" maxlength="8" class="h-12 w-full min-w-0 rounded-md border border-zinc-300 px-3 text-base focus:border-brand-dark focus:ring-2 focus:ring-brand/20 focus:outline-none font-mono tracking-widest uppercase">
+                </label>
             </div>
 
             @if (! empty($types))
@@ -128,6 +152,20 @@
                     btn.disabled = false;
                 });
                 form.addEventListener('submit', () => { btn.disabled = true; btn.textContent = 'Enviando…'; });
+                // modelos da marca escolhida (catálogo FIPE)
+                const marca = document.getElementById('marca');
+                const lista = document.getElementById('modelos');
+                const carregar = async () => {
+                    lista.innerHTML = '';
+                    if (!marca.value) return;
+                    try {
+                        const r = await fetch(@json(route('agendar.modelos', [], false)) + '?marca=' + encodeURIComponent(marca.value), { headers: { Accept: 'application/json' } });
+                        const nomes = r.ok ? await r.json() : [];
+                        lista.append(...nomes.map((n) => Object.assign(document.createElement('option'), { value: n })));
+                    } catch (e) {}
+                };
+                marca.addEventListener('change', () => { document.getElementById('modelo').value = ''; carregar(); });
+                carregar();
             })();
         </script>
     @endif

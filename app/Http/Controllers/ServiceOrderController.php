@@ -103,8 +103,11 @@ class ServiceOrderController extends Controller
             'name' => ['required_without:client_id', 'nullable', 'string', 'max:255'],
             'phone' => ['required_without:client_id', 'nullable', 'string', 'max:20'],
             'plate' => [$arrived ? 'required_without:vehicle_id' : 'nullable', 'nullable', 'string', 'max:10'],
-            'vehicle_model' => ['nullable', 'string', 'max:60'],
+            'vehicle_brand' => ['nullable', 'string', 'max:60'],
+            'vehicle_model' => ['nullable', 'string', 'max:120'],
             'vehicle_year' => ['nullable', 'string', 'max:9'],
+            'vehicle_color' => ['nullable', 'string', 'max:30'],
+            'vehicle_chassis' => ['nullable', 'string', 'max:20'],
             'service_type' => ['nullable', Rule::in(array_keys(ServiceOrder::SERVICE_TYPES))],
             'complaint' => ['required', 'string', 'max:5000'],
             'scheduled_at' => ['nullable', 'date'],
@@ -184,7 +187,8 @@ class ServiceOrderController extends Controller
             'client.city' => ['nullable', 'string', 'max:120'],
             'vehicle.plate' => [$plateRequired ? 'required' : 'nullable', 'string', 'max:10'],
             'vehicle.brand' => ['nullable', 'string', 'max:60'],
-            'vehicle.model' => ['nullable', 'string', 'max:60'],
+            'vehicle.model' => ['nullable', 'string', 'max:120'],
+            'vehicle.chassis' => ['nullable', 'string', 'max:20'],
             'vehicle.year' => ['nullable', 'string', 'max:9'],
             'vehicle.color' => ['nullable', 'string', 'max:30'],
             'vehicle.engine' => ['nullable', 'string', 'max:30'],
@@ -230,9 +234,16 @@ class ServiceOrderController extends Controller
             'damages.*.y' => ['required', 'numeric', 'between:0,100'],
             'damages.*.type' => ['required', Rule::in(['risco', 'amassado', 'quebrado', 'falta'])],
             'damages.*.note' => ['nullable', 'string', 'max:120'],
+            'chassis' => ['nullable', 'string', 'max:20'],
         ], ['km_in.required' => 'Informe o km do painel.', 'fuel_level.required' => 'Marque o nível de combustível.'], ['km_in' => 'km']);
 
         $first = ! $os->inspected_at;
+        // chassi é do veículo, não da OS
+        $chassis = $data['chassis'] ?? null;
+        unset($data['chassis']);
+        if ($chassis !== null && $chassis !== '') {
+            $os->vehicle?->update(['chassis' => $chassis]);
+        }
         $os->update([
             ...$data,
             'checklist' => $data['checklist'] ?? [],

@@ -19,8 +19,9 @@ export default function PrintEntrada({ os, shop }: { os: OsFull; shop: Shop }) {
                         <Line label="Placa" value={<b className="font-mono tracking-wider">{plate(v?.plate)}</b>} />
                         <Line label="Cor" value={v?.color} />
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-[1fr_1.6fr_1.2fr] gap-4">
                         <Line label="Km" value={os.km_in ? km(os.km_in) : ''} />
+                        <Line label="Chassi" value={<span className="font-mono">{v?.chassis}</span>} />
                         <Line label="Entrada" value={os.created_at ? date(os.created_at, true) : ''} />
                     </div>
                 </div>

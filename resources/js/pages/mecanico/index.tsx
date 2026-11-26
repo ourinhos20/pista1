@@ -98,8 +98,7 @@ function MobileCard({ os, info = false }: { os: OsCard; info?: boolean }) {
                     )}
                     <a
                         href={route('os.print', [os.id, workFor(os.service_type).print])}
-                        target="_blank"
-                        rel="noreferrer"
+                        
                         aria-label="Imprimir ficha"
                         className="grid h-12 w-14 place-items-center rounded-[3px] border border-[#c9cdd3] bg-white dark:bg-zinc-900"
                     >

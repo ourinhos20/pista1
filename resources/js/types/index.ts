@@ -58,6 +58,7 @@ export interface VehicleData {
     id: number;
     client_id: number;
     plate: string;
+    chassis?: string | null;
     brand?: string | null;
     model?: string | null;
     year?: string | null;

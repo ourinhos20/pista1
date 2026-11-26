@@ -20,7 +20,8 @@ class VehicleController extends Controller
         $data = $request->validate([
             'plate' => ['required', 'string', 'max:10'],
             'brand' => ['nullable', 'string', 'max:60'],
-            'model' => ['nullable', 'string', 'max:60'],
+            'model' => ['nullable', 'string', 'max:120'],
+            'chassis' => ['nullable', 'string', 'max:20'],
             'year' => ['nullable', 'string', 'max:9'],
             'engine' => ['nullable', 'string', 'max:30'],
             'color' => ['nullable', 'string', 'max:30'],
