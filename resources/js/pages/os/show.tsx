@@ -5,12 +5,47 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
-import { ENTRY_CHECKLIST, FLOW, FUEL, ORIGIN, PAYMENT, SERVICE_TYPE, STATUS, WAITING_FOR, date, documentFmt, km, money, nextStep, phone, plate, whatsapp, workFor } from '@/lib/os';
+import {
+    ENTRY_CHECKLIST,
+    FLOW,
+    FUEL,
+    ORIGIN,
+    PAYMENT,
+    SERVICE_TYPE,
+    STATUS,
+    WAITING_FOR,
+    date,
+    documentFmt,
+    km,
+    money,
+    nextStep,
+    phone,
+    plate,
+    whatsapp,
+    workFor,
+} from '@/lib/os';
 import { REVISION_GROUPS, REVISION_TOTAL, REVISION_VALUES, type RevisionValue } from '@/lib/revisao';
 import { cn } from '@/lib/utils';
 import type { Damage, OsEvent, OsFull, OsItem, OsStatus, SharedData } from '@/types';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
-import { ArrowRight, Check, ChevronDown, CircleCheck, ClipboardCheck, Hourglass, Link2, MessageCircle, PackageSearch, Pencil, Plus, Printer, Save, ShoppingCart, Trash2, X } from 'lucide-react';
+import {
+    ArrowRight,
+    Check,
+    ChevronDown,
+    CircleCheck,
+    ClipboardCheck,
+    Hourglass,
+    Link2,
+    MessageCircle,
+    PackageSearch,
+    Pencil,
+    Plus,
+    Printer,
+    Save,
+    ShoppingCart,
+    Trash2,
+    X,
+} from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 type Hist = { id: number; number: string; status: OsStatus; date: string; km_in: number | null; summary: string | null };
@@ -22,7 +57,6 @@ interface Props {
     serviceTypes: Record<string, string>;
 }
 type Tab = 'vistoria' | 'diag' | 'revisao' | 'itens' | 'fotos' | 'historico';
-
 
 /** Mostra o motivo quando o servidor recusa mudar de etapa (ex.: falta vistoria). */
 const showError = (errors: Record<string, string>) => {
@@ -49,13 +83,19 @@ function Vistoria({ os, canEdit }: { os: OsFull; canEdit: boolean }) {
                         <CircleCheck className="size-4 text-green-700" /> Vistoria feita em <b>{date(os.inspected_at, true)}</b>
                         {os.inspected_by && <span>por {os.inspected_by}</span>}
                         {canEdit && (
-                            <button type="button" onClick={() => setEditing(true)} className="ml-auto inline-flex items-center gap-1 text-[12px] font-semibold text-[#b51f1f] hover:underline">
+                            <button
+                                type="button"
+                                onClick={() => setEditing(true)}
+                                className="ml-auto inline-flex items-center gap-1 text-[12px] font-semibold text-[#b51f1f] hover:underline"
+                            >
                                 <Pencil className="size-3.5" /> Alterar
                             </button>
                         )}
                     </p>
                 ) : (
-                    <p className="rounded-[3px] border border-amber-300 bg-amber-50 px-3 py-2 text-[13px]">A vistoria é feita pelo mecânico quando o carro chega (km, combustível, itens e avarias).</p>
+                    <p className="rounded-[3px] border border-amber-300 bg-amber-50 px-3 py-2 text-[13px]">
+                        A vistoria é feita pelo mecânico quando o carro chega (km, combustível, itens e avarias).
+                    </p>
                 )}
                 {os.inspected_at && (
                     <div className="grid gap-4 lg:grid-cols-[minmax(0,560px)_260px]">
@@ -74,7 +114,9 @@ function Vistoria({ os, canEdit }: { os: OsFull; canEdit: boolean }) {
                             {ENTRY_CHECKLIST.map((c) => (
                                 <div key={c.key} className="flex justify-between border-b border-[#eceef1] py-1">
                                     <dt>{c.label}</dt>
-                                    <dd className={os.checklist?.[c.key] ? 'font-bold text-green-700' : 'text-zinc-400'}>{os.checklist?.[c.key] ? 'SIM' : 'NÃO'}</dd>
+                                    <dd className={os.checklist?.[c.key] ? 'font-bold text-green-700' : 'text-zinc-400'}>
+                                        {os.checklist?.[c.key] ? 'SIM' : 'NÃO'}
+                                    </dd>
                                 </div>
                             ))}
                         </dl>
@@ -93,11 +135,17 @@ function Vistoria({ os, canEdit }: { os: OsFull; canEdit: boolean }) {
             }}
         >
             <p className="text-[13px] text-zinc-600">
-                <b>Primeiro passo, antes do diagnóstico:</b> registre como o carro chegou. Isso protege a oficina se aparecer um risco depois. Tire fotos das avarias na aba <b>Fotos</b>.
+                <b>Primeiro passo, antes do diagnóstico:</b> registre como o carro chegou. Isso protege a oficina se aparecer um risco depois. Tire
+                fotos das avarias na aba <b>Fotos</b>.
             </p>
             <div className="grid gap-3 sm:grid-cols-[180px_1fr]">
-                <Field label="Km do painel *" error={err.km_in}>
-                    <Input value={data.km_in} onChange={(e) => setData('km_in', e.target.value.replace(/\D/g, ''))} inputMode="numeric" className="text-lg font-bold tabular-nums" />
+                <Field label="Km *" error={err.km_in}>
+                    <Input
+                        value={data.km_in}
+                        onChange={(e) => setData('km_in', e.target.value.replace(/\D/g, ''))}
+                        inputMode="numeric"
+                        className="text-lg font-bold tabular-nums"
+                    />
                 </Field>
                 <Field label="Combustível *" error={err.fuel_level}>
                     <div className="grid grid-cols-5 overflow-hidden rounded-[3px] border border-[#b9bec6]">
@@ -106,7 +154,10 @@ function Vistoria({ os, canEdit }: { os: OsFull; canEdit: boolean }) {
                                 key={f}
                                 type="button"
                                 onClick={() => setData('fuel_level', i)}
-                                className={cn('h-11 border-r border-[#d7dade] text-[13px] font-semibold last:border-r-0 md:h-8', data.fuel_level === i ? 'bg-zinc-900 text-white' : 'bg-card')}
+                                className={cn(
+                                    'h-11 border-r border-[#d7dade] text-[13px] font-semibold last:border-r-0 md:h-8',
+                                    data.fuel_level === i ? 'bg-zinc-900 text-white' : 'bg-card',
+                                )}
                             >
                                 {f}
                             </button>
@@ -118,23 +169,36 @@ function Vistoria({ os, canEdit }: { os: OsFull; canEdit: boolean }) {
                 <div className="grid grid-cols-2 gap-x-3 gap-y-1 sm:grid-cols-5">
                     {ENTRY_CHECKLIST.map((c) => (
                         <label key={c.key} className="flex h-10 items-center gap-2 text-[14px] md:h-7 md:text-[13px]">
-                            <input type="checkbox" className="size-5 accent-[#d42a2a] md:size-4" checked={!!data.checklist[c.key]} onChange={(e) => setData('checklist', { ...data.checklist, [c.key]: e.target.checked })} />
+                            <input
+                                type="checkbox"
+                                className="size-5 accent-[#d42a2a] md:size-4"
+                                checked={!!data.checklist[c.key]}
+                                onChange={(e) => setData('checklist', { ...data.checklist, [c.key]: e.target.checked })}
+                            />
                             {c.label}
                         </label>
                     ))}
                 </div>
             </Field>
-            <Field label="Avarias na lataria (toque no desenho)">
+            <Field label="Avarias na lataria">
                 <div className="max-w-3xl">
                     <CarDiagramEditor value={data.damages} onChange={(v) => setData('damages', v)} />
                 </div>
             </Field>
             <div className="flex flex-wrap gap-2">
-                <button type="submit" disabled={processing} className="inline-flex h-12 items-center gap-2 rounded-[3px] bg-[#d42a2a] px-5 text-[15px] font-semibold text-white disabled:opacity-60 md:h-9 md:text-[13px]">
+                <button
+                    type="submit"
+                    disabled={processing}
+                    className="inline-flex h-12 items-center gap-2 rounded-[3px] bg-[#d42a2a] px-5 text-[15px] font-semibold text-white disabled:opacity-60 md:h-9 md:text-[13px]"
+                >
                     <ClipboardCheck className="size-5 md:size-4" /> {os.inspected_at ? 'Gravar alterações' : 'Concluir vistoria'}
                 </button>
                 {os.inspected_at && (
-                    <button type="button" onClick={() => setEditing(false)} className="inline-flex h-12 items-center gap-1 rounded-[3px] border border-[#c9cdd3] px-4 text-[13px] font-semibold md:h-9">
+                    <button
+                        type="button"
+                        onClick={() => setEditing(false)}
+                        className="inline-flex h-12 items-center gap-1 rounded-[3px] border border-[#c9cdd3] px-4 text-[13px] font-semibold md:h-9"
+                    >
                         <X className="size-4" /> Cancelar
                     </button>
                 )}
@@ -159,8 +223,22 @@ function CadastroForm({ os, checkin, onDone }: { os: OsFull; checkin: boolean; o
     const c = os.client;
     const v = os.vehicle;
     const { data, setData, put, post, processing, errors } = useForm({
-        client: { name: c?.name ?? '', phone: c?.phone ?? '', document: c?.document ?? '', email: c?.email ?? '', address: c?.address ?? '', city: c?.city ?? '' },
-        vehicle: { plate: v?.plate ?? '', brand: v?.brand ?? '', model: v?.model ?? '', year: v?.year ?? '', color: v?.color ?? '', engine: v?.engine ?? '' },
+        client: {
+            name: c?.name ?? '',
+            phone: c?.phone ?? '',
+            document: c?.document ?? '',
+            email: c?.email ?? '',
+            address: c?.address ?? '',
+            city: c?.city ?? '',
+        },
+        vehicle: {
+            plate: v?.plate ?? '',
+            brand: v?.brand ?? '',
+            model: v?.model ?? '',
+            year: v?.year ?? '',
+            color: v?.color ?? '',
+            engine: v?.engine ?? '',
+        },
     });
     const err = errors as Record<string, string>;
     const setC = (k: keyof typeof data.client, val: string) => setData('client', { ...data.client, [k]: val });
@@ -176,11 +254,21 @@ function CadastroForm({ os, checkin, onDone }: { os: OsFull; checkin: boolean; o
                 else put(route('os.cadastro', os.id), opts);
             }}
         >
-            {checkin && <p className="rounded-[3px] bg-cyan-50 px-3 py-2 text-[13px] text-cyan-900">Confira os dados e complete o que faltar. Só a <b>placa</b> é obrigatória agora; o resto pode ficar para depois.</p>}
-            <p className="text-[11px] font-bold tracking-wide text-zinc-600 uppercase">Carro</p>
+            {checkin && (
+                <p className="rounded-[3px] bg-cyan-50 px-3 py-2 text-[13px] text-cyan-900">
+                    Confira os dados e complete o que faltar. Só a <b>placa</b> é obrigatória agora; o resto pode ficar para depois.
+                </p>
+            )}
+            <p className="text-[11px] font-bold tracking-wide text-zinc-600 uppercase">Veículo</p>
             <div className="grid gap-3 sm:grid-cols-6">
                 <Field label={checkin ? 'Placa *' : 'Placa'} className="sm:col-span-2" error={err['vehicle.plate']}>
-                    <Input value={data.vehicle.plate} onChange={(e) => setV('plate', e.target.value.toUpperCase())} maxLength={8} className="font-mono text-lg font-bold tracking-widest uppercase" autoFocus={checkin} />
+                    <Input
+                        value={data.vehicle.plate}
+                        onChange={(e) => setV('plate', e.target.value.toUpperCase())}
+                        maxLength={8}
+                        className="font-mono text-lg font-bold tracking-widest uppercase"
+                        autoFocus={checkin}
+                    />
                 </Field>
                 <Field label="Marca" className="sm:col-span-2">
                     <Input value={data.vehicle.brand} onChange={(e) => setV('brand', e.target.value)} />
@@ -220,7 +308,11 @@ function CadastroForm({ os, checkin, onDone }: { os: OsFull; checkin: boolean; o
                 </Field>
             </div>
             <div className="flex justify-end">
-                <button type="submit" disabled={processing} className="inline-flex h-11 items-center gap-1.5 rounded-[3px] border border-[#b51f1f] bg-[#d42a2a] px-4 text-[13px] font-semibold text-white disabled:opacity-60 md:h-9">
+                <button
+                    type="submit"
+                    disabled={processing}
+                    className="inline-flex h-11 items-center gap-1.5 rounded-[3px] border border-[#b51f1f] bg-[#d42a2a] px-4 text-[13px] font-semibold text-white disabled:opacity-60 md:h-9"
+                >
                     <Save className="size-4" /> {checkin ? 'Confirmar chegada e liberar para o mecânico' : 'Gravar cadastro'}
                 </button>
             </div>
@@ -241,7 +333,12 @@ function Etapas({ status }: { status: OsStatus }) {
                         i === cur ? 'bg-zinc-900 text-white' : i < cur ? 'text-zinc-700 dark:text-zinc-300' : 'text-zinc-400',
                     )}
                 >
-                    <span className={cn('grid size-4 place-items-center rounded-[2px] text-[10px]', i === cur ? 'bg-[#d42a2a]' : i < cur ? STATUS[s].dot + ' text-white' : 'border border-zinc-300')}>
+                    <span
+                        className={cn(
+                            'grid size-4 place-items-center rounded-[2px] text-[10px]',
+                            i === cur ? 'bg-[#d42a2a]' : i < cur ? STATUS[s].dot + ' text-white' : 'border border-zinc-300',
+                        )}
+                    >
                         {i < cur ? '✓' : i + 1}
                     </span>
                     {STATUS[s].short ?? STATUS[s].label}
@@ -267,12 +364,25 @@ function Revisao({ os }: { os: OsFull }) {
         });
         setDirty(true);
     };
+    // marca como OK o que ainda está em branco no grupo (o mecânico só toca no que tem problema)
+    const restOk = (keys: string[]) => {
+        setValues((cur) => {
+            const n = { ...cur };
+            keys.forEach((k) => (n[k] ??= 'ok'));
+            return n;
+        });
+        setDirty(true);
+    };
     // grava sozinho logo após cada toque (o mecânico não perde nada se mudar de etapa)
     useEffect(() => {
         if (!dirty) return;
         const t = setTimeout(() => {
             setSaving(true);
-            router.patch(route('os.revision', os.id), { revision: values }, { preserveScroll: true, preserveState: true, onSuccess: () => setDirty(false), onFinish: () => setSaving(false) });
+            router.patch(
+                route('os.revision', os.id),
+                { revision: values },
+                { preserveScroll: true, preserveState: true, onSuccess: () => setDirty(false), onFinish: () => setSaving(false) },
+            );
         }, 600);
         return () => clearTimeout(t);
     }, [values, dirty, os.id]);
@@ -283,7 +393,9 @@ function Revisao({ os }: { os: OsFull }) {
                 <span>
                     Preenchidos: <b className="tabular-nums">{filled}</b> de {REVISION_TOTAL}
                 </span>
-                <span className="text-muted-foreground text-[12px]">{saving || dirty ? 'Gravando…' : filled ? 'Gravado ✓' : 'Toque para marcar; grava sozinho'}</span>
+                <span className="text-muted-foreground text-[12px]">
+                    {saving || dirty ? 'Gravando…' : filled ? 'Gravado ✓' : 'Toque para marcar; grava sozinho'}
+                </span>
                 <span className="ml-auto flex gap-1.5">
                     {REVISION_VALUES.map((r) => (
                         <span key={r.value} className={cn('rounded-[2px] border px-1.5 py-0.5 text-[11px] font-bold', r.cls)}>
@@ -292,12 +404,39 @@ function Revisao({ os }: { os: OsFull }) {
                     ))}
                 </span>
             </div>
+            <details className="rounded-[3px] border border-[#d7dade] bg-[#f6f7f8] px-3 py-1.5 text-[13px] md:text-[12px] dark:bg-zinc-800">
+                <summary className="cursor-pointer font-semibold">Como marcar (OK, Atenção, Trocar)</summary>
+                <ul className="mt-1 grid gap-0.5">
+                    {REVISION_VALUES.map((r) => (
+                        <li key={r.value}>
+                            <b>{r.label}:</b> {r.rule}.
+                        </li>
+                    ))}
+                    <li>
+                        <b>Em branco:</b> não verificado ou não existe neste carro.
+                    </li>
+                </ul>
+            </details>
             <div className="grid gap-3 lg:grid-cols-2 2xl:grid-cols-3">
                 {REVISION_GROUPS.map((g) => (
                     <div key={g.title} className="overflow-hidden rounded-[4px] border border-[#c9cdd3]">
-                        <div className="flex h-8 items-center border-b border-[#d7dade] bg-[#eceef1] px-2.5 text-[11px] font-bold tracking-wide uppercase dark:bg-zinc-800">{g.title}</div>
+                        <div className="flex h-10 items-center border-b border-[#d7dade] bg-[#eceef1] px-2.5 text-[11px] font-bold tracking-wide uppercase md:h-8 dark:bg-zinc-800">
+                            <span className="flex-1">{g.title}</span>
+                            {g.items.some((it) => !values[it.key]) && (
+                                <button
+                                    type="button"
+                                    onClick={() => restOk(g.items.map((it) => it.key))}
+                                    className="h-8 rounded-[3px] border border-green-700 bg-white px-2.5 text-[12px] font-bold text-green-700 normal-case md:h-6 md:text-[11px] dark:bg-zinc-900"
+                                >
+                                    Resto OK
+                                </button>
+                            )}
+                        </div>
                         {g.items.map((it) => (
-                            <div key={it.key} className="flex items-center gap-2 border-b border-[#eceef1] px-2.5 py-1.5 last:border-b-0 even:bg-[#f8f9fa] dark:even:bg-zinc-900/60">
+                            <div
+                                key={it.key}
+                                className="flex items-center gap-2 border-b border-[#eceef1] px-2.5 py-1.5 last:border-b-0 even:bg-[#f8f9fa] dark:even:bg-zinc-900/60"
+                            >
                                 <span className="min-w-0 flex-1 text-[15px] md:text-[13px]">{it.label}</span>
                                 {REVISION_VALUES.map((r) => (
                                     <button
@@ -306,7 +445,9 @@ function Revisao({ os }: { os: OsFull }) {
                                         onClick={() => set(it.key, r.value)}
                                         className={cn(
                                             'h-10 w-14 rounded-[3px] border text-[12px] font-bold md:h-7 md:w-11 md:text-[11px]',
-                                            values[it.key] === r.value ? r.cls : 'border-[#c9cdd3] bg-white text-zinc-500 hover:bg-zinc-50 dark:bg-zinc-900',
+                                            values[it.key] === r.value
+                                                ? r.cls
+                                                : 'border-[#c9cdd3] bg-white text-zinc-500 hover:bg-zinc-50 dark:bg-zinc-900',
                                         )}
                                         aria-pressed={values[it.key] === r.value}
                                     >
@@ -346,7 +487,9 @@ function ItemRow({ item, osId }: { item: OsItem; osId: number }) {
             <td className="px-2.5 py-1 text-[11px] font-bold uppercase">{item.type === 'peca' ? 'Peça' : 'Serviço'}</td>
             <td className="px-2.5 py-1">
                 <span className={item.approval === 'recusado' ? 'line-through' : ''}>{item.description}</span>
-                {item.extra && <span className="ml-1.5 rounded-[2px] bg-amber-400 px-1 text-[10px] font-bold text-black uppercase">complementar</span>}
+                {item.extra && (
+                    <span className="ml-1.5 rounded-[2px] bg-amber-400 px-1 text-[10px] font-bold text-black uppercase">complementar</span>
+                )}
             </td>
             <td className="w-36 px-1.5 py-1">
                 <span className="flex items-center gap-1">
@@ -354,7 +497,10 @@ function ItemRow({ item, osId }: { item: OsItem; osId: number }) {
                         type="button"
                         title="Cliente aprovou"
                         onClick={() => setApproval(item.approval === 'aprovado' ? null : 'aprovado')}
-                        className={cn('grid size-8 place-items-center rounded-[3px] border md:size-7', item.approval === 'aprovado' ? 'border-green-700 bg-green-700 text-white' : 'border-[#c9cdd3] text-zinc-400')}
+                        className={cn(
+                            'grid size-8 place-items-center rounded-[3px] border md:size-7',
+                            item.approval === 'aprovado' ? 'border-green-700 bg-green-700 text-white' : 'border-[#c9cdd3] text-zinc-400',
+                        )}
                     >
                         <Check className="size-4" />
                     </button>
@@ -362,18 +508,37 @@ function ItemRow({ item, osId }: { item: OsItem; osId: number }) {
                         type="button"
                         title="Cliente recusou"
                         onClick={() => setApproval(item.approval === 'recusado' ? null : 'recusado')}
-                        className={cn('grid size-8 place-items-center rounded-[3px] border md:size-7', item.approval === 'recusado' ? 'border-zinc-700 bg-zinc-700 text-white' : 'border-[#c9cdd3] text-zinc-400')}
+                        className={cn(
+                            'grid size-8 place-items-center rounded-[3px] border md:size-7',
+                            item.approval === 'recusado' ? 'border-zinc-700 bg-zinc-700 text-white' : 'border-[#c9cdd3] text-zinc-400',
+                        )}
                     >
                         <X className="size-4" />
                     </button>
-                    <span className="text-[11px] text-zinc-500">{item.approval === 'aprovado' ? 'aprovado' : item.approval === 'recusado' ? 'recusado' : 'pendente'}</span>
+                    <span className="text-[11px] text-zinc-500">
+                        {item.approval === 'aprovado' ? 'aprovado' : item.approval === 'recusado' ? 'recusado' : 'pendente'}
+                    </span>
                 </span>
             </td>
             <td className="w-20 px-1.5 py-1">
-                <Input value={qty} onChange={(e) => setQty(e.target.value)} onBlur={save} inputMode="decimal" className="text-right tabular-nums" aria-label="Quantidade" />
+                <Input
+                    value={qty}
+                    onChange={(e) => setQty(e.target.value)}
+                    onBlur={save}
+                    inputMode="decimal"
+                    className="text-right tabular-nums"
+                    aria-label="Quantidade"
+                />
             </td>
             <td className="w-32 px-1.5 py-1">
-                <Input value={price} onChange={(e) => setPrice(e.target.value)} onBlur={save} inputMode="decimal" className={cn('text-right tabular-nums', noPrice && 'border-amber-400')} aria-label="Valor unitário" />
+                <Input
+                    value={price}
+                    onChange={(e) => setPrice(e.target.value)}
+                    onBlur={save}
+                    inputMode="decimal"
+                    className={cn('text-right tabular-nums', noPrice && 'border-amber-400')}
+                    aria-label="Valor unitário"
+                />
             </td>
             <td className="w-28 px-2.5 py-1 text-right font-semibold tabular-nums">{money(item.total)}</td>
             <td className="w-10 px-1 py-1 text-center">
@@ -381,7 +546,10 @@ function ItemRow({ item, osId }: { item: OsItem; osId: number }) {
                     type="button"
                     aria-label="Remover item"
                     className="grid size-9 place-items-center rounded-[3px] text-zinc-500 hover:bg-red-50 hover:text-red-700 md:size-7"
-                    onClick={() => confirm(`Remover "${item.description}"?`) && router.delete(route('os.items.destroy', [osId, item.id]), { preserveScroll: true })}
+                    onClick={() =>
+                        confirm(`Remover "${item.description}"?`) &&
+                        router.delete(route('os.items.destroy', [osId, item.id]), { preserveScroll: true })
+                    }
                 >
                     <Trash2 className="size-4" />
                 </button>
@@ -391,7 +559,12 @@ function ItemRow({ item, osId }: { item: OsItem; osId: number }) {
 }
 
 function AddItem({ osId, sensitive }: { osId: number; sensitive: boolean }) {
-    const { data, setData, post, processing, errors, reset, transform } = useForm({ type: 'peca' as 'servico' | 'peca', description: '', quantity: '1', unit_price: '' });
+    const { data, setData, post, processing, errors, reset, transform } = useForm({
+        type: 'peca' as 'servico' | 'peca',
+        description: '',
+        quantity: '1',
+        unit_price: '',
+    });
     return (
         <form
             className="grid items-end gap-2 border-t border-[#d7dade] bg-[#f6f7f8] p-2.5 sm:grid-cols-[130px_1fr_80px_auto] lg:grid-cols-[130px_1fr_80px_120px_auto] dark:bg-zinc-800"
@@ -412,18 +585,32 @@ function AddItem({ osId, sensitive }: { osId: number; sensitive: boolean }) {
                 <Input
                     value={data.description}
                     onChange={(e) => setData('description', e.target.value)}
-                    placeholder={data.type === 'peca' ? (sensitive ? 'Ex.: pastilha de freio dianteira' : 'Peça necessária') : 'Ex.: mão de obra troca de pastilhas'}
+                    placeholder={data.type === 'peca' ? 'Peça' : 'Serviço'}
                 />
             </Field>
             <Field label="Qtd">
-                <Input value={data.quantity} onChange={(e) => setData('quantity', e.target.value)} inputMode="decimal" className="text-right tabular-nums" />
+                <Input
+                    value={data.quantity}
+                    onChange={(e) => setData('quantity', e.target.value)}
+                    inputMode="decimal"
+                    className="text-right tabular-nums"
+                />
             </Field>
             {sensitive && (
-                <Field label="Vl. unitário" className="hidden lg:grid">
-                    <Input value={data.unit_price} onChange={(e) => setData('unit_price', e.target.value)} inputMode="decimal" className="text-right tabular-nums" />
+                <Field label="Valor unitário" className="hidden lg:grid">
+                    <Input
+                        value={data.unit_price}
+                        onChange={(e) => setData('unit_price', e.target.value)}
+                        inputMode="decimal"
+                        className="text-right tabular-nums"
+                    />
                 </Field>
             )}
-            <button type="submit" disabled={processing || !data.description} className="inline-flex h-11 items-center justify-center gap-1.5 rounded-[3px] border border-zinc-800 bg-zinc-900 px-3 text-[13px] font-semibold text-white disabled:opacity-50 md:h-8">
+            <button
+                type="submit"
+                disabled={processing || !data.description}
+                className="inline-flex h-11 items-center justify-center gap-1.5 rounded-[3px] border border-zinc-800 bg-zinc-900 px-3 text-[13px] font-semibold text-white disabled:opacity-50 md:h-8"
+            >
                 <Plus className="size-4" /> Incluir
             </button>
         </form>
@@ -442,8 +629,13 @@ function Totais({ os }: { os: OsFull }) {
                 <span>Subtotal</span>
                 <b className="tabular-nums">{money(os.subtotal)}</b>
             </div>
-            <Field label="Desconto (R$)">
-                <Input value={data.discount} onChange={(e) => setData('discount', e.target.value)} inputMode="decimal" className="text-right tabular-nums" />
+            <Field label="Desconto">
+                <Input
+                    value={data.discount}
+                    onChange={(e) => setData('discount', e.target.value)}
+                    inputMode="decimal"
+                    className="text-right tabular-nums"
+                />
             </Field>
             <div className="flex items-baseline justify-between rounded-[3px] bg-zinc-900 px-3 py-2 text-white">
                 <span className="text-[12px] font-bold uppercase">Total</span>
@@ -514,7 +706,9 @@ function Pagamentos({ os }: { os: OsFull }) {
                                     {PAYMENT[p.payment_method ?? ''] ?? '—'}
                                     {p.installments ? ` ${p.installment}/${p.installments}` : ''}
                                     <span className={cn('block text-[11px]', p.paid_at ? 'text-green-700' : 'text-amber-700')}>
-                                        {p.paid_at ? `Recebido ${p.paid_at.split('-').reverse().join('/')}` : `Vence ${p.due_date.split('-').reverse().join('/')}`}
+                                        {p.paid_at
+                                            ? `Recebido ${p.paid_at.split('-').reverse().join('/')}`
+                                            : `Vence ${p.due_date.split('-').reverse().join('/')}`}
                                     </span>
                                 </td>
                                 <td className="py-1 text-right font-semibold tabular-nums">{money(p.amount)}</td>
@@ -523,7 +717,10 @@ function Pagamentos({ os }: { os: OsFull }) {
                                         type="button"
                                         title="Excluir pagamento"
                                         className="text-zinc-400 hover:text-red-700"
-                                        onClick={() => confirm('Excluir este pagamento?') && router.delete(route('os.payments.destroy', [os.id, p.id]), { preserveScroll: true })}
+                                        onClick={() =>
+                                            confirm('Excluir este pagamento?') &&
+                                            router.delete(route('os.payments.destroy', [os.id, p.id]), { preserveScroll: true })
+                                        }
                                     >
                                         <Trash2 className="size-3.5" />
                                     </button>
@@ -550,8 +747,13 @@ function Pagamentos({ os }: { os: OsFull }) {
                     }}
                 >
                     <div className="grid grid-cols-2 gap-2">
-                        <Field label="Valor (R$)" error={err.amount}>
-                            <Input value={data.amount} onChange={(e) => setData('amount', e.target.value)} inputMode="decimal" className="text-right tabular-nums" />
+                        <Field label="Valor" error={err.amount}>
+                            <Input
+                                value={data.amount}
+                                onChange={(e) => setData('amount', e.target.value)}
+                                inputMode="decimal"
+                                className="text-right tabular-nums"
+                            />
                         </Field>
                         <Field label="Forma">
                             <select className={selectCls} value={data.payment_method} onChange={(e) => setData('payment_method', e.target.value)}>
@@ -575,10 +777,19 @@ function Pagamentos({ os }: { os: OsFull }) {
                         </Field>
                     )}
                     <label className="flex items-center gap-2 text-[12px] font-medium">
-                        <input type="checkbox" className="size-4 accent-[#d42a2a]" checked={data.received} onChange={(e) => setData('received', e.target.checked)} />
+                        <input
+                            type="checkbox"
+                            className="size-4 accent-[#d42a2a]"
+                            checked={data.received}
+                            onChange={(e) => setData('received', e.target.checked)}
+                        />
                         {Number(data.installments) > 1 ? '1ª parcela recebida agora' : 'Recebido agora'}
                     </label>
-                    <button type="submit" disabled={processing} className="inline-flex h-11 items-center justify-center gap-1.5 rounded-[3px] border border-green-800 bg-green-700 text-[13px] font-semibold text-white disabled:opacity-60 md:h-8">
+                    <button
+                        type="submit"
+                        disabled={processing}
+                        className="inline-flex h-11 items-center justify-center gap-1.5 rounded-[3px] border border-green-800 bg-green-700 text-[13px] font-semibold text-white disabled:opacity-60 md:h-8"
+                    >
                         <CircleCheck className="size-4" /> Registrar pagamento
                     </button>
                 </form>
@@ -664,7 +875,9 @@ export default function OsShow({ os, history, mechanics, statuses, serviceTypes 
         '',
         `*Total: ${money(os.total)}*`,
         '',
-        os.public_url ? `Veja os detalhes, as fotos e aprove item por item por aqui:\n${os.public_url}` : 'Podemos seguir com o serviço? Responda SIM para autorizar.',
+        os.public_url
+            ? `Veja os detalhes, as fotos e aprove item por item por aqui:\n${os.public_url}`
+            : 'Podemos seguir com o serviço? Responda SIM para autorizar.',
     ].join('\n');
     const extraText = [
         `Olá, ${first}! Durante o serviço no seu ${car} encontramos mais um item:`,
@@ -715,13 +928,33 @@ export default function OsShow({ os, history, mechanics, statuses, serviceTypes 
             code="ATD030"
             toolbar={
                 <>
-                    {primary && <Tool primary icon={<ArrowRight />} label={primary.label} onClick={primary.run} disabled={busy} className="hidden md:inline-flex" />}
-                    {sensitive && os.status === 'aprovacao' && <Tool icon={<PackageSearch />} label="Aprovado · aguardar peças" onClick={() => setStatus('pecas')} disabled={busy} />}
-                    {sensitive && os.status === 'execucao' && <Tool icon={<PackageSearch />} label="Aguardando peças" onClick={() => setStatus('pecas')} disabled={busy} className="hidden lg:inline-flex" />}
+                    {primary && (
+                        <Tool
+                            primary
+                            icon={<ArrowRight />}
+                            label={primary.label}
+                            onClick={primary.run}
+                            disabled={busy}
+                            className="hidden md:inline-flex"
+                        />
+                    )}
+                    {sensitive && os.status === 'aprovacao' && (
+                        <Tool icon={<PackageSearch />} label="Aguardar peças" onClick={() => setStatus('pecas')} disabled={busy} />
+                    )}
+                    {sensitive && os.status === 'execucao' && (
+                        <Tool
+                            icon={<PackageSearch />}
+                            label="Aguardando peças"
+                            onClick={() => setStatus('pecas')}
+                            disabled={busy}
+                            className="hidden lg:inline-flex"
+                        />
+                    )}
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <button className="inline-flex h-11 items-center gap-1.5 rounded-[3px] border border-[#c9cdd3] bg-white px-3 text-[13px] font-semibold md:h-8 md:px-2.5 dark:bg-zinc-900">
-                                <Printer className="size-4" /> Imprimir <kbd className="hidden rounded-[2px] border px-1 font-mono text-[10px] font-normal text-zinc-500 md:inline">F8</kbd>
+                                <Printer className="size-4" /> Imprimir{' '}
+                                <kbd className="hidden rounded-[2px] border px-1 font-mono text-[10px] font-normal text-zinc-500 md:inline">F8</kbd>
                                 <ChevronDown className="size-3.5" />
                             </button>
                         </DropdownMenuTrigger>
@@ -733,7 +966,11 @@ export default function OsShow({ os, history, mechanics, statuses, serviceTypes 
                                     </a>
                                 </DropdownMenuItem>
                             ))}
-                            {isMechanic && <p className="px-2 py-1.5 text-[11px] text-zinc-500">Preencheu no papel? Tire uma foto da ficha e anexe na aba Fotos.</p>}
+                            {isMechanic && (
+                                <p className="px-2 py-1.5 text-[11px] text-zinc-500">
+                                    Preencheu no papel? Tire uma foto da ficha e anexe na aba Fotos.
+                                </p>
+                            )}
                         </DropdownMenuContent>
                     </DropdownMenu>
                     {wa && waStep && (
@@ -748,7 +985,12 @@ export default function OsShow({ os, history, mechanics, statuses, serviceTypes 
                     )}
                     {waExtra && <Tool icon={<MessageCircle className="text-amber-600" />} label="Enviar item complementar" href={waExtra} external />}
                     {sensitive && !['entregue', 'cancelada', 'aguardando'].includes(os.status) && (
-                        <Tool icon={<ShoppingCart />} label="Comprar peças" href={route('compras.index', { os: os.id })} className="hidden lg:inline-flex" />
+                        <Tool
+                            icon={<ShoppingCart />}
+                            label="Comprar peças"
+                            href={route('compras.index', { os: os.id })}
+                            className="hidden lg:inline-flex"
+                        />
                     )}
                     {sensitive && os.public_url && ['orcamento', 'aprovacao', 'pecas', 'execucao'].includes(os.status) && (
                         <Tool
@@ -762,7 +1004,12 @@ export default function OsShow({ os, history, mechanics, statuses, serviceTypes 
                         />
                     )}
                     {sensitive && (
-                        <select aria-label="Alterar etapa" className={cn(selectCls, 'w-auto md:w-40')} value="" onChange={(e) => e.target.value && setStatus(e.target.value as OsStatus)}>
+                        <select
+                            aria-label="Alterar etapa"
+                            className={cn(selectCls, 'w-auto md:w-40')}
+                            value=""
+                            onChange={(e) => e.target.value && setStatus(e.target.value as OsStatus)}
+                        >
                             <option value="">Alterar etapa…</option>
                             {statuses
                                 .filter((s) => s.value !== os.status)
@@ -774,7 +1021,13 @@ export default function OsShow({ os, history, mechanics, statuses, serviceTypes 
                         </select>
                     )}
                     {auth.can.master && (
-                        <Tool danger icon={<Trash2 />} label="Excluir" onClick={() => confirm(`Excluir a OS ${os.number}? Não pode ser desfeito.`) && router.delete(route('os.destroy', os.id))} className="hidden xl:inline-flex" />
+                        <Tool
+                            danger
+                            icon={<Trash2 />}
+                            label="Excluir"
+                            onClick={() => confirm(`Excluir a OS ${os.number}? Não pode ser desfeito.`) && router.delete(route('os.destroy', os.id))}
+                            className="hidden xl:inline-flex"
+                        />
                     )}
                 </>
             }
@@ -800,7 +1053,8 @@ export default function OsShow({ os, history, mechanics, statuses, serviceTypes 
                 {sensitive && os.status === 'aguardando' && (
                     <p className="flex flex-wrap items-center gap-2 rounded-[3px] border border-zinc-300 bg-white px-3 py-2 text-[13px] dark:bg-zinc-900">
                         <span>
-                            Quando o cliente chegar, clique em <b>Cliente chegou</b>: confira a placa e complete o cadastro. O carro entra na fila do mecânico.
+                            Quando o cliente chegar, clique em <b>Cliente chegou</b>: confira a placa e complete o cadastro. O carro entra na fila do
+                            mecânico.
                         </span>
                     </p>
                 )}
@@ -833,13 +1087,16 @@ export default function OsShow({ os, history, mechanics, statuses, serviceTypes 
                     <p className="flex flex-wrap items-center gap-2 rounded-[3px] border border-red-300 bg-red-50 px-3 py-2 text-[13px] dark:border-red-800 dark:bg-red-950/40">
                         <b className="text-red-800">Cliente NÃO aprovou nenhum item</b> em {date(os.rejected_at, true)} ({os.approval_name})
                         {os.approval_note && <span>· “{os.approval_note}”</span>}
-                        {sensitive && <span>Ajuste e reenvie, ou entregue o carro (se cobrar diagnóstico, inclua o item "Taxa de diagnóstico").</span>}
+                        {sensitive && (
+                            <span>Ajuste e reenvie, ou entregue o carro (se cobrar diagnóstico, inclua o item "Taxa de diagnóstico").</span>
+                        )}
                     </p>
                 )}
                 {sensitive && os.status === 'orcamento' && !os.rejected_at && (
                     <p className="flex items-center gap-2 rounded-[3px] border border-violet-300 bg-violet-50 px-3 py-2 text-[13px] dark:border-violet-800 dark:bg-violet-950/40">
                         <span>
-                            O mecânico enviou o diagnóstico. Lance os valores em <b>Peças e serviços</b> e clique em <b>Orçamento no WhatsApp</b> (ou imprima a via do cliente).
+                            O mecânico enviou o diagnóstico. Lance os valores em <b>Peças e serviços</b> e clique em <b>Orçamento no WhatsApp</b> (ou
+                            imprima a via do cliente).
                         </span>
                     </p>
                 )}
@@ -848,7 +1105,11 @@ export default function OsShow({ os, history, mechanics, statuses, serviceTypes 
                     title="Dados da ordem de serviço"
                     actions={
                         sensitive && (
-                            <button type="button" onClick={() => setCadastro('edit')} className="inline-flex items-center gap-1 text-[12px] font-semibold text-[#b51f1f] hover:underline">
+                            <button
+                                type="button"
+                                onClick={() => setCadastro('edit')}
+                                className="inline-flex items-center gap-1 text-[12px] font-semibold text-[#b51f1f] hover:underline"
+                            >
                                 <Pencil className="size-3.5" /> Completar / corrigir cadastro
                             </button>
                         )
@@ -906,7 +1167,13 @@ export default function OsShow({ os, history, mechanics, statuses, serviceTypes 
                         )}
                         <Field label="Mecânico" className="col-span-2">
                             {sensitive ? (
-                                <select className={selectCls} value={os.mechanic?.id ?? ''} onChange={(e) => router.patch(route('os.update', os.id), { mechanic_id: e.target.value || null }, { preserveScroll: true })}>
+                                <select
+                                    className={selectCls}
+                                    value={os.mechanic?.id ?? ''}
+                                    onChange={(e) =>
+                                        router.patch(route('os.update', os.id), { mechanic_id: e.target.value || null }, { preserveScroll: true })
+                                    }
+                                >
                                     <option value="">— quem estiver livre —</option>
                                     {mechanics.map((m) => (
                                         <option key={m.id} value={m.id}>
@@ -918,9 +1185,15 @@ export default function OsShow({ os, history, mechanics, statuses, serviceTypes 
                                 <ReadOnly>{os.mechanic?.name}</ReadOnly>
                             )}
                         </Field>
-                        <Field label="Tipo">
+                        <Field label="Tipo de serviço">
                             {sensitive ? (
-                                <select className={selectCls} value={os.service_type ?? ''} onChange={(e) => router.patch(route('os.update', os.id), { service_type: e.target.value || null }, { preserveScroll: true })}>
+                                <select
+                                    className={selectCls}
+                                    value={os.service_type ?? ''}
+                                    onChange={(e) =>
+                                        router.patch(route('os.update', os.id), { service_type: e.target.value || null }, { preserveScroll: true })
+                                    }
+                                >
                                     <option value="">—</option>
                                     {Object.entries(serviceTypes).map(([k, l]) => (
                                         <option key={k} value={k}>
@@ -956,19 +1229,34 @@ export default function OsShow({ os, history, mechanics, statuses, serviceTypes 
                                           {
                                               value: 'revisao' as Tab,
                                               label: work.checklistTitle,
-                                              badge: Object.keys(os.revision ?? {}).length ? <span className="rounded-[2px] bg-zinc-200 px-1 text-[10px] dark:bg-zinc-700">{Object.keys(os.revision).length}</span> : null,
+                                              badge: Object.keys(os.revision ?? {}).length ? (
+                                                  <span className="rounded-[2px] bg-zinc-200 px-1 text-[10px] dark:bg-zinc-700">
+                                                      {Object.keys(os.revision).length}
+                                                  </span>
+                                              ) : null,
                                           },
                                       ]
                                     : []),
                                 {
                                     value: 'itens',
                                     label: 'Peças e serviços',
-                                    badge: os.items.length ? <span className={cn('rounded-[2px] px-1 text-[10px]', sensitive && pendingPrice ? 'bg-amber-400 text-black' : 'bg-zinc-200 dark:bg-zinc-700')}>{os.items.length}</span> : null,
+                                    badge: os.items.length ? (
+                                        <span
+                                            className={cn(
+                                                'rounded-[2px] px-1 text-[10px]',
+                                                sensitive && pendingPrice ? 'bg-amber-400 text-black' : 'bg-zinc-200 dark:bg-zinc-700',
+                                            )}
+                                        >
+                                            {os.items.length}
+                                        </span>
+                                    ) : null,
                                 },
                                 {
                                     value: 'fotos',
                                     label: 'Fotos',
-                                    badge: os.photos.length ? <span className="rounded-[2px] bg-zinc-200 px-1 text-[10px] dark:bg-zinc-700">{os.photos.length}</span> : null,
+                                    badge: os.photos.length ? (
+                                        <span className="rounded-[2px] bg-zinc-200 px-1 text-[10px] dark:bg-zinc-700">{os.photos.length}</span>
+                                    ) : null,
                                 },
                                 { value: 'historico', label: 'Histórico' },
                             ]}
@@ -980,7 +1268,12 @@ export default function OsShow({ os, history, mechanics, statuses, serviceTypes 
                             <div className="grid gap-3 lg:grid-cols-2">
                                 <Field label="O que o cliente relatou">
                                     {sensitive ? (
-                                        <textarea rows={8} className={textareaCls} value={diag.data.complaint} onChange={(e) => diag.setData('complaint', e.target.value)} />
+                                        <textarea
+                                            rows={8}
+                                            className={textareaCls}
+                                            value={diag.data.complaint}
+                                            onChange={(e) => diag.setData('complaint', e.target.value)}
+                                        />
                                     ) : (
                                         <div className="min-h-40 rounded-[3px] border border-[#d7dade] bg-[#f7f8f9] px-3 py-2 text-[16px] leading-relaxed whitespace-pre-line md:text-[14px] dark:bg-zinc-800">
                                             {os.complaint || '—'}
@@ -1014,11 +1307,22 @@ export default function OsShow({ os, history, mechanics, statuses, serviceTypes 
                                 )}
                                 <Revisao os={os} />
                                 {!work.diag && (
-                                    <Field label="Observações do mecânico (o que precisa trocar, o que está no limite…)">
-                                        <textarea rows={4} className={textareaCls} value={diag.data.diagnosis} onChange={(e) => diag.setData('diagnosis', e.target.value)} />
+                                    <Field label="Observações do mecânico">
+                                        <textarea
+                                            rows={4}
+                                            className={textareaCls}
+                                            value={diag.data.diagnosis}
+                                            onChange={(e) => diag.setData('diagnosis', e.target.value)}
+                                        />
                                         {diag.isDirty && (
                                             <div className="mt-2">
-                                                <Tool primary icon={<Save />} label="Gravar observações" onClick={saveDiag} disabled={diag.processing} />
+                                                <Tool
+                                                    primary
+                                                    icon={<Save />}
+                                                    label="Gravar observações"
+                                                    onClick={saveDiag}
+                                                    disabled={diag.processing}
+                                                />
                                             </div>
                                         )}
                                     </Field>
@@ -1060,13 +1364,25 @@ export default function OsShow({ os, history, mechanics, statuses, serviceTypes 
                                     ) : (
                                         <Grid
                                             cols={[
-                                                { label: 'Tipo', render: (r: OsItem) => <span className="text-[11px] font-bold uppercase">{r.type === 'peca' ? 'Peça' : 'Serviço'}</span>, className: 'w-20' },
+                                                {
+                                                    label: 'Tipo',
+                                                    render: (r: OsItem) => (
+                                                        <span className="text-[11px] font-bold uppercase">
+                                                            {r.type === 'peca' ? 'Peça' : 'Serviço'}
+                                                        </span>
+                                                    ),
+                                                    className: 'w-20',
+                                                },
                                                 {
                                                     label: 'Descrição',
                                                     render: (r: OsItem) => (
                                                         <span className={r.approval === 'recusado' ? 'text-zinc-400 line-through' : ''}>
                                                             {r.description}
-                                                            {r.extra && <span className="ml-1.5 rounded-[2px] bg-amber-400 px-1 text-[10px] font-bold text-black uppercase">complementar</span>}
+                                                            {r.extra && (
+                                                                <span className="ml-1.5 rounded-[2px] bg-amber-400 px-1 text-[10px] font-bold text-black uppercase">
+                                                                    complementar
+                                                                </span>
+                                                            )}
                                                         </span>
                                                     ),
                                                 },
@@ -1089,7 +1405,11 @@ export default function OsShow({ os, history, mechanics, statuses, serviceTypes 
                                             empty="Nenhuma peça ou serviço lançado."
                                         />
                                     )}
-                                    {sensitive && pendingPrice && <p className="border-t border-amber-300 bg-amber-50 px-3 py-1.5 text-[12px] dark:bg-amber-950/30">Itens em amarelo estão sem valor.</p>}
+                                    {sensitive && pendingPrice && (
+                                        <p className="border-t border-amber-300 bg-amber-50 px-3 py-1.5 text-[12px] dark:bg-amber-950/30">
+                                            Itens em amarelo estão sem valor.
+                                        </p>
+                                    )}
                                     <AddItem osId={os.id} sensitive={sensitive} />
                                 </div>
                                 {sensitive && (
@@ -1123,7 +1443,13 @@ export default function OsShow({ os, history, mechanics, statuses, serviceTypes 
                         {tab === 'historico' && (
                             <div className="grid gap-3">
                                 <Block title="Passagens anteriores deste veículo" bodyClassName="p-0">
-                                    <Grid cols={histCols} rows={history} rowKey={(r) => r.id} onRowClick={(r) => router.visit(route('os.show', r.id))} empty="Primeira vez deste carro na oficina." />
+                                    <Grid
+                                        cols={histCols}
+                                        rows={history}
+                                        rowKey={(r) => r.id}
+                                        onRowClick={(r) => router.visit(route('os.show', r.id))}
+                                        empty="Primeira vez deste carro na oficina."
+                                    />
                                 </Block>
                                 <Block title="Movimentação desta OS" bodyClassName="p-0">
                                     <Grid cols={evCols} rows={os.events} rowKey={(r) => r.id} />
@@ -1136,7 +1462,11 @@ export default function OsShow({ os, history, mechanics, statuses, serviceTypes 
 
             {primary && (
                 <div className="no-print bg-background/95 fixed inset-x-0 bottom-0 z-30 border-t border-[#c9cdd3] p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] md:hidden">
-                    <button disabled={busy} onClick={primary.run} className="flex h-12 w-full items-center justify-center gap-2 rounded-[4px] bg-[#d42a2a] text-[16px] font-semibold text-white disabled:opacity-60">
+                    <button
+                        disabled={busy}
+                        onClick={primary.run}
+                        className="flex h-12 w-full items-center justify-center gap-2 rounded-[4px] bg-[#d42a2a] text-[16px] font-semibold text-white disabled:opacity-60"
+                    >
                         <ArrowRight className="size-5" /> {primary.label}
                     </button>
                 </div>

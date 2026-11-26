@@ -1,41 +1,50 @@
 import { Block, Field, Grid, Tool, selectCls, type Col } from '@/components/erp';
-import { EntryForm } from '@/components/finance-entry-form';
+import { EntryForm, PayForm } from '@/components/finance-entry-form';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
-import { type Categories, type EntryType, type FinanceRow, type Methods, dateBr, situation } from '@/lib/finance';
+import { dateBr, situation, type EntryOptions, type EntryType, type FinanceRow } from '@/lib/finance';
 import { money } from '@/lib/os';
 import { cn } from '@/lib/utils';
 import { Head, Link, router } from '@inertiajs/react';
 import { CircleCheck, Minus, Plus, Search, Undo2 } from 'lucide-react';
 import { useState } from 'react';
 
-interface Props {
+interface Props extends EntryOptions {
     entries: FinanceRow[];
     totals: { in: number; out: number };
     filters: { mes: string; tipo: string; situacao: string; categoria: string; q: string };
-    parties: string[];
-    categories: Categories;
-    methods: Methods;
 }
 
-export default function Lancamentos({ entries, totals, filters, parties, categories, methods }: Props) {
+export default function Lancamentos({ entries, totals, filters, ...options }: Props) {
+    const { categories, methods } = options;
     const [f, setF] = useState(filters);
     const [dialog, setDialog] = useState<{ type: EntryType; entry?: FinanceRow } | null>(null);
+    const [paying, setPaying] = useState<FinanceRow | null>(null);
     const apply = (patch: Partial<typeof filters>) => {
         const next = { ...f, ...patch };
         setF(next);
         router.get(route('financeiro.entries'), next, { preserveState: true, preserveScroll: true, replace: true });
     };
-    const pay = (r: FinanceRow) => router.patch(route('financeiro.entries.pay', r.id), {}, { preserveScroll: true });
-    const unpay = (r: FinanceRow) => confirm('Estornar a baixa deste lançamento?') && router.patch(route('financeiro.entries.unpay', r.id), {}, { preserveScroll: true });
+    const pay = (r: FinanceRow) => setPaying(r);
+    const unpay = (r: FinanceRow) =>
+        confirm('Estornar a baixa deste lançamento?') && router.patch(route('financeiro.entries.unpay', r.id), {}, { preserveScroll: true });
 
     const cols: Col<FinanceRow>[] = [
-        { label: 'Vencimento', render: (r) => <span className={cn('tabular-nums', r.overdue && 'font-bold text-red-700')}>{dateBr(r.due_date)}</span>, className: 'w-24' },
+        {
+            label: 'Vencimento',
+            render: (r) => <span className={cn('tabular-nums', r.overdue && 'font-bold text-red-700')}>{dateBr(r.due_date)}</span>,
+            className: 'w-24',
+        },
         {
             label: 'Tipo',
             render: (r) => (
-                <span className={cn('inline-flex items-center gap-1 text-[11px] font-bold uppercase', r.type === 'entrada' ? 'text-green-700' : 'text-[#b51f1f]')}>
+                <span
+                    className={cn(
+                        'inline-flex items-center gap-1 text-[11px] font-bold uppercase',
+                        r.type === 'entrada' ? 'text-green-700' : 'text-[#b51f1f]',
+                    )}
+                >
                     {r.type === 'entrada' ? <Plus className="size-3" /> : <Minus className="size-3" />}
                     {r.type === 'entrada' ? 'Entrada' : 'Saída'}
                 </span>
@@ -49,18 +58,38 @@ export default function Lancamentos({ entries, totals, filters, parties, categor
                 <span>
                     {r.description}
                     {r.os_number && (
-                        <Link href={route('os.show', r.service_order_id!)} onClick={(e) => e.stopPropagation()} className="ml-1.5 text-[11px] font-semibold text-[#b51f1f] hover:underline">
+                        <Link
+                            href={route('os.show', r.service_order_id!)}
+                            onClick={(e) => e.stopPropagation()}
+                            className="ml-1.5 text-[11px] font-semibold text-[#b51f1f] hover:underline"
+                        >
                             ver OS
                         </Link>
+                    )}
+                    {r.purchase_id && (
+                        <Link
+                            href={route('compras.index')}
+                            onClick={(e) => e.stopPropagation()}
+                            className="ml-1.5 text-[11px] font-semibold text-[#b51f1f] hover:underline"
+                        >
+                            ver compra
+                        </Link>
+                    )}
+                    {r.paid_by && (
+                        <span className="ml-1.5 rounded-[2px] bg-zinc-200 px-1 text-[10px] font-semibold dark:bg-zinc-700">sócio {r.paid_by}</span>
                     )}
                 </span>
             ),
         },
-        { label: 'Fornecedor / cliente', render: (r) => r.party ?? '—', hide: 'md' },
+        { label: 'Cliente / fornecedor', render: (r) => r.party ?? '—', hide: 'md' },
         { label: 'Forma', render: (r) => (r.payment_method ? methods[r.payment_method] : '—'), hide: 'lg', className: 'w-32' },
         {
             label: 'Valor',
-            render: (r) => <b className={r.type === 'entrada' ? 'text-green-800' : 'text-zinc-900 dark:text-zinc-100'}>{(r.type === 'saida' ? '- ' : '') + money(r.amount)}</b>,
+            render: (r) => (
+                <b className={r.type === 'entrada' ? 'text-green-800' : 'text-zinc-900 dark:text-zinc-100'}>
+                    {(r.type === 'saida' ? '- ' : '') + money(r.amount)}
+                </b>
+            ),
             align: 'right',
             className: 'w-32',
         },
@@ -69,7 +98,9 @@ export default function Lancamentos({ entries, totals, filters, parties, categor
             render: (r) => {
                 const s = situation(r);
                 return (
-                    <span className={cn('inline-flex h-5 items-center rounded-[3px] px-1.5 text-[11px] font-bold uppercase ring-1 ring-inset', s.cls)}>
+                    <span
+                        className={cn('inline-flex h-5 items-center rounded-[3px] px-1.5 text-[11px] font-bold uppercase ring-1 ring-inset', s.cls)}
+                    >
                         {s.label}
                         {r.paid_at && <span className="ml-1 font-normal normal-case">{dateBr(r.paid_at).slice(0, 5)}</span>}
                     </span>
@@ -136,7 +167,12 @@ export default function Lancamentos({ entries, totals, filters, parties, categor
                         }}
                     >
                         <Field label="Mês">
-                            <Input type="month" value={f.mes} onChange={(e) => apply({ mes: e.target.value })} disabled={f.situacao === 'aberto' || f.situacao === 'vencido'} />
+                            <Input
+                                type="month"
+                                value={f.mes}
+                                onChange={(e) => apply({ mes: e.target.value })}
+                                disabled={f.situacao === 'aberto' || f.situacao === 'vencido'}
+                            />
                         </Field>
                         <Field label="Tipo">
                             <select className={selectCls} value={f.tipo} onChange={(e) => apply({ tipo: e.target.value, categoria: '' })}>
@@ -170,10 +206,17 @@ export default function Lancamentos({ entries, totals, filters, parties, categor
                                     ))}
                             </select>
                         </Field>
-                        <Field label="Pesquisa">
-                            <Input value={f.q} onChange={(e) => setF({ ...f, q: e.target.value })} placeholder="Descrição ou fornecedor" />
+                        <Field label="Pesquisar">
+                            <Input
+                                value={f.q}
+                                onChange={(e) => setF({ ...f, q: e.target.value })}
+                                placeholder="Descrição, cliente, fornecedor ou nº da OS"
+                            />
                         </Field>
-                        <button type="submit" className="inline-flex h-11 items-center gap-1.5 rounded-[3px] border border-[#c9cdd3] bg-white px-3 text-[13px] font-semibold md:h-8 dark:bg-zinc-900">
+                        <button
+                            type="submit"
+                            className="inline-flex h-11 items-center gap-1.5 rounded-[3px] border border-[#c9cdd3] bg-white px-3 text-[13px] font-semibold md:h-8 dark:bg-zinc-900"
+                        >
                             <Search className="size-4" /> Pesquisar
                         </button>
                     </form>
@@ -209,19 +252,28 @@ export default function Lancamentos({ entries, totals, filters, parties, categor
             <Dialog open={dialog !== null} onOpenChange={(o) => !o && setDialog(null)}>
                 <DialogContent className="max-h-[92svh] overflow-y-auto rounded-[4px] sm:max-w-2xl">
                     <DialogHeader>
-                        <DialogTitle>{dialog?.entry ? 'Alterar lançamento' : dialog?.type === 'entrada' ? 'Nova entrada' : 'Nova despesa'}</DialogTitle>
+                        <DialogTitle>
+                            {dialog?.entry ? 'Alterar lançamento' : dialog?.type === 'entrada' ? 'Nova entrada' : 'Nova despesa'}
+                        </DialogTitle>
                     </DialogHeader>
                     {dialog && (
                         <EntryForm
                             key={dialog.entry?.id ?? dialog.type}
                             type={dialog.type}
                             entry={dialog.entry}
-                            categories={categories}
-                            methods={methods}
-                            parties={parties}
+                            options={options}
                             onDone={() => setDialog(null)}
                         />
                     )}
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={paying !== null} onOpenChange={(o) => !o && setPaying(null)}>
+                <DialogContent className="rounded-[4px] sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>{paying?.type === 'entrada' ? 'Registrar recebimento' : 'Registrar pagamento'}</DialogTitle>
+                    </DialogHeader>
+                    {paying && <PayForm key={paying.id} entry={paying} methods={methods} onDone={() => setPaying(null)} />}
                 </DialogContent>
             </Dialog>
         </AppLayout>

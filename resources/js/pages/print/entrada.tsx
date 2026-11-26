@@ -53,7 +53,10 @@ export default function PrintEntrada({ os, shop }: { os: OsFull; shop: Shop }) {
                 <div className="mb-2 flex flex-wrap gap-4 text-[11px] font-semibold">
                     {Object.values(DAMAGE).map((d) => (
                         <span key={d.letter} className="flex items-center gap-1.5">
-                            <span className="grid size-4 place-items-center rounded-full text-[9px] font-black text-white" style={{ background: d.color }}>
+                            <span
+                                className="grid size-4 place-items-center rounded-full text-[9px] font-black text-white"
+                                style={{ background: d.color }}
+                            >
                                 {d.letter}
                             </span>
                             {d.label}
@@ -69,12 +72,14 @@ export default function PrintEntrada({ os, shop }: { os: OsFull; shop: Shop }) {
             </Box>
 
             <Box label="Observações da vistoria">
-                <BlankLines n={2} />
+                {/* luz acesa na chegada protege a oficina ("a injeção já estava acesa") */}
+                <Line label="Luzes acesas no painel" />
+                <BlankLines n={1} />
             </Box>
 
             <p className="text-[10.5px] text-zinc-700">
-                Declaro que conferi as condições do veículo descritas acima no momento da entrega à oficina, inclusive avarias já existentes na lataria, para-choques,
-                vidros e acessórios.
+                Declaro que conferi as condições do veículo descritas acima no momento da entrega à oficina, inclusive avarias já existentes na
+                lataria, para-choques, vidros e acessórios.
             </p>
 
             <Signatures left={['Assinatura do Cliente', 'Atendente Pista 1']} />

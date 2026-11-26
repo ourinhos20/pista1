@@ -15,8 +15,35 @@ export interface FinanceRow {
     installments: number | null;
     service_order_id: number | null;
     os_number: string | null;
+    purchase_id: number | null;
+    paid_by: string | null;
     notes: string | null;
     overdue: boolean;
+}
+
+/** OS com valor a receber, para vincular a uma entrada. */
+export interface OsToReceive {
+    id: number;
+    number: string;
+    status: string;
+    status_label: string;
+    client: string | null;
+    vehicle: string;
+    total: number;
+    billed: number;
+    remaining: number;
+}
+
+export type Parties = Record<EntryType, string[]>;
+export type PartnerOption = { id: number; name: string };
+
+/** Listas usadas pelo formulário de lançamento (vêm do servidor em todas as telas do financeiro). */
+export interface EntryOptions {
+    categories: Categories;
+    methods: Methods;
+    parties: Parties;
+    orders: OsToReceive[];
+    partnerList: PartnerOption[];
 }
 
 export type Categories = Record<EntryType, Record<string, string>>;
@@ -40,6 +67,9 @@ export function todayIso() {
     const pad = (n: number) => String(n).padStart(2, '0');
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
+
+/** 1234.5 -> "1234,50" para o campo de valor. */
+export const moneyInput = (v: number) => v.toFixed(2).replace('.', ',');
 
 export function situation(r: Pick<FinanceRow, 'paid_at' | 'overdue' | 'type'>) {
     if (r.paid_at) return { label: r.type === 'entrada' ? 'Recebido' : 'Pago', cls: 'bg-green-50 text-green-800 ring-green-300' };

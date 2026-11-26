@@ -11,7 +11,16 @@ import { ArrowLeft, ChevronLeft, ChevronRight, MessageCircle, Pencil, ShoppingCa
 import { useState } from 'react';
 import { SupplierForm } from './fornecedores';
 
-type Supplier = { id: number; name: string; document: string | null; phone: string | null; contact: string | null; email: string | null; notes: string | null; active: boolean };
+type Supplier = {
+    id: number;
+    name: string;
+    document: string | null;
+    phone: string | null;
+    contact: string | null;
+    email: string | null;
+    notes: string | null;
+    active: boolean;
+};
 interface Props {
     supplier: Supplier;
     purchases: PurchaseRow[];
@@ -32,7 +41,8 @@ export default function FornecedorShow({ supplier, purchases, filters, months, s
     const [editing, setEditing] = useState(false);
     const all = filters.mes === 'todos';
     const current = all ? new Date().toISOString().slice(0, 7) : filters.mes;
-    const go = (mes: string) => router.get(route('fornecedores.show', supplier.id), { mes }, { preserveState: true, preserveScroll: true, replace: true });
+    const go = (mes: string) =>
+        router.get(route('fornecedores.show', supplier.id), { mes }, { preserveState: true, preserveScroll: true, replace: true });
     const wa = whatsapp(supplier.phone, 'Olá! Aqui é da Pista 1 Mecânica Automotiva.');
 
     const cols: Col<PurchaseRow>[] = [
@@ -59,7 +69,7 @@ export default function FornecedorShow({ supplier, purchases, filters, months, s
             toolbar={
                 <>
                     <Tool icon={<ArrowLeft />} label="Fornecedores" href={route('fornecedores.index')} />
-                    <Tool primary icon={<ShoppingCart />} label="Nova compra" href={route('compras.index', { nova: 1 })} />
+                    <Tool primary icon={<ShoppingCart />} label="Nova compra" href={route('compras.index', { nova: 1, fornecedor: supplier.id })} />
                     {wa && <Tool icon={<MessageCircle className="text-green-600" />} label="WhatsApp" href={wa} external />}
                     <Tool icon={<Pencil />} label="Alterar" onClick={() => setEditing(true)} />
                 </>
@@ -72,13 +82,13 @@ export default function FornecedorShow({ supplier, purchases, filters, months, s
                         <Field label="Nome" className="col-span-2">
                             <ReadOnly className={cn('font-semibold', !supplier.active && 'text-zinc-400 line-through')}>{supplier.name}</ReadOnly>
                         </Field>
-                        <Field label="CNPJ / CPF">
+                        <Field label="CPF / CNPJ">
                             <ReadOnly>{documentFmt(supplier.document)}</ReadOnly>
                         </Field>
                         <Field label="Telefone">
                             <ReadOnly>{phone(supplier.phone)}</ReadOnly>
                         </Field>
-                        <Field label="Vendedor / contato">
+                        <Field label="Vendedor">
                             <ReadOnly>{supplier.contact}</ReadOnly>
                         </Field>
                         <Field label="E-mail">
@@ -93,14 +103,20 @@ export default function FornecedorShow({ supplier, purchases, filters, months, s
                 {/* totais */}
                 <section className="bg-card grid grid-cols-2 overflow-hidden rounded-[4px] border border-[#c9cdd3] md:grid-cols-4">
                     {[
-                        [all ? 'Comprado (todos os meses)' : `Comprado em ${monthLabel(filters.mes)}`, money(summary.period_total), `${summary.period_count} compra(s)`],
+                        [
+                            all ? 'Comprado no total' : `Comprado em ${monthLabel(filters.mes)}`,
+                            money(summary.period_total),
+                            `${summary.period_count} compra(s)`,
+                        ],
                         ['Comprado desde o início', money(summary.all_total), ''],
                         ['Em aberto com o fornecedor', money(summary.open_total), 'todas as datas'],
                         ['Vencido', money(summary.overdue_total), summary.overdue_total ? 'pagar o quanto antes' : 'nada vencido'],
                     ].map(([label, value, sub], i) => (
                         <div key={i} className="border-r border-b border-[#d7dade] px-3 py-2 last:border-r-0 md:border-b-0">
                             <p className="truncate text-[11px] font-semibold tracking-wide text-zinc-600 uppercase">{label}</p>
-                            <p className={cn('text-[19px] font-bold tabular-nums', i === 3 && summary.overdue_total > 0 && 'text-[#b51f1f]')}>{value}</p>
+                            <p className={cn('text-[19px] font-bold tabular-nums', i === 3 && summary.overdue_total > 0 && 'text-[#b51f1f]')}>
+                                {value}
+                            </p>
                             {sub && <p className="text-[11px] text-zinc-500">{sub}</p>}
                         </div>
                     ))}
@@ -119,7 +135,13 @@ export default function FornecedorShow({ supplier, purchases, filters, months, s
                             >
                                 <ChevronLeft className="size-4" />
                             </button>
-                            <Input type="month" value={all ? '' : filters.mes} onChange={(e) => e.target.value && go(e.target.value)} className="w-40 md:h-7" aria-label="Mês" />
+                            <Input
+                                type="month"
+                                value={all ? '' : filters.mes}
+                                onChange={(e) => e.target.value && go(e.target.value)}
+                                className="w-40 md:h-7"
+                                aria-label="Mês"
+                            />
                             <button
                                 type="button"
                                 aria-label="Próximo mês"
@@ -128,7 +150,12 @@ export default function FornecedorShow({ supplier, purchases, filters, months, s
                             >
                                 <ChevronRight className="size-4" />
                             </button>
-                            <select className={cn(selectCls, 'w-44 md:h-7')} value={all ? 'todos' : months.includes(filters.mes) ? filters.mes : ''} onChange={(e) => e.target.value && go(e.target.value)} aria-label="Meses com compra">
+                            <select
+                                className={cn(selectCls, 'w-44 md:h-7')}
+                                value={all ? 'todos' : months.includes(filters.mes) ? filters.mes : ''}
+                                onChange={(e) => e.target.value && go(e.target.value)}
+                                aria-label="Meses com compra"
+                            >
                                 <option value="">Meses com compra…</option>
                                 <option value="todos">Todos os meses</option>
                                 {months.map((m) => (
@@ -145,7 +172,9 @@ export default function FornecedorShow({ supplier, purchases, filters, months, s
                         rows={purchases}
                         rowKey={(r) => r.id}
                         onRowClick={setView}
-                        empty={all ? 'Nenhuma compra com este fornecedor.' : 'Nenhuma compra neste mês. Use as setas ou escolha um dos meses com compra.'}
+                        empty={
+                            all ? 'Nenhuma compra com este fornecedor.' : 'Nenhuma compra neste mês. Use as setas ou escolha um dos meses com compra.'
+                        }
                         footer={
                             <>
                                 <span>{purchases.length} compra(s) · clique para ver os itens</span>
@@ -165,7 +194,9 @@ export default function FornecedorShow({ supplier, purchases, filters, months, s
                     <DialogHeader>
                         <DialogTitle>Alterar fornecedor</DialogTitle>
                     </DialogHeader>
-                    {editing && <SupplierForm s={{ ...supplier, purchases_count: 0, purchases_total: 0 }} onDone={() => setEditing(false)} />}
+                    {editing && (
+                        <SupplierForm s={{ ...supplier, purchases_count: 0, purchases_total: 0, open_total: 0 }} onDone={() => setEditing(false)} />
+                    )}
                 </DialogContent>
             </Dialog>
         </AppLayout>

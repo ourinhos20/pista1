@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Support\Finance;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class FinanceEntry extends Model
 {
@@ -29,6 +30,17 @@ class FinanceEntry extends Model
         return $this->belongsTo(ServiceOrder::class);
     }
 
+    public function purchase(): BelongsTo
+    {
+        return $this->belongsTo(Purchase::class);
+    }
+
+    /** Aporte/retirada gerado quando um sócio pagou ou recebeu direto. */
+    public function partnerMovement(): HasOne
+    {
+        return $this->hasOne(PartnerMovement::class);
+    }
+
     public function isOverdue(): bool
     {
         return ! $this->paid_at && $this->due_date->lt(today());
@@ -51,6 +63,8 @@ class FinanceEntry extends Model
             'installments' => $this->installments,
             'service_order_id' => $this->service_order_id,
             'os_number' => $this->service_order_id ? str_pad((string) $this->service_order_id, 5, '0', STR_PAD_LEFT) : null,
+            'purchase_id' => $this->purchase_id,
+            'paid_by' => $this->relationLoaded('partnerMovement') ? $this->partnerMovement?->partner?->name : null,
             'notes' => $this->notes,
             'overdue' => $this->isOverdue(),
         ];

@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Enums\OsStatus;
 use App\Models\FinanceEntry;
 use App\Models\Partner;
+use App\Models\PartnerMovement;
 use App\Models\ServiceOrder;
 use App\Models\User;
 use App\Support\Finance;
@@ -124,5 +125,76 @@ class FinanceTest extends TestCase
         // mecânico não vê pagamentos
         $this->actingAs($this->mecanico)->get($this->p("/os/{$os->id}"))->assertInertia(fn (Assert $page) => $page->missing('os.payments')->missing('os.paid_total'));
         $this->post($this->p("/os/{$os->id}/pagamentos"), ['amount' => '10', 'payment_method' => 'pix'])->assertForbidden();
+    }
+
+    public function test_nova_entrada_vincula_a_os_e_aparece_nos_pagamentos_dela(): void
+    {
+        $os = ServiceOrder::where('status', OsStatus::Pronto)->first();
+        $total = $os->load('items')->total();
+
+        // a OS pronta sem pagamento aparece no painel e na lista da "Nova entrada"
+        $this->actingAs($this->master)->get($this->p('/financeiro'))->assertInertia(fn (Assert $page) => $page
+            ->where('toBill', fn ($rows) => collect($rows)->contains(fn ($r) => $r['id'] === $os->id && abs($r['remaining'] - $total) < 0.001))
+            ->where('orders', fn ($rows) => collect($rows)->contains('id', $os->id))
+            // lista de nomes separada: clientes na entrada, fornecedores na saída
+            ->where('parties.saida', fn ($n) => collect($n)->contains('Auto Peças Brasil'))
+            ->where('parties.entrada', fn ($n) => ! collect($n)->contains('Auto Peças Brasil'))
+        );
+
+        $this->post($this->p('/financeiro/lancamentos'), [
+            'type' => 'entrada', 'category' => 'servicos', 'description' => "OS {$os->number()}", 'party' => 'Lucas',
+            'amount' => number_format($total, 2, ',', '.'), 'due_date' => today()->toDateString(), 'paid' => true,
+            'payment_method' => 'pix', 'service_order_id' => $os->id,
+        ])->assertSessionHasNoErrors();
+
+        $this->assertSame(1, FinanceEntry::where('service_order_id', $os->id)->count());
+        $this->get($this->p('/financeiro'))->assertInertia(fn (Assert $page) => $page
+            ->where('toBill', fn ($rows) => ! collect($rows)->contains('id', $os->id)));
+
+        // despesa não pode ser ligada a uma OS (contaria como pagamento do cliente)
+        $this->post($this->p('/financeiro/lancamentos'), [
+            'type' => 'saida', 'category' => 'autopecas', 'description' => 'x', 'amount' => '10', 'due_date' => today()->toDateString(), 'service_order_id' => $os->id,
+        ])->assertSessionHasErrors('service_order_id');
+    }
+
+    public function test_despesa_paga_pelo_socio_vira_aporte_e_desfaz_junto(): void
+    {
+        $p1 = Partner::where('name', 'Sócio 1')->first();
+        $cash = Finance::cashBalance();
+        $before = collect(Finance::partnerBalance()['partners'])->firstWhere('id', $p1->id)['aportes'];
+
+        $this->actingAs($this->master)->post($this->p('/financeiro/lancamentos'), [
+            'type' => 'saida', 'category' => 'energia_agua', 'description' => 'Conta de luz', 'amount' => '300,00',
+            'due_date' => today()->toDateString(), 'paid' => true, 'paid_at' => today()->toDateString(), 'partner_id' => $p1->id,
+        ])->assertSessionHasNoErrors();
+
+        $entry = FinanceEntry::where('description', 'Conta de luz')->first();
+        $mv = PartnerMovement::where('finance_entry_id', $entry->id)->first();
+        $this->assertSame('aporte', $mv->type);
+        $this->assertSame(300.0, (float) $mv->amount);
+        // o caixa da oficina não mudou: a despesa saiu do bolso do sócio
+        $this->assertSame($cash, Finance::cashBalance());
+        $this->assertSame(round($before + 300, 2), collect(Finance::partnerBalance()['partners'])->firstWhere('id', $p1->id)['aportes']);
+
+        // o movimento só se desfaz pelo lançamento
+        $this->delete($this->p("/financeiro/socios/movimentos/{$mv->id}"))->assertSessionHas('error');
+        $this->patch($this->p("/financeiro/lancamentos/{$entry->id}/estorno"));
+        $this->assertNull(PartnerMovement::find($mv->id));
+    }
+
+    public function test_baixa_grava_data_e_forma(): void
+    {
+        $open = FinanceEntry::whereNull('paid_at')->where('type', 'saida')->first();
+        $this->actingAs($this->master)->patch($this->p("/financeiro/lancamentos/{$open->id}/baixa"), ['paid_at' => '2026-11-20', 'payment_method' => 'boleto'])->assertSessionHasNoErrors();
+        $open->refresh();
+        $this->assertSame('2026-11-20', $open->paid_at->toDateString());
+        $this->assertSame('boleto', $open->payment_method);
+    }
+
+    public function test_participacao_aceita_virgula(): void
+    {
+        $p = Partner::first();
+        $this->actingAs($this->master)->put($this->p("/financeiro/socios/{$p->id}"), ['name' => $p->name, 'share' => '33,34', 'active' => true])->assertSessionHasNoErrors();
+        $this->assertEqualsWithDelta(33.34, (float) $p->fresh()->share, 0.001);
     }
 }

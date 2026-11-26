@@ -3,6 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\FinanceEntry;
+use App\Models\Partner;
+use App\Models\ServiceOrder;
+use App\Enums\OsStatus;
 use App\Models\PartnerMovement;
 use App\Support\Finance;
 use App\Support\Installments;
@@ -23,9 +26,16 @@ class FinanceController extends Controller
         return preg_match('/^\d{4}-\d{2}$/', $m) ? Carbon::createFromFormat('Y-m-d', "$m-01")->startOfDay() : now()->startOfMonth();
     }
 
+    /** Dados do formulário de lançamento (listas e OS que podem ser vinculadas). */
     private function options(): array
     {
-        return ['categories' => Finance::CATEGORIES, 'methods' => Finance::METHODS];
+        return [
+            'categories' => Finance::CATEGORIES,
+            'methods' => Finance::METHODS,
+            'parties' => Finance::parties(),
+            'orders' => Finance::ordersToReceive(),
+            'partnerList' => Partner::where('active', true)->orderBy('id')->get(['id', 'name']),
+        ];
     }
 
     public function dashboard(Request $request): Response
@@ -56,7 +66,7 @@ class FinanceController extends Controller
             return ['month' => $s->format('Y-m'), 'in' => round($in, 2), 'out' => round($out, 2), 'result' => round($in - $out, 2)];
         });
 
-        $upcoming = FinanceEntry::whereNull('paid_at')->whereDate('due_date', '<=', today()->addDays(15))
+        $upcoming = FinanceEntry::with('partnerMovement.partner')->whereNull('paid_at')->whereDate('due_date', '<=', today()->addDays(15))
             ->orderBy('due_date')->limit(15)->get()->map->toRow();
 
         return Inertia::render('financeiro/index', [
@@ -78,7 +88,8 @@ class FinanceController extends Controller
             'history' => $history,
             'upcoming' => $upcoming,
             'partners' => Finance::partnerBalance(),
-            'parties' => FinanceEntry::whereNotNull('party')->distinct()->orderBy('party')->limit(200)->pluck('party'),
+            // carro pronto/entregue sem o pagamento lançado: dinheiro que fica fora do caixa
+            'toBill' => Finance::ordersToReceive([OsStatus::Pronto, OsStatus::Entregue]),
             ...$this->options(),
         ]);
     }
@@ -92,7 +103,7 @@ class FinanceController extends Controller
         $categoria = $request->string('categoria')->toString();
         $q = trim($request->string('q')->toString());
 
-        $query = FinanceEntry::query()->orderBy('due_date')->orderBy('id');
+        $query = FinanceEntry::with('partnerMovement.partner')->orderBy('due_date')->orderBy('id');
 
         // contas em aberto/vencidas aparecem independentemente do mês
         if ($situacao === 'aberto') {
@@ -115,7 +126,8 @@ class FinanceController extends Controller
             $query->where('category', $categoria);
         }
         if ($q !== '') {
-            $query->where(fn ($w) => $w->where('description', 'like', "%{$q}%")->orWhere('party', 'like', "%{$q}%"));
+            $query->where(fn ($w) => $w->where('description', 'like', "%{$q}%")->orWhere('party', 'like', "%{$q}%")
+                ->when(ctype_digit($q), fn ($x) => $x->orWhere('service_order_id', (int) $q)));
         }
 
         $rows = $query->limit(500)->get();
@@ -127,7 +139,6 @@ class FinanceController extends Controller
                 'out' => round((float) $rows->where('type', 'saida')->sum('amount'), 2),
             ],
             'filters' => ['mes' => $start->format('Y-m'), 'tipo' => $tipo, 'situacao' => $situacao, 'categoria' => $categoria, 'q' => $q],
-            'parties' => FinanceEntry::whereNotNull('party')->distinct()->orderBy('party')->limit(200)->pluck('party'),
             ...$this->options(),
         ]);
     }
@@ -148,7 +159,13 @@ class FinanceController extends Controller
             'paid_at' => ['nullable', 'date'],
             'payment_method' => ['nullable', Rule::in(array_keys(Finance::METHODS))],
             'notes' => ['nullable', 'string', 'max:2000'],
-            ...($creating ? ['installments' => ['nullable', 'integer', 'between:1,48']] : []),
+            // receita de uma OS: o pagamento passa a aparecer na própria OS
+            'service_order_id' => ['nullable', 'integer', Rule::exists('service_orders', 'id'), Rule::prohibitedIf($type !== 'entrada')],
+            ...($creating ? [
+                'installments' => ['nullable', 'integer', 'between:1,48'],
+                // sócio que pagou/recebeu do próprio bolso (vira aporte/retirada dele)
+                'partner_id' => ['nullable', Rule::exists('partners', 'id')->where('active', true)],
+            ] : []),
         ], [
             'amount.gt' => 'Informe um valor maior que zero.',
             'category.in' => 'Escolha uma categoria válida.',
@@ -164,6 +181,7 @@ class FinanceController extends Controller
             [
                 'type' => $d['type'], 'category' => $d['category'], 'description' => $d['description'], 'party' => $d['party'] ?? null,
                 'payment_method' => $d['payment_method'] ?? null, 'notes' => $d['notes'] ?? null, 'created_by' => $request->user()->id,
+                'service_order_id' => $d['service_order_id'] ?? null,
             ],
             (float) $d['amount'],
             Carbon::parse($d['due_date']),
@@ -171,6 +189,24 @@ class FinanceController extends Controller
             $paid,
             ! empty($d['paid_at']) ? Carbon::parse($d['paid_at']) : null,
         );
+
+        // sócio pagou a despesa (ou recebeu do cliente) com o próprio dinheiro
+        $first = $created[0];
+        if (! empty($d['partner_id']) && $first->paid_at) {
+            PartnerMovement::create([
+                'partner_id' => $d['partner_id'],
+                'finance_entry_id' => $first->id,
+                'type' => $d['type'] === 'saida' ? 'aporte' : 'retirada',
+                'amount' => $first->amount,
+                'date' => $first->paid_at,
+                'description' => ($d['type'] === 'saida' ? 'Pagou: ' : 'Recebeu: ').$first->description,
+                'created_by' => $request->user()->id,
+            ]);
+        }
+
+        if (! empty($d['service_order_id'])) {
+            ServiceOrder::find($d['service_order_id'])?->logEvent($request->user(), 'Pagamento lançado pelo financeiro: R$ '.number_format((float) $d['amount'], 2, ',', '.'));
+        }
 
         $what = $d['type'] === 'entrada' ? 'Entrada' : 'Despesa';
 
@@ -184,8 +220,14 @@ class FinanceController extends Controller
 
         $entry->update([
             ...collect($d)->except(['paid', 'paid_at'])->all(),
+            'service_order_id' => $d['service_order_id'] ?? null,
             'paid_at' => $paid ? ($d['paid_at'] ?? $entry->paid_at?->toDateString() ?? today()->toDateString()) : null,
         ]);
+        if (! $paid) {
+            $entry->partnerMovement()->delete();
+        } else {
+            $entry->partnerMovement()->update(['amount' => $entry->amount, 'date' => $entry->paid_at]);
+        }
 
         return back()->with('success', 'Lançamento alterado.');
     }
@@ -208,12 +250,14 @@ class FinanceController extends Controller
     public function unpay(FinanceEntry $entry): RedirectResponse
     {
         $entry->update(['paid_at' => null]);
+        $entry->partnerMovement()->delete();
 
         return back()->with('success', 'Baixa estornada.');
     }
 
     public function destroy(FinanceEntry $entry): RedirectResponse
     {
+        $entry->partnerMovement()->delete();
         $entry->delete();
 
         return back()->with('success', 'Lançamento excluído.');

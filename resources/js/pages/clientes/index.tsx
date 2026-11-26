@@ -31,7 +31,7 @@ export function ClientForm({ client, onDone }: { client?: ClientData; onDone?: (
             }}
         >
             <div className="grid gap-3 sm:grid-cols-6">
-                <Field label="Nome completo *" className="sm:col-span-6" error={errors.name}>
+                <Field label="Nome *" className="sm:col-span-6" error={errors.name}>
                     <Input value={data.name} onChange={(e) => setData('name', e.target.value)} autoFocus />
                 </Field>
                 <Field label="WhatsApp" className="sm:col-span-2" error={errors.phone}>
@@ -54,7 +54,11 @@ export function ClientForm({ client, onDone }: { client?: ClientData; onDone?: (
                 </Field>
             </div>
             <div className="flex justify-end">
-                <button type="submit" disabled={processing} className="inline-flex h-11 items-center gap-1.5 rounded-[3px] border border-[#b51f1f] bg-[#d42a2a] px-4 text-[13px] font-semibold text-white md:h-8">
+                <button
+                    type="submit"
+                    disabled={processing}
+                    className="inline-flex h-11 items-center gap-1.5 rounded-[3px] border border-[#b51f1f] bg-[#d42a2a] px-4 text-[13px] font-semibold text-white md:h-8"
+                >
                     <Save className="size-4" /> {client ? 'Gravar alterações' : 'Gravar cliente'}
                 </button>
             </div>
@@ -86,7 +90,11 @@ export default function Clientes({ clients, filters }: { clients: Row[]; filters
     ];
 
     return (
-        <AppLayout title="Clientes e Veículos" code="CAD010" toolbar={<Tool primary icon={<UserPlus />} label="Novo cliente" onClick={() => setOpen(true)} />}>
+        <AppLayout
+            title="Clientes e Veículos"
+            code="CAD010"
+            toolbar={<Tool primary icon={<UserPlus />} label="Novo cliente" onClick={() => setOpen(true)} />}
+        >
             <Head title="Clientes" />
             <div className="grid gap-2 md:gap-3">
                 <Block title="Pesquisa">
@@ -97,16 +105,25 @@ export default function Clientes({ clients, filters }: { clients: Row[]; filters
                             router.get(route('clientes.index'), { q }, { preserveState: true, replace: true });
                         }}
                     >
-                        <Field label="Nome, placa, CPF/CNPJ ou telefone">
-                            <Input value={q} onChange={(e) => setQ(e.target.value)} />
+                        <Field label="Pesquisar">
+                            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Nome, CPF, telefone ou placa" />
                         </Field>
-                        <button type="submit" className="inline-flex h-11 items-center gap-1.5 rounded-[3px] border border-[#c9cdd3] bg-white px-3 text-[13px] font-semibold md:h-8 dark:bg-zinc-900">
+                        <button
+                            type="submit"
+                            className="inline-flex h-11 items-center gap-1.5 rounded-[3px] border border-[#c9cdd3] bg-white px-3 text-[13px] font-semibold md:h-8 dark:bg-zinc-900"
+                        >
                             <Search className="size-4" /> Pesquisar
                         </button>
                     </form>
                 </Block>
                 <Block title="Clientes" bodyClassName="p-0">
-                    <Grid cols={cols} rows={clients} rowKey={(r) => r.id} onRowClick={(r) => router.visit(route('clientes.show', r.id))} footer={<span>{clients.length} registro(s)</span>} />
+                    <Grid
+                        cols={cols}
+                        rows={clients}
+                        rowKey={(r) => r.id}
+                        onRowClick={(r) => router.visit(route('clientes.show', r.id))}
+                        footer={<span>{clients.length} registro(s)</span>}
+                    />
                 </Block>
             </div>
 

@@ -127,4 +127,62 @@ class SuppliersPurchasesTest extends TestCase
         $this->delete($this->p("/compras/{$purchase->id}"))->assertSessionHas('success');
         $this->assertNull($purchase->fresh());
     }
+
+    private function compra(array $extra = []): \Illuminate\Testing\TestResponse
+    {
+        return $this->post($this->p('/compras'), [
+            'supplier_id' => $this->sup->id, 'invoice' => '5555', 'date' => today()->toDateString(),
+            'items' => [['description' => 'Amortecedor dianteiro', 'quantity' => '2', 'unit_cost' => '150,00']],
+            'payment_method' => 'boleto', 'installments' => 1, 'first_due' => today()->addDays(28)->toDateString(), 'paid' => false,
+            ...$extra,
+        ]);
+    }
+
+    public function test_mesma_nota_do_mesmo_fornecedor_nao_entra_duas_vezes(): void
+    {
+        $this->actingAs($this->balcao);
+        $this->compra()->assertSessionHasNoErrors();
+        $this->compra()->assertSessionHasErrors('invoice');
+        $this->assertSame(1, Purchase::where('invoice', '5555')->count());
+
+        // a mesma NF de outro fornecedor pode
+        $outro = Supplier::where('id', '!=', $this->sup->id)->first() ?? Supplier::create(['name' => 'Outro Fornecedor']);
+        $this->compra(['supplier_id' => $outro->id])->assertSessionHasNoErrors();
+    }
+
+    public function test_compra_para_os_nao_duplica_as_pecas_do_orcamento(): void
+    {
+        $os = ServiceOrder::where('status', OsStatus::Execucao)->first();
+        $antes = $os->items()->count();
+        $this->actingAs($this->balcao);
+        $this->compra(['service_order_id' => $os->id])->assertSessionHasNoErrors();
+        $this->assertSame($antes, $os->items()->count());
+        $this->assertSame($os->id, Purchase::where('invoice', '5555')->first()->service_order_id);
+    }
+
+    public function test_tela_de_compras_lista_carros_aguardando_pecas_e_pesquisa(): void
+    {
+        $os = ServiceOrder::where('status', OsStatus::Execucao)->first();
+        $os->update(['status' => OsStatus::Pecas]);
+        $this->actingAs($this->balcao);
+        $this->compra(['date' => now()->subMonths(3)->toDateString()]);
+
+        $this->get($this->p('/compras'))->assertInertia(fn (Assert $page) => $page
+            ->where('orders.0.id', $os->id) // quem espera peça vem primeiro
+            ->where('orders.0.parts', fn ($parts) => collect($parts)->isNotEmpty())
+        );
+        // a pesquisa acha em qualquer mês
+        $this->get($this->p('/compras?q=amortecedor'))->assertInertia(fn (Assert $page) => $page->has('rows', 1));
+        $this->get($this->p('/compras?q=5555'))->assertInertia(fn (Assert $page) => $page->has('rows', 1));
+    }
+
+    public function test_lista_de_fornecedores_mostra_o_que_falta_pagar(): void
+    {
+        $this->actingAs($this->balcao);
+        $this->compra()->assertSessionHasNoErrors();
+        $open = (float) FinanceEntry::whereNull('paid_at')->whereIn('purchase_id', Purchase::where('supplier_id', $this->sup->id)->select('id'))->sum('amount');
+
+        $this->get($this->p('/fornecedores'))->assertInertia(fn (Assert $page) => $page
+            ->where('rows', fn ($rows) => abs(collect($rows)->firstWhere('id', $this->sup->id)['open_total'] - $open) < 0.01));
+    }
 }

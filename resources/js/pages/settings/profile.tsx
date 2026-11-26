@@ -35,8 +35,13 @@ export default function MinhaConta() {
                         <Field label="Nome" error={profile.errors.name}>
                             <Input value={profile.data.name} onChange={(e) => profile.setData('name', e.target.value)} autoComplete="name" />
                         </Field>
-                        <Field label="E-mail (login)" error={profile.errors.email}>
-                            <Input type="email" value={profile.data.email} onChange={(e) => profile.setData('email', e.target.value)} autoComplete="username" />
+                        <Field label="E-mail" error={profile.errors.email}>
+                            <Input
+                                type="email"
+                                value={profile.data.email}
+                                onChange={(e) => profile.setData('email', e.target.value)}
+                                autoComplete="username"
+                            />
                         </Field>
                         <div className="flex justify-end sm:col-span-2">
                             <button type="submit" disabled={profile.processing || !profile.isDirty} className={saveBtn}>
@@ -65,13 +70,29 @@ export default function MinhaConta() {
                         }}
                     >
                         <Field label="Senha atual" error={pwd.errors.current_password}>
-                            <Input type="password" value={pwd.data.current_password} onChange={(e) => pwd.setData('current_password', e.target.value)} autoComplete="current-password" />
+                            <Input
+                                type="password"
+                                value={pwd.data.current_password}
+                                onChange={(e) => pwd.setData('current_password', e.target.value)}
+                                autoComplete="current-password"
+                            />
                         </Field>
                         <Field label="Nova senha" error={pwd.errors.password}>
-                            <Input ref={passwordInput} type="password" value={pwd.data.password} onChange={(e) => pwd.setData('password', e.target.value)} autoComplete="new-password" />
+                            <Input
+                                ref={passwordInput}
+                                type="password"
+                                value={pwd.data.password}
+                                onChange={(e) => pwd.setData('password', e.target.value)}
+                                autoComplete="new-password"
+                            />
                         </Field>
                         <Field label="Repita a nova senha" error={pwd.errors.password_confirmation}>
-                            <Input type="password" value={pwd.data.password_confirmation} onChange={(e) => pwd.setData('password_confirmation', e.target.value)} autoComplete="new-password" />
+                            <Input
+                                type="password"
+                                value={pwd.data.password_confirmation}
+                                onChange={(e) => pwd.setData('password_confirmation', e.target.value)}
+                                autoComplete="new-password"
+                            />
                         </Field>
                         <p className="text-muted-foreground text-[12px] sm:col-span-2">Mínimo de 8 caracteres, com letras e números.</p>
                         <div className="flex justify-end">

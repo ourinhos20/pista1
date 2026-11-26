@@ -48,14 +48,19 @@ Publicação: `deploy/empacotar.ps1` gera o zip; passo a passo em `deploy/PUBLIC
   - O master faz e altera tudo.
 - **Bot do WhatsApp:** `POST /api/bot/agendamento` com `Authorization: Bearer <BOT_TOKEN>`. Com `BOT_TOKEN` vazio, a rota fica desligada. Detalhes em `deploy/PUBLICAR-HOSTGATOR.md`.
 - **Só o balcão ou o master lançam valores.** O mecânico pode pedir peça, mas sem preço.
-- **Revisão:** o checklist é preenchido no celular e grava sozinho a cada toque.
+- **Revisão:** o checklist é preenchido no celular e grava sozinho a cada toque. Critério (impresso na ficha e na tela): OK = bom; Atenção = funciona mas perto do limite, avisar e trocar na próxima; Trocar = entra no orçamento; em branco = não verificado/não se aplica. Botão "Resto OK" por grupo. Itens em `resources/js/lib/revisao.ts` (não renomear chaves já usadas: perde o que foi marcado nas OS antigas).
 - **Financeiro:**
   - só master;
   - regime de caixa;
   - o equilíbrio dos sócios compara aportes − retiradas com a parte ideal pela participação (%);
   - pagamentos da OS e compras de peças viram lançamentos automaticamente.
+  - entrada pode ser **vinculada a uma OS** (puxa cliente e o valor que falta); o pagamento aparece na própria OS. Despesa nunca é ligada a OS;
+  - o painel lista **carros prontos/entregues sem pagamento lançado** (`Finance::ordersToReceive`);
+  - despesa paga do bolso do sócio vira **aporte** dele, e receita que ficou com o sócio vira **retirada** (ligadas ao lançamento: excluir/estornar desfaz);
+  - "Baixar" pede a data e a forma de pagamento.
 - **Sem catálogo de peças e sem controle de estoque** (foram removidos a pedido). Na compra e na OS, a peça é só uma descrição digitada.
 - **Fornecedores** ficam em Cadastros e em Compras. A ficha do fornecedor mostra o histórico de compras por mês.
+- **Compras:** a OS é escolhida numa lista (puxa as peças pedidas). Por padrão **não** lança as peças de novo na OS (já estão no orçamento); só o custo entra na margem. A mesma NF do mesmo fornecedor não entra duas vezes. A tela mostra os carros "aguardando peças" com botão Comprar.
 
 ## Visual (importante)
 - Estilo **ERP**, como Consinco/Bluesoft: barra de menus, código da tela (ATD001, FIN010…), barra de ferramentas com teclas F, grades densas, barra de status.

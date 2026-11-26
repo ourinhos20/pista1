@@ -134,8 +134,8 @@
                             <input name="name" value="{{ old('name') }}" autocomplete="name" required maxlength="120" class="h-12 rounded-md border border-zinc-300 px-3 text-base focus:border-brand-dark focus:ring-2 focus:ring-brand/20 focus:outline-none">
                         </label>
                         <label class="grid gap-1.5">
-                            <span class="text-sm font-semibold">Observação (opcional)</span>
-                            <textarea name="note" rows="2" maxlength="500" placeholder="Ex.: o restante faço no mês que vem" class="rounded-md border border-zinc-300 px-3 py-2 text-base focus:border-brand-dark focus:ring-2 focus:ring-brand/20 focus:outline-none">{{ old('note') }}</textarea>
+                            <span class="text-sm font-semibold">Observação</span>
+                            <textarea name="note" rows="2" maxlength="500" class="rounded-md border border-zinc-300 px-3 py-2 text-base focus:border-brand-dark focus:ring-2 focus:ring-brand/20 focus:outline-none">{{ old('note') }}</textarea>
                         </label>
                         <label class="flex items-start gap-3 text-sm">
                             <input type="checkbox" name="agree" value="1" class="mt-0.5 size-5 accent-[#d42a2a]">

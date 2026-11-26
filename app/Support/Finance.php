@@ -2,9 +2,13 @@
 
 namespace App\Support;
 
+use App\Enums\OsStatus;
+use App\Models\Client;
 use App\Models\FinanceEntry;
 use App\Models\Partner;
 use App\Models\PartnerMovement;
+use App\Models\ServiceOrder;
+use App\Models\Supplier;
 use Illuminate\Support\Carbon;
 
 class Finance
@@ -34,8 +38,51 @@ class Finance
         'credito' => 'Cartão de crédito',
         'boleto' => 'Boleto',
         'transferencia' => 'Transferência',
-        'parcelado' => 'Parcelado',
+        'parcelado' => 'Crediário / promissória',
     ];
+
+    /**
+     * OS com valor a receber (total aprovado − o que já foi lançado no financeiro).
+     * Usado na "Nova entrada" (vincular a OS) e no painel (OS prontas sem pagamento lançado).
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public static function ordersToReceive(?array $statuses = null): array
+    {
+        $statuses ??= [OsStatus::Aprovacao, OsStatus::Pecas, OsStatus::Execucao, OsStatus::Pronto, OsStatus::Entregue];
+
+        return ServiceOrder::with(['items', 'payments', 'client', 'vehicle'])
+            ->whereIn('status', $statuses)->latest('id')->limit(200)->get()
+            ->map(function (ServiceOrder $os) {
+                $total = $os->total();
+                $billed = round((float) $os->payments->where('type', 'entrada')->sum('amount'), 2);
+
+                return [
+                    'id' => $os->id,
+                    'number' => $os->number(),
+                    'status' => $os->status->value,
+                    'status_label' => $os->status->label(),
+                    'client' => $os->client?->name,
+                    'vehicle' => trim(($os->vehicle?->title() ?? '').' '.($os->vehicle?->plate ?? '')),
+                    'total' => $total,
+                    'billed' => $billed,
+                    'remaining' => round($total - $billed, 2),
+                ];
+            })
+            ->filter(fn ($r) => $r['remaining'] > 0.009)
+            ->values()->all();
+    }
+
+    /** Sugestões para o campo "cliente / fornecedor", separadas por tipo. */
+    public static function parties(): array
+    {
+        $past = fn (string $type) => FinanceEntry::where('type', $type)->whereNotNull('party')->distinct()->pluck('party');
+
+        return [
+            'entrada' => Client::orderBy('name')->limit(300)->pluck('name')->merge($past('entrada'))->unique()->sort()->values(),
+            'saida' => Supplier::where('active', true)->orderBy('name')->pluck('name')->merge($past('saida'))->unique()->sort()->values(),
+        ];
+    }
 
     public static function categoryKeys(string $type): array
     {

@@ -56,15 +56,33 @@ function CarShape() {
 function Labels() {
     return (
         <g fill="currentColor" fontSize="10" fontWeight="600" letterSpacing="1.5" opacity="0.55" textAnchor="middle">
-            <text x="8" y={H / 2} transform={`rotate(-90 8 ${H / 2})`}>FRENTE</text>
-            <text x={W - 14} y={H / 2} transform={`rotate(90 ${W - 14} ${H / 2})`}>TRASEIRA</text>
-            <text x={W / 2} y="11">LADO DIREITO (PASSAGEIRO)</text>
-            <text x={W / 2} y={H - 3}>LADO ESQUERDO (MOTORISTA)</text>
+            <text x="8" y={H / 2} transform={`rotate(-90 8 ${H / 2})`}>
+                FRENTE
+            </text>
+            <text x={W - 14} y={H / 2} transform={`rotate(90 ${W - 14} ${H / 2})`}>
+                TRASEIRA
+            </text>
+            <text x={W / 2} y="11">
+                LADO DIREITO (PASSAGEIRO)
+            </text>
+            <text x={W / 2} y={H - 3}>
+                LADO ESQUERDO (MOTORISTA)
+            </text>
         </g>
     );
 }
 
-export function CarDiagramSvg({ damages, className, onAdd, onRemove }: { damages: Damage[]; className?: string; onAdd?: (x: number, y: number) => void; onRemove?: (index: number) => void }) {
+export function CarDiagramSvg({
+    damages,
+    className,
+    onAdd,
+    onRemove,
+}: {
+    damages: Damage[];
+    className?: string;
+    onAdd?: (x: number, y: number) => void;
+    onRemove?: (index: number) => void;
+}) {
     const ref = useRef<SVGSVGElement>(null);
 
     const click = (e: React.MouseEvent<SVGSVGElement>) => {
@@ -131,7 +149,10 @@ export function CarDiagramEditor({ value, onChange }: { value: Damage[]; onChang
                             type === t ? 'bg-foreground text-background ring-foreground' : 'bg-card ring-border hover:bg-muted',
                         )}
                     >
-                        <span className="grid size-5 place-items-center rounded-full text-[11px] font-black text-white" style={{ background: DAMAGE[t].color }}>
+                        <span
+                            className="grid size-5 place-items-center rounded-full text-[11px] font-black text-white"
+                            style={{ background: DAMAGE[t].color }}
+                        >
                             {DAMAGE[t].letter}
                         </span>
                         {DAMAGE[t].label}
@@ -150,7 +171,11 @@ export function CarDiagramEditor({ value, onChange }: { value: Damage[]; onChang
             <div className="text-muted-foreground flex items-center justify-between gap-2 text-sm">
                 <span>Toque no desenho para marcar. Toque numa marca para apagar.</span>
                 {value.length > 0 && (
-                    <button type="button" className="text-foreground inline-flex h-11 items-center gap-1 px-2 font-semibold" onClick={() => onChange(value.slice(0, -1))}>
+                    <button
+                        type="button"
+                        className="text-foreground inline-flex h-11 items-center gap-1 px-2 font-semibold"
+                        onClick={() => onChange(value.slice(0, -1))}
+                    >
                         <Undo2 className="size-4" /> Desfazer
                     </button>
                 )}
@@ -160,13 +185,16 @@ export function CarDiagramEditor({ value, onChange }: { value: Damage[]; onChang
                 <ol className="grid gap-2 sm:grid-cols-2">
                     {value.map((d, i) => (
                         <li key={i} className="bg-card flex items-center gap-2 rounded-[3px] border border-[#d7dade] px-2.5 py-1.5">
-                            <span className="grid size-7 shrink-0 place-items-center rounded-full text-xs font-black text-white" style={{ background: DAMAGE[d.type].color }}>
+                            <span
+                                className="grid size-7 shrink-0 place-items-center rounded-full text-xs font-black text-white"
+                                style={{ background: DAMAGE[d.type].color }}
+                            >
                                 {DAMAGE[d.type].letter}
                                 {i + 1}
                             </span>
                             <input
                                 className="placeholder:text-muted-foreground min-w-0 flex-1 bg-transparent text-[15px] outline-none"
-                                placeholder={`${DAMAGE[d.type].label} — onde? (opcional)`}
+                                placeholder={`${DAMAGE[d.type].label} — onde?`}
                                 value={d.note ?? ''}
                                 maxLength={120}
                                 onChange={(e) => onChange(value.map((v, idx) => (idx === i ? { ...v, note: e.target.value } : v)))}
@@ -185,7 +213,10 @@ export function DamageLegend({ damages }: { damages: Damage[] }) {
         <ol className="grid gap-1.5 text-sm sm:grid-cols-2">
             {damages.map((d, i) => (
                 <li key={i} className="flex items-center gap-2">
-                    <span className="grid size-6 shrink-0 place-items-center rounded-full text-[10px] font-black text-white" style={{ background: DAMAGE[d.type].color }}>
+                    <span
+                        className="grid size-6 shrink-0 place-items-center rounded-full text-[10px] font-black text-white"
+                        style={{ background: DAMAGE[d.type].color }}
+                    >
                         {DAMAGE[d.type].letter}
                         {i + 1}
                     </span>

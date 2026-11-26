@@ -32,7 +32,9 @@ function MobileCard({ os, info = false }: { os: OsCard; info?: boolean }) {
                 <div className="flex items-start justify-between gap-2">
                     {os.vehicle?.plate ? <Placa value={os.vehicle.plate} big /> : <span className="text-[13px] text-zinc-500">sem placa</span>}
                     <div className="min-w-0 text-right">
-                        <p className="text-[15px] font-bold whitespace-nowrap">{os.status === 'aguardando' ? when(os.scheduled_at) : `OS ${os.number}`}</p>
+                        <p className="text-[15px] font-bold whitespace-nowrap">
+                            {os.status === 'aguardando' ? when(os.scheduled_at) : `OS ${os.number}`}
+                        </p>
                         <Situacao status={os.status} short />
                         <div>
                             <Since iso={os.status_since} status={os.status} />
@@ -46,13 +48,20 @@ function MobileCard({ os, info = false }: { os: OsCard; info?: boolean }) {
                     {os.service_type ? ` · ${SERVICE_TYPE[os.service_type]}` : ''}
                     {os.mechanic ? ` · ${os.mechanic.name}` : ''}
                 </p>
-                {os.complaint && <p className="mt-2 line-clamp-3 border-l-4 border-[#d42a2a] bg-[#f6f7f8] px-2.5 py-1.5 text-[15px] dark:bg-zinc-800">{os.complaint}</p>}
+                {os.complaint && (
+                    <p className="mt-2 line-clamp-3 border-l-4 border-[#d42a2a] bg-[#f6f7f8] px-2.5 py-1.5 text-[15px] dark:bg-zinc-800">
+                        {os.complaint}
+                    </p>
+                )}
                 {!next && !info && WAITING_FOR[os.status] && <p className="mt-2 text-[13px] text-amber-800">{WAITING_FOR[os.status]}</p>}
             </Link>
             {!info && (
                 <div className="grid grid-cols-[1fr_auto] gap-1.5 border-t border-[#e3e5e8] bg-[#f6f7f8] p-2 dark:bg-zinc-800">
                     {needsInspection ? (
-                        <Link href={route('os.show', os.id)} className="flex h-12 items-center justify-center gap-2 rounded-[3px] bg-[#d42a2a] text-[15px] font-semibold text-white">
+                        <Link
+                            href={route('os.show', os.id)}
+                            className="flex h-12 items-center justify-center gap-2 rounded-[3px] bg-[#d42a2a] text-[15px] font-semibold text-white"
+                        >
                             <ClipboardCheck className="size-5" /> Fazer a vistoria de entrada
                         </Link>
                     ) : next ? (
@@ -62,9 +71,17 @@ function MobileCard({ os, info = false }: { os: OsCard; info?: boolean }) {
                                 setBusy(true);
                                 if (next.to === 'diagnostico') {
                                     // começa e já abre a ficha na vistoria
-                                    router.patch(route('os.status', os.id), { status: next.to }, { onSuccess: () => router.visit(route('os.show', os.id)), onFinish: () => setBusy(false) });
+                                    router.patch(
+                                        route('os.status', os.id),
+                                        { status: next.to },
+                                        { onSuccess: () => router.visit(route('os.show', os.id)), onFinish: () => setBusy(false) },
+                                    );
                                 } else {
-                                    router.patch(route('os.status', os.id), { status: next.to }, { preserveScroll: true, onFinish: () => setBusy(false) });
+                                    router.patch(
+                                        route('os.status', os.id),
+                                        { status: next.to },
+                                        { preserveScroll: true, onFinish: () => setBusy(false) },
+                                    );
                                 }
                             }}
                             className="flex h-12 items-center justify-center gap-2 rounded-[3px] bg-[#d42a2a] text-[15px] font-semibold text-white disabled:opacity-60"
@@ -72,7 +89,10 @@ function MobileCard({ os, info = false }: { os: OsCard; info?: boolean }) {
                             <ArrowRight className="size-5" /> {next.label}
                         </button>
                     ) : (
-                        <Link href={route('os.show', os.id)} className="flex h-12 items-center justify-center gap-2 rounded-[3px] border border-[#c9cdd3] bg-white text-[15px] font-semibold dark:bg-zinc-900">
+                        <Link
+                            href={route('os.show', os.id)}
+                            className="flex h-12 items-center justify-center gap-2 rounded-[3px] border border-[#c9cdd3] bg-white text-[15px] font-semibold dark:bg-zinc-900"
+                        >
                             <FileText className="size-5" /> Abrir ficha
                         </Link>
                     )}
@@ -129,24 +149,32 @@ export default function AgendaOficina({ fila, andamento, agenda }: { fila: OsCar
 
             {/* Computador */}
             <div className="hidden gap-3 md:grid">
-                <Block title={`Fila: carros que chegaram e esperam mecânico · ${fila.length}`} className="border-l-4 border-l-cyan-600" bodyClassName="p-0">
+                <Block title={`Fila · ${fila.length}`} className="border-l-4 border-l-cyan-600" bodyClassName="p-0">
                     <Grid cols={filaCols} rows={fila} rowKey={(r) => r.id} onRowClick={open} empty="Nenhum carro esperando. 👍" />
                 </Block>
                 <Block title={`Em andamento · ${andamento.length}`} bodyClassName="p-0">
                     <Grid cols={workCols} rows={andamento} rowKey={(r) => r.id} onRowClick={open} empty="Nenhum carro em atendimento." />
                 </Block>
-                <Block title={`Agendados (ainda não chegaram) · ${agenda.length}`} bodyClassName="p-0">
+                <Block title={`Agendados · ${agenda.length}`} bodyClassName="p-0">
                     <Grid cols={agendaCols} rows={agenda} rowKey={(r) => r.id} onRowClick={open} empty="Nenhum agendamento." />
                 </Block>
             </div>
 
             {/* Celular */}
             <div className="grid gap-2 md:hidden">
-                <h2 className="px-1 pt-1 text-[13px] font-bold tracking-wide text-cyan-800 uppercase">Fila: chegaram · {fila.length}</h2>
-                {fila.length ? fila.map((os) => <MobileCard key={os.id} os={os} />) : <p className="text-muted-foreground px-1 text-[15px]">Nenhum carro esperando.</p>}
+                <h2 className="px-1 pt-1 text-[13px] font-bold tracking-wide text-cyan-800 uppercase">Fila · {fila.length}</h2>
+                {fila.length ? (
+                    fila.map((os) => <MobileCard key={os.id} os={os} />)
+                ) : (
+                    <p className="text-muted-foreground px-1 text-[15px]">Nenhum carro esperando.</p>
+                )}
                 <h2 className="px-1 pt-3 text-[13px] font-bold tracking-wide text-zinc-600 uppercase">Em andamento · {andamento.length}</h2>
-                {andamento.length ? andamento.map((os) => <MobileCard key={os.id} os={os} />) : <p className="text-muted-foreground px-1 text-[15px]">Nenhum carro em atendimento.</p>}
-                <h2 className="px-1 pt-3 text-[13px] font-bold tracking-wide text-zinc-500 uppercase">Agendados (ainda não chegaram) · {agenda.length}</h2>
+                {andamento.length ? (
+                    andamento.map((os) => <MobileCard key={os.id} os={os} />)
+                ) : (
+                    <p className="text-muted-foreground px-1 text-[15px]">Nenhum carro em atendimento.</p>
+                )}
+                <h2 className="px-1 pt-3 text-[13px] font-bold tracking-wide text-zinc-500 uppercase">Agendados · {agenda.length}</h2>
                 {agenda.map((os) => (
                     <MobileCard key={os.id} os={os} info />
                 ))}

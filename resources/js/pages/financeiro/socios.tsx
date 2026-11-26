@@ -10,7 +10,16 @@ import { ArrowDownToLine, ArrowUpFromLine, Save, Trash2, UserCog } from 'lucide-
 import { useState } from 'react';
 
 type Bal = { id: number; name: string; share: number; aportes: number; retiradas: number; net: number; target: number; diff: number };
-type Mov = { id: number; partner: string; partner_id: number; type: 'aporte' | 'retirada'; amount: number; date: string; description: string | null };
+type Mov = {
+    id: number;
+    partner: string;
+    partner_id: number;
+    type: 'aporte' | 'retirada';
+    amount: number;
+    date: string;
+    description: string | null;
+    from_entry: boolean;
+};
 type P = { id: number; name: string; share: number; active: boolean; user_id: number | null };
 
 interface Props {
@@ -26,7 +35,13 @@ const pct = (v: number) => `${v.toLocaleString('pt-BR', { maximumFractionDigits:
 
 function MovementForm({ type, partners, onDone }: { type: 'aporte' | 'retirada'; partners: P[]; onDone: () => void }) {
     const active = partners.filter((p) => p.active);
-    const { data, setData, post, processing, errors } = useForm({ type, partner_id: String(active[0]?.id ?? ''), amount: '', date: todayIso(), description: '' });
+    const { data, setData, post, processing, errors } = useForm({
+        type,
+        partner_id: String(active[0]?.id ?? ''),
+        amount: '',
+        date: todayIso(),
+        description: '',
+    });
     return (
         <form
             className="grid gap-3 sm:grid-cols-2"
@@ -47,14 +62,25 @@ function MovementForm({ type, partners, onDone }: { type: 'aporte' | 'retirada';
             <Field label="Data *" error={errors.date}>
                 <Input type="date" value={data.date} onChange={(e) => setData('date', e.target.value)} />
             </Field>
-            <Field label="Valor (R$) *" error={errors.amount}>
-                <Input inputMode="decimal" value={data.amount} onChange={(e) => setData('amount', e.target.value)} className="text-right font-semibold tabular-nums" placeholder="0,00" autoFocus />
+            <Field label="Valor *" error={errors.amount}>
+                <Input
+                    inputMode="decimal"
+                    value={data.amount}
+                    onChange={(e) => setData('amount', e.target.value)}
+                    className="text-right font-semibold tabular-nums"
+                    placeholder="0,00"
+                    autoFocus
+                />
             </Field>
             <Field label="Descrição">
-                <Input value={data.description} onChange={(e) => setData('description', e.target.value)} placeholder={type === 'aporte' ? 'Ex.: compra de elevador' : 'Ex.: pró-labore'} />
+                <Input value={data.description} onChange={(e) => setData('description', e.target.value)} />
             </Field>
             <div className="flex justify-end sm:col-span-2">
-                <button type="submit" disabled={processing} className="inline-flex h-11 items-center gap-1.5 rounded-[3px] border border-[#b51f1f] bg-[#d42a2a] px-4 text-[13px] font-semibold text-white md:h-8">
+                <button
+                    type="submit"
+                    disabled={processing}
+                    className="inline-flex h-11 items-center gap-1.5 rounded-[3px] border border-[#b51f1f] bg-[#d42a2a] px-4 text-[13px] font-semibold text-white md:h-8"
+                >
                     <Save className="size-4" /> Gravar {type}
                 </button>
             </div>
@@ -63,7 +89,12 @@ function MovementForm({ type, partners, onDone }: { type: 'aporte' | 'retirada';
 }
 
 function PartnerRowForm({ p, users }: { p?: P; users: Props['users'] }) {
-    const { data, setData, post, put, processing, isDirty, errors } = useForm({ name: p?.name ?? '', share: String(p?.share ?? ''), active: p?.active ?? true, user_id: p?.user_id ? String(p.user_id) : '' });
+    const { data, setData, post, put, processing, isDirty, errors } = useForm({
+        name: p?.name ?? '',
+        share: String(p?.share ?? ''),
+        active: p?.active ?? true,
+        user_id: p?.user_id ? String(p.user_id) : '',
+    });
     const save = () => {
         const opts = { preserveScroll: true };
         if (p) put(route('financeiro.partners.update', p.id), opts);
@@ -76,7 +107,12 @@ function PartnerRowForm({ p, users }: { p?: P; users: Props['users'] }) {
                 {errors.name && <span className="text-[12px] text-red-600">{errors.name}</span>}
             </td>
             <td className="w-24 p-1.5">
-                <Input value={data.share} onChange={(e) => setData('share', e.target.value)} inputMode="decimal" className="text-right tabular-nums" />
+                <Input
+                    value={data.share}
+                    onChange={(e) => setData('share', e.target.value)}
+                    inputMode="decimal"
+                    className="text-right tabular-nums"
+                />
             </td>
             <td className="w-40 p-1.5">
                 <select className={selectCls} value={data.user_id} onChange={(e) => setData('user_id', e.target.value)}>
@@ -89,11 +125,21 @@ function PartnerRowForm({ p, users }: { p?: P; users: Props['users'] }) {
                 </select>
             </td>
             <td className="w-16 p-1.5 text-center">
-                <input type="checkbox" className="size-4 accent-[#d42a2a]" checked={data.active} onChange={(e) => setData('active', e.target.checked)} />
+                <input
+                    type="checkbox"
+                    className="size-4 accent-[#d42a2a]"
+                    checked={data.active}
+                    onChange={(e) => setData('active', e.target.checked)}
+                />
             </td>
             <td className="w-24 p-1.5">
                 {(isDirty || !p) && (
-                    <button type="button" onClick={save} disabled={processing || !data.name} className="h-9 w-full rounded-[3px] bg-zinc-900 text-[12px] font-semibold text-white md:h-8">
+                    <button
+                        type="button"
+                        onClick={save}
+                        disabled={processing || !data.name}
+                        className="h-9 w-full rounded-[3px] bg-zinc-900 text-[12px] font-semibold text-white md:h-8"
+                    >
                         {p ? 'Gravar' : 'Incluir'}
                     </button>
                 )}
@@ -133,22 +179,41 @@ export default function Socios({ month, balance, result, movements, partners, us
         { label: 'Sócio', render: (r) => r.partner, className: 'w-40' },
         {
             label: 'Tipo',
-            render: (r) => <span className={cn('text-[11px] font-bold uppercase', r.type === 'aporte' ? 'text-green-700' : 'text-[#b51f1f]')}>{r.type === 'aporte' ? 'Aporte' : 'Retirada'}</span>,
+            render: (r) => (
+                <span className={cn('text-[11px] font-bold uppercase', r.type === 'aporte' ? 'text-green-700' : 'text-[#b51f1f]')}>
+                    {r.type === 'aporte' ? 'Aporte' : 'Retirada'}
+                </span>
+            ),
             className: 'w-24',
         },
-        { label: 'Descrição', render: (r) => r.description ?? '—', hide: 'sm' },
+        {
+            label: 'Descrição',
+            render: (r) => (
+                <span>
+                    {r.description ?? '—'}
+                    {r.from_entry && (
+                        <span className="ml-1.5 rounded-[2px] bg-zinc-200 px-1 text-[10px] font-semibold dark:bg-zinc-700">via lançamento</span>
+                    )}
+                </span>
+            ),
+            hide: 'sm',
+        },
         { label: 'Valor', render: (r) => <b>{(r.type === 'retirada' ? '- ' : '') + money(r.amount)}</b>, align: 'right', className: 'w-32' },
         {
             label: '',
-            render: (r) => (
-                <button
-                    title="Excluir"
-                    onClick={() => confirm('Excluir esta movimentação?') && router.delete(route('financeiro.movements.destroy', r.id), { preserveScroll: true })}
-                    className="grid size-9 place-items-center rounded-[3px] text-zinc-500 hover:bg-red-50 hover:text-red-700 md:size-7"
-                >
-                    <Trash2 className="size-4" />
-                </button>
-            ),
+            render: (r) =>
+                r.from_entry ? null : (
+                    <button
+                        title="Excluir"
+                        onClick={() =>
+                            confirm('Excluir esta movimentação?') &&
+                            router.delete(route('financeiro.movements.destroy', r.id), { preserveScroll: true })
+                        }
+                        className="grid size-9 place-items-center rounded-[3px] text-zinc-500 hover:bg-red-50 hover:text-red-700 md:size-7"
+                    >
+                        <Trash2 className="size-4" />
+                    </button>
+                ),
             className: 'w-12',
             align: 'center',
         },
@@ -156,7 +221,7 @@ export default function Socios({ month, balance, result, movements, partners, us
 
     return (
         <AppLayout
-            title="Sócios: Aportes e Retiradas"
+            title="Sócios"
             code="FIN020"
             toolbar={
                 <>
@@ -168,12 +233,13 @@ export default function Socios({ month, balance, result, movements, partners, us
         >
             <Head title="Sócios" />
             <div className="grid gap-2 md:gap-3">
-                <Block title="Equilíbrio dos aportes (acumulado)" bodyClassName="p-0">
+                <Block title="Equilíbrio dos aportes" bodyClassName="p-0">
                     <p className="border-b border-[#e3e5e8] bg-[#fafafa] px-3 py-2 text-[13px] dark:bg-zinc-900">
                         Total investido pelos sócios: <b>{money(balance.total)}</b>.{' '}
                         {n > 0 && (
                             <>
-                                Pela participação, a parte de cada um é a coluna <b>Parte ideal</b>. Quem está abaixo precisa aportar a diferença para todos ficarem iguais.
+                                Pela participação, a parte de cada um é a coluna <b>Parte ideal</b>. Quem está abaixo precisa aportar a diferença para
+                                todos ficarem iguais.
                             </>
                         )}
                     </p>
@@ -189,7 +255,15 @@ export default function Socios({ month, balance, result, movements, partners, us
                     <Block
                         title={`Resultado e divisão · ${monthLabel(month)}`}
                         bodyClassName="p-0"
-                        actions={<Input type="month" value={month} onChange={(e) => router.get(route('financeiro.partners'), { mes: e.target.value }, { preserveState: true })} className="h-8 w-36 md:h-7" aria-label="Mês" />}
+                        actions={
+                            <Input
+                                type="month"
+                                value={month}
+                                onChange={(e) => router.get(route('financeiro.partners'), { mes: e.target.value }, { preserveState: true })}
+                                className="h-8 w-36 md:h-7"
+                                aria-label="Mês"
+                            />
+                        }
                     >
                         <table className="w-full text-[13px]">
                             <tbody>
@@ -203,14 +277,18 @@ export default function Socios({ month, balance, result, movements, partners, us
                                 </tr>
                                 <tr className="border-b border-[#c9cdd3] bg-[#f3f4f6] font-bold dark:bg-zinc-800">
                                     <td className="px-3 py-1.5">Resultado do mês</td>
-                                    <td className={cn('px-3 py-1.5 text-right tabular-nums', result.total < 0 && 'text-[#b51f1f]')}>{money(result.total)}</td>
+                                    <td className={cn('px-3 py-1.5 text-right tabular-nums', result.total < 0 && 'text-[#b51f1f]')}>
+                                        {money(result.total)}
+                                    </td>
                                 </tr>
                                 {result.split.map((s) => (
                                     <tr key={s.id} className="border-b border-[#e3e5e8] last:border-b-0">
                                         <td className="px-3 py-1.5">
                                             {s.name} <span className="text-zinc-500">({pct(s.share)})</span>
                                         </td>
-                                        <td className={cn('px-3 py-1.5 text-right font-semibold tabular-nums', s.value < 0 && 'text-[#b51f1f]')}>{money(s.value)}</td>
+                                        <td className={cn('px-3 py-1.5 text-right font-semibold tabular-nums', s.value < 0 && 'text-[#b51f1f]')}>
+                                            {money(s.value)}
+                                        </td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -218,7 +296,13 @@ export default function Socios({ month, balance, result, movements, partners, us
                     </Block>
 
                     <Block title="Movimentações dos sócios" bodyClassName="p-0">
-                        <Grid cols={movCols} rows={movements} rowKey={(r) => r.id} empty="Nenhum aporte ou retirada." footer={<span>{movements.length} movimentação(ões)</span>} />
+                        <Grid
+                            cols={movCols}
+                            rows={movements}
+                            rowKey={(r) => r.id}
+                            empty="Nenhum aporte ou retirada."
+                            footer={<span>{movements.length} movimentação(ões)</span>}
+                        />
                     </Block>
                 </div>
             </div>
@@ -226,9 +310,13 @@ export default function Socios({ month, balance, result, movements, partners, us
             <Dialog open={dialog !== null} onOpenChange={(o) => !o && setDialog(null)}>
                 <DialogContent className={cn('max-h-[92svh] overflow-y-auto rounded-[4px]', dialog === 'socios' ? 'sm:max-w-3xl' : 'sm:max-w-xl')}>
                     <DialogHeader>
-                        <DialogTitle>{dialog === 'aporte' ? 'Novo aporte' : dialog === 'retirada' ? 'Nova retirada' : 'Cadastro de sócios'}</DialogTitle>
+                        <DialogTitle>
+                            {dialog === 'aporte' ? 'Novo aporte' : dialog === 'retirada' ? 'Nova retirada' : 'Cadastro de sócios'}
+                        </DialogTitle>
                     </DialogHeader>
-                    {(dialog === 'aporte' || dialog === 'retirada') && <MovementForm key={dialog} type={dialog} partners={partners} onDone={() => setDialog(null)} />}
+                    {(dialog === 'aporte' || dialog === 'retirada') && (
+                        <MovementForm key={dialog} type={dialog} partners={partners} onDone={() => setDialog(null)} />
+                    )}
                     {dialog === 'socios' && (
                         <div className="overflow-x-auto">
                             <table className="w-full min-w-[560px] text-[13px]">
@@ -248,7 +336,9 @@ export default function Socios({ month, balance, result, movements, partners, us
                                     <PartnerRowForm key={`novo-${partners.length}`} users={users} />
                                 </tbody>
                             </table>
-                            <p className="text-muted-foreground mt-2 text-[12px]">A participação (%) define a parte ideal de cada um nos aportes e a divisão do resultado.</p>
+                            <p className="text-muted-foreground mt-2 text-[12px]">
+                                A participação (%) define a parte ideal de cada um nos aportes e a divisão do resultado.
+                            </p>
                         </div>
                     )}
                 </DialogContent>

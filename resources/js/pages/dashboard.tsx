@@ -32,9 +32,21 @@ export default function Dashboard({ counts, oldest, today, online, open, month }
 
     const agendaCols: Col<OsCard>[] = [
         { label: 'Hora', render: (r) => <b className="tabular-nums">{time(r.scheduled_at) || '—'}</b>, className: 'w-16' },
-        { label: 'Placa', render: (r) => (r.vehicle?.plate ? <Placa value={r.vehicle.plate} /> : <span className="text-zinc-400">sem placa</span>), className: 'w-24' },
+        {
+            label: 'Placa',
+            render: (r) => (r.vehicle?.plate ? <Placa value={r.vehicle.plate} /> : <span className="text-zinc-400">sem placa</span>),
+            className: 'w-24',
+        },
         { label: 'Veículo', render: (r) => r.vehicle?.title || '—' },
-        { label: 'Cliente', render: (r) => <span className="flex items-center gap-1.5">{r.client?.name} <OriginTag origin={r.origin} /></span>, hide: 'md' },
+        {
+            label: 'Cliente',
+            render: (r) => (
+                <span className="flex items-center gap-1.5">
+                    {r.client?.name} <OriginTag origin={r.origin} />
+                </span>
+            ),
+            hide: 'md',
+        },
         { label: 'Solicitação', render: (r) => <span className="line-clamp-1">{r.complaint}</span>, hide: 'lg' },
     ];
 
@@ -76,16 +88,27 @@ export default function Dashboard({ counts, oldest, today, online, open, month }
                 <div className="grid min-w-0 content-start gap-2 md:gap-3">
                     {online.length > 0 && (
                         <Block
-                            title={`Novos agendamentos online (bot / site) · ${online.length}`}
+                            title={`Agendamentos online · ${online.length}`}
                             className="border-l-4 border-l-emerald-600"
                             bodyClassName="p-0"
                             actions={<span className="text-[11px] text-zinc-500">abra para confirmar com o cliente</span>}
                         >
                             <Grid
                                 cols={[
-                                    { label: 'Quando', render: (r: OsCard) => (r.scheduled_at ? `${date(r.scheduled_at)} ${time(r.scheduled_at)}` : 'a combinar'), className: 'w-36' },
-                                    { label: 'Cliente', render: (r: OsCard) => <span className="flex items-center gap-1.5"><b>{r.client?.name}</b> <OriginTag origin={r.origin} /></span> },
-                                    { label: 'Carro', render: (r: OsCard) => r.vehicle?.title || '—', hide: 'md' },
+                                    {
+                                        label: 'Quando',
+                                        render: (r: OsCard) => (r.scheduled_at ? `${date(r.scheduled_at)} ${time(r.scheduled_at)}` : 'a combinar'),
+                                        className: 'w-36',
+                                    },
+                                    {
+                                        label: 'Cliente',
+                                        render: (r: OsCard) => (
+                                            <span className="flex items-center gap-1.5">
+                                                <b>{r.client?.name}</b> <OriginTag origin={r.origin} />
+                                            </span>
+                                        ),
+                                    },
+                                    { label: 'Veículo', render: (r: OsCard) => r.vehicle?.title || '—', hide: 'md' },
                                     { label: 'Tipo', render: (r: OsCard) => (r.service_type ? SERVICE_TYPE[r.service_type] : '—'), hide: 'lg' },
                                     { label: 'Relato', render: (r: OsCard) => <span className="line-clamp-1">{r.complaint}</span>, hide: 'lg' },
                                 ]}
@@ -96,12 +119,27 @@ export default function Dashboard({ counts, oldest, today, online, open, month }
                         </Block>
                     )}
 
-                    <Block title={`Agendados para hoje (ainda não chegaram) · ${date(new Date().toISOString())}`} bodyClassName="p-0">
+                    <Block title="Agendados para hoje" bodyClassName="p-0">
                         <Grid cols={agendaCols} rows={today} rowKey={(r) => r.id} onRowClick={go} empty="Nenhum agendamento pendente para hoje." />
                     </Block>
 
-                    <Block title={`Na oficina · ${open.length}`} bodyClassName="p-0" actions={<Link href={route('os.index')} className="text-[12px] font-semibold text-[#b51f1f] hover:underline">Ver todas</Link>}>
-                        <Grid cols={openCols} rows={open} rowKey={(r) => r.id} onRowClick={go} empty="Nenhum carro na oficina." footer={<span>Ordenado pelo que está parado há mais tempo</span>} />
+                    <Block
+                        title={`Na oficina · ${open.length}`}
+                        bodyClassName="p-0"
+                        actions={
+                            <Link href={route('os.index')} className="text-[12px] font-semibold text-[#b51f1f] hover:underline">
+                                Ver todas
+                            </Link>
+                        }
+                    >
+                        <Grid
+                            cols={openCols}
+                            rows={open}
+                            rowKey={(r) => r.id}
+                            onRowClick={go}
+                            empty="Nenhum carro na oficina."
+                            footer={<span>Ordenado pelo que está parado há mais tempo</span>}
+                        />
                     </Block>
                 </div>
 
@@ -113,11 +151,25 @@ export default function Dashboard({ counts, oldest, today, online, open, month }
                                     const s = since(oldest[p.status], p.status);
                                     return (
                                         <li key={p.status} className="border-b border-[#e3e5e8] last:border-b-0">
-                                            <Link href={route('os.index', { status: p.status })} className="flex items-center gap-3 px-3 py-2.5 hover:bg-[#fdecec]">
-                                                <span className="grid h-7 min-w-7 place-items-center rounded-[3px] bg-[#d42a2a] px-1.5 text-[13px] font-bold text-white tabular-nums">{counts[p.status]}</span>
+                                            <Link
+                                                href={route('os.index', { status: p.status })}
+                                                className="flex items-center gap-3 px-3 py-2.5 hover:bg-[#fdecec]"
+                                            >
+                                                <span className="grid h-7 min-w-7 place-items-center rounded-[3px] bg-[#d42a2a] px-1.5 text-[13px] font-bold text-white tabular-nums">
+                                                    {counts[p.status]}
+                                                </span>
                                                 <span className="min-w-0 flex-1 text-[13px] leading-tight">
                                                     {p.text}
-                                                    {s.text && <span className={cn('block text-[11px]', s.stale ? 'font-bold text-[#b51f1f]' : 'text-zinc-500')}>{s.stale ? '⚠ ' : ''}mais antigo {s.text}</span>}
+                                                    {s.text && (
+                                                        <span
+                                                            className={cn(
+                                                                'block text-[11px]',
+                                                                s.stale ? 'font-bold text-[#b51f1f]' : 'text-zinc-500',
+                                                            )}
+                                                        >
+                                                            {s.stale ? '⚠ ' : ''}mais antigo {s.text}
+                                                        </span>
+                                                    )}
                                                 </span>
                                             </Link>
                                         </li>
@@ -140,7 +192,14 @@ export default function Dashboard({ counts, oldest, today, online, open, month }
                                                     {STATUS[s].short}
                                                 </Link>
                                             </td>
-                                            <td className={cn('px-1 py-1.5 text-right text-[11px] tabular-nums', old.stale ? 'font-bold text-[#b51f1f]' : 'text-zinc-500')}>{counts[s] ? old.text : ''}</td>
+                                            <td
+                                                className={cn(
+                                                    'px-1 py-1.5 text-right text-[11px] tabular-nums',
+                                                    old.stale ? 'font-bold text-[#b51f1f]' : 'text-zinc-500',
+                                                )}
+                                            >
+                                                {counts[s] ? old.text : ''}
+                                            </td>
                                             <td className="w-10 px-3 py-1.5 text-right font-bold tabular-nums">{counts[s] ?? 0}</td>
                                         </tr>
                                     );

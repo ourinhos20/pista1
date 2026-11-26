@@ -7,7 +7,18 @@ import { Head, router } from '@inertiajs/react';
 import { Plus, Search } from 'lucide-react';
 import { useState } from 'react';
 
-const STATUSES: OsStatus[] = ['aguardando', 'recebido', 'diagnostico', 'orcamento', 'aprovacao', 'pecas', 'execucao', 'pronto', 'entregue', 'cancelada'];
+const STATUSES: OsStatus[] = [
+    'aguardando',
+    'recebido',
+    'diagnostico',
+    'orcamento',
+    'aprovacao',
+    'pecas',
+    'execucao',
+    'pronto',
+    'entregue',
+    'cancelada',
+];
 
 type Filters = { status: string; q: string; origem: string };
 
@@ -15,7 +26,8 @@ export default function OsIndex({ orders, filters }: { orders: OsCard[]; filters
     const [q, setQ] = useState(filters.q);
     const [status, setStatus] = useState(filters.status);
     const [origem, setOrigem] = useState(filters.origem ?? '');
-    const search = (params?: Partial<Filters>) => router.get(route('os.index'), { status, q, origem, ...params }, { preserveState: true, replace: true });
+    const search = (params?: Partial<Filters>) =>
+        router.get(route('os.index'), { status, q, origem, ...params }, { preserveState: true, replace: true });
 
     const cols: Col<OsCard>[] = [
         {
@@ -29,8 +41,17 @@ export default function OsIndex({ orders, filters }: { orders: OsCard[]; filters
             ),
             className: 'w-28',
         },
-        { label: 'Agendado', render: (r) => (r.scheduled_at ? `${date(r.scheduled_at)} ${time(r.scheduled_at)}` : '—'), hide: 'lg', className: 'w-36' },
-        { label: 'Placa', render: (r) => (r.vehicle?.plate ? <Placa value={r.vehicle.plate} /> : <span className="text-[12px] text-zinc-400">sem placa</span>), className: 'w-24' },
+        {
+            label: 'Agendado',
+            render: (r) => (r.scheduled_at ? `${date(r.scheduled_at)} ${time(r.scheduled_at)}` : '—'),
+            hide: 'lg',
+            className: 'w-36',
+        },
+        {
+            label: 'Placa',
+            render: (r) => (r.vehicle?.plate ? <Placa value={r.vehicle.plate} /> : <span className="text-[12px] text-zinc-400">sem placa</span>),
+            className: 'w-24',
+        },
         { label: 'Veículo', render: (r) => r.vehicle?.title },
         { label: 'Cliente', render: (r) => r.client?.name, hide: 'md' },
         { label: 'Tipo', render: (r) => (r.service_type ? SERVICE_TYPE[r.service_type] : '—'), hide: 'lg', className: 'w-36' },
@@ -48,7 +69,11 @@ export default function OsIndex({ orders, filters }: { orders: OsCard[]; filters
     ];
 
     return (
-        <AppLayout title="Ordens de Serviço" code="ATD020" toolbar={<Tool primary icon={<Plus />} label="Nova OS" fkey="F2" href={route('os.create')} />}>
+        <AppLayout
+            title="Ordens de Serviço"
+            code="ATD020"
+            toolbar={<Tool primary icon={<Plus />} label="Nova OS" fkey="F2" href={route('os.create')} />}
+        >
             <Head title="Ordens de serviço" />
             <div className="grid gap-2 md:gap-3">
                 <Block title="Filtros">
@@ -87,14 +112,14 @@ export default function OsIndex({ orders, filters }: { orders: OsCard[]; filters
                                 }}
                             >
                                 <option value="">Todas</option>
-                                <option value="online">Online (bot + site)</option>
+                                <option value="online">Online</option>
                                 <option value="bot">Bot do WhatsApp</option>
                                 <option value="site">Site</option>
                                 <option value="balcao">Balcão</option>
                             </select>
                         </Field>
-                        <Field label="Pesquisa">
-                            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Placa, nome, telefone, modelo ou nº da OS" />
+                        <Field label="Pesquisar">
+                            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Nome, CPF, telefone, placa ou nº da OS" />
                         </Field>
                         <Tool icon={<Search />} label="Pesquisar" onClick={() => search()} />
                     </form>

@@ -12,7 +12,7 @@
         </div>
     @else
         <h1 class="text-3xl font-black tracking-tight">Agendar atendimento</h1>
-        <p class="mt-2 text-zinc-600">Conte o que está acontecendo com o carro. Se puder, mande fotos. A gente confirma o horário pelo WhatsApp.</p>
+        <p class="mt-2 text-zinc-600">Preencha os dados e confirmamos o horário pelo WhatsApp.</p>
 
         @if ($errors->any())
             <div class="mt-6 rounded-md border border-red-300 bg-red-50 p-4 text-sm text-red-800" role="alert">
@@ -39,28 +39,28 @@
                     <input name="name" value="{{ old('name') }}" required maxlength="120" autocomplete="name" class="h-12 rounded-md border border-zinc-300 px-3 text-base focus:border-brand-dark focus:ring-2 focus:ring-brand/20 focus:outline-none">
                 </label>
                 <label class="grid gap-1.5">
-                    <span class="text-sm font-semibold">WhatsApp com DDD *</span>
-                    <input name="phone" value="{{ old('phone') }}" required inputmode="tel" autocomplete="tel" placeholder="(11) 90000-0000" class="h-12 rounded-md border border-zinc-300 px-3 text-base focus:border-brand-dark focus:ring-2 focus:ring-brand/20 focus:outline-none">
+                    <span class="text-sm font-semibold">WhatsApp *</span>
+                    <input name="phone" value="{{ old('phone') }}" required inputmode="tel" autocomplete="tel" class="h-12 rounded-md border border-zinc-300 px-3 text-base focus:border-brand-dark focus:ring-2 focus:ring-brand/20 focus:outline-none">
                 </label>
                 <label class="grid gap-1.5">
                     <span class="text-sm font-semibold">Placa</span>
-                    <input name="plate" value="{{ old('plate') }}" maxlength="8" placeholder="ABC1D23" class="h-12 rounded-md border border-zinc-300 px-3 font-mono text-base tracking-widest uppercase focus:border-brand-dark focus:ring-2 focus:ring-brand/20 focus:outline-none">
+                    <input name="plate" value="{{ old('plate') }}" maxlength="8" class="h-12 rounded-md border border-zinc-300 px-3 font-mono text-base tracking-widest uppercase focus:border-brand-dark focus:ring-2 focus:ring-brand/20 focus:outline-none">
                 </label>
-                <div class="grid grid-cols-[1fr_96px] gap-2">
+                <div class="grid min-w-0 grid-cols-[minmax(0,1fr)_88px] gap-2">
                     <label class="grid gap-1.5">
-                        <span class="text-sm font-semibold">Carro (marca e modelo)</span>
-                        <input name="vehicle" value="{{ old('vehicle') }}" maxlength="120" placeholder="Ex.: Fiat Strada" class="h-12 rounded-md border border-zinc-300 px-3 text-base focus:border-brand-dark focus:ring-2 focus:ring-brand/20 focus:outline-none">
+                        <span class="text-sm font-semibold">Veículo</span>
+                        <input name="vehicle" value="{{ old('vehicle') }}" maxlength="120" class="w-full min-w-0 h-12 rounded-md border border-zinc-300 px-3 text-base focus:border-brand-dark focus:ring-2 focus:ring-brand/20 focus:outline-none">
                     </label>
                     <label class="grid gap-1.5">
                         <span class="text-sm font-semibold">Ano</span>
-                        <input name="year" value="{{ old('year') }}" maxlength="9" inputmode="numeric" placeholder="2021" class="h-12 rounded-md border border-zinc-300 px-3 text-base focus:border-brand-dark focus:ring-2 focus:ring-brand/20 focus:outline-none">
+                        <input name="year" value="{{ old('year') }}" maxlength="9" inputmode="numeric" class="w-full min-w-0 h-12 rounded-md border border-zinc-300 px-3 text-base focus:border-brand-dark focus:ring-2 focus:ring-brand/20 focus:outline-none">
                     </label>
                 </div>
             </div>
 
             @if (! empty($types))
                 <fieldset class="grid gap-1.5">
-                    <legend class="mb-1.5 text-sm font-semibold">O que você precisa?</legend>
+                    <legend class="mb-1.5 text-sm font-semibold">Tipo de serviço</legend>
                     <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
                         @foreach ($types as $key => $label)
                             <label class="flex h-12 cursor-pointer items-center justify-center rounded-md border border-zinc-300 px-2 text-center text-sm font-semibold has-[:checked]:border-zinc-900 has-[:checked]:bg-zinc-900 has-[:checked]:text-white">
@@ -73,19 +73,19 @@
             @endif
 
             <label class="grid gap-1.5">
-                <span class="text-sm font-semibold">O que está acontecendo? *</span>
-                <textarea name="complaint" required rows="5" maxlength="3000" placeholder="Ex.: barulho na roda dianteira quando freio; luz da injeção acesa; quero fazer a revisão dos 60 mil km…" class="rounded-md border border-zinc-300 px-3 py-2.5 text-base focus:border-brand-dark focus:ring-2 focus:ring-brand/20 focus:outline-none">{{ old('complaint') }}</textarea>
+                <span class="text-sm font-semibold">Descreva o problema ou o serviço *</span>
+                <textarea name="complaint" required rows="5" maxlength="3000" class="rounded-md border border-zinc-300 px-3 py-2.5 text-base focus:border-brand-dark focus:ring-2 focus:ring-brand/20 focus:outline-none">{{ old('complaint') }}</textarea>
             </label>
 
             <label class="grid gap-1.5 sm:w-1/2">
-                <span class="text-sm font-semibold">Melhor dia e horário (opcional)</span>
+                <span class="text-sm font-semibold">Dia e horário</span>
                 <input type="datetime-local" name="preferred_at" value="{{ old('preferred_at') }}" class="h-12 rounded-md border border-zinc-300 px-3 text-base focus:border-brand-dark focus:ring-2 focus:ring-brand/20 focus:outline-none">
             </label>
 
             <label class="grid gap-1.5">
-                <span class="text-sm font-semibold">Fotos (opcional, até 4)</span>
+                <span class="text-sm font-semibold">Fotos</span>
                 <input id="fotos" type="file" name="photos[]" accept="image/*" multiple class="block w-full text-sm file:mr-3 file:h-11 file:rounded-md file:border-0 file:bg-zinc-900 file:px-4 file:font-semibold file:text-white">
-                <span id="fotos-info" class="text-xs text-zinc-500">Painel com luz acesa, peça com vazamento, barulho (foto do local)…</span>
+                <span id="fotos-info" class="text-xs text-zinc-500">Até 4 fotos.</span>
             </label>
 
             <label class="flex items-start gap-3 text-sm text-zinc-700">

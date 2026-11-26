@@ -4,7 +4,14 @@
  */
 import { FlashToast } from '@/components/flash-toast';
 import { PlateSearch } from '@/components/plate-search';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { STATUS, since } from '@/lib/os';
 import { cn } from '@/lib/utils';
@@ -46,7 +53,7 @@ export function menusFor(role: Role, preNew = 0): MenuGroup[] {
             items: [
                 item('Painel de atendimento', 'dashboard', 'ATD001', 'F1'),
                 item('Ordens de serviço', 'os.index', 'ATD020', 'F4'),
-                { label: 'Agendamentos online (bot/site)', href: path('os.index') + '?origem=online&status=aguardando', code: 'ATD005', badge: preNew },
+                { label: 'Agendamentos online', href: path('os.index') + '?origem=online&status=aguardando', code: 'ATD005', badge: preNew },
             ],
         },
         oficina,
@@ -101,7 +108,9 @@ function UserMenu() {
     return (
         <DropdownMenu>
             <DropdownMenuTrigger className="flex h-full items-center gap-2 px-3 text-[13px] text-zinc-300 hover:bg-white/10 hover:text-white">
-                <span className="grid size-6 place-items-center rounded-[3px] bg-[#d42a2a] text-[11px] font-bold text-white">{auth.user.name.slice(0, 1)}</span>
+                <span className="grid size-6 place-items-center rounded-[3px] bg-[#d42a2a] text-[11px] font-bold text-white">
+                    {auth.user.name.slice(0, 1)}
+                </span>
                 <span className="hidden max-w-32 truncate lg:inline">{auth.user.name}</span>
                 <ChevronDown className="size-3.5" />
             </DropdownMenuTrigger>
@@ -132,7 +141,9 @@ function MenuBar() {
     const current = page.url.split('?')[0];
     const groups = menusFor(auth.user.role, preNew);
     const Badge = ({ n }: { n?: number }) =>
-        n ? <span className="ml-2 grid h-5 min-w-5 place-items-center rounded-full bg-[#d42a2a] px-1 text-[11px] font-bold text-white">{n}</span> : null;
+        n ? (
+            <span className="ml-2 grid h-5 min-w-5 place-items-center rounded-full bg-[#d42a2a] px-1 text-[11px] font-bold text-white">{n}</span>
+        ) : null;
     const home = path(auth.user.role === 'mecanico' ? 'mecanico.index' : 'dashboard');
     const dash = path('dashboard');
     const [open, setOpen] = useState(false);
@@ -156,7 +167,14 @@ function MenuBar() {
                                 <p className="px-3 py-2 text-[11px] font-bold tracking-wider text-zinc-500 uppercase">{g.label}</p>
                                 {g.items.map((i) =>
                                     i.newTab ? (
-                                        <a key={i.href} href={i.href} target="_blank" rel="noreferrer" onClick={() => setOpen(false)} className="flex h-12 items-center rounded-[4px] px-3 text-[15px] text-zinc-300">
+                                        <a
+                                            key={i.href}
+                                            href={i.href}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            onClick={() => setOpen(false)}
+                                            className="flex h-12 items-center rounded-[4px] px-3 text-[15px] text-zinc-300"
+                                        >
                                             {i.label}
                                         </a>
                                     ) : (
@@ -164,7 +182,10 @@ function MenuBar() {
                                             key={i.href}
                                             href={i.href}
                                             onClick={() => setOpen(false)}
-                                            className={cn('flex h-12 items-center rounded-[4px] px-3 text-[15px]', current === i.href ? 'bg-white/10 font-semibold' : 'text-zinc-300')}
+                                            className={cn(
+                                                'flex h-12 items-center rounded-[4px] px-3 text-[15px]',
+                                                current === i.href ? 'bg-white/10 font-semibold' : 'text-zinc-300',
+                                            )}
                                         >
                                             {i.label}
                                             <Badge n={i.badge} />
@@ -210,7 +231,11 @@ function MenuBar() {
                                                 <span className="text-muted-foreground w-14 font-mono text-[11px]">{i.code}</span>
                                                 <span className="flex-1">{i.label}</span>
                                                 <Badge n={i.badge} />
-                                                {i.key && <kbd className="text-muted-foreground ml-4 rounded-[2px] border px-1 font-mono text-[10px]">{i.key}</kbd>}
+                                                {i.key && (
+                                                    <kbd className="text-muted-foreground ml-4 rounded-[2px] border px-1 font-mono text-[10px]">
+                                                        {i.key}
+                                                    </kbd>
+                                                )}
                                             </Link>
                                         )}
                                     </DropdownMenuItem>
@@ -315,7 +340,16 @@ export function Tool({ icon, label, fkey, href, onClick, primary, danger, disabl
         <>
             {icon}
             <span>{label}</span>
-            {fkey && <kbd className={cn('hidden rounded-[2px] border px-1 font-mono text-[10px] font-normal md:inline', primary ? 'border-white/40 text-white/80' : 'text-zinc-500')}>{fkey}</kbd>}
+            {fkey && (
+                <kbd
+                    className={cn(
+                        'hidden rounded-[2px] border px-1 font-mono text-[10px] font-normal md:inline',
+                        primary ? 'border-white/40 text-white/80' : 'text-zinc-500',
+                    )}
+                >
+                    {fkey}
+                </kbd>
+            )}
         </>
     );
     if (href && external)
@@ -339,7 +373,19 @@ export function Tool({ icon, label, fkey, href, onClick, primary, danger, disabl
 
 /* ------------------------------------------------------- blocos de tela */
 
-export function Block({ title, actions, children, className, bodyClassName }: { title?: ReactNode; actions?: ReactNode; children: ReactNode; className?: string; bodyClassName?: string }) {
+export function Block({
+    title,
+    actions,
+    children,
+    className,
+    bodyClassName,
+}: {
+    title?: ReactNode;
+    actions?: ReactNode;
+    children: ReactNode;
+    className?: string;
+    bodyClassName?: string;
+}) {
     return (
         <section className={cn('bg-card @container overflow-hidden rounded-[4px] border border-[#c9cdd3] dark:border-zinc-700', className)}>
             {(title || actions) && (
@@ -366,7 +412,12 @@ export function Field({ label, children, className, error }: { label: string; ch
 /** Valor somente leitura com aparência de campo. */
 export function ReadOnly({ children, className }: { children?: ReactNode; className?: string }) {
     return (
-        <div className={cn('flex min-h-11 min-w-0 items-center rounded-[3px] border border-[#d7dade] bg-[#f7f8f9] px-2.5 text-[15px] md:min-h-8 md:text-[13px] dark:border-zinc-700 dark:bg-zinc-800', className)}>
+        <div
+            className={cn(
+                'flex min-h-11 min-w-0 items-center rounded-[3px] border border-[#d7dade] bg-[#f7f8f9] px-2.5 text-[15px] md:min-h-8 md:text-[13px] dark:border-zinc-700 dark:bg-zinc-800',
+                className,
+            )}
+        >
             <span className="truncate">{children ?? <span className="text-zinc-400">—</span>}</span>
         </div>
     );
@@ -377,7 +428,15 @@ export const selectCls =
 export const textareaCls =
     'w-full rounded-[3px] border border-input bg-card px-2.5 py-2 text-base leading-relaxed md:text-[13px] focus-visible:border-[#d42a2a] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d42a2a]/20';
 
-export function Tabs<T extends string>({ tabs, value, onChange }: { tabs: { value: T; label: string; badge?: ReactNode }[]; value: T; onChange: (v: T) => void }) {
+export function Tabs<T extends string>({
+    tabs,
+    value,
+    onChange,
+}: {
+    tabs: { value: T; label: string; badge?: ReactNode }[];
+    value: T;
+    onChange: (v: T) => void;
+}) {
     return (
         <div className="flex overflow-x-auto border-b border-[#c9cdd3]">
             {tabs.map((t) => (
@@ -403,7 +462,13 @@ export function Tabs<T extends string>({ tabs, value, onChange }: { tabs: { valu
 export function Situacao({ status, className, short = false }: { status: OsStatus; className?: string; short?: boolean }) {
     const s = STATUS[status];
     return (
-        <span className={cn('inline-flex h-6 items-center gap-1.5 rounded-[3px] px-2 text-[11px] font-bold whitespace-nowrap uppercase ring-1 ring-inset md:h-5 md:px-1.5', s.badge, className)}>
+        <span
+            className={cn(
+                'inline-flex h-6 items-center gap-1.5 rounded-[3px] px-2 text-[11px] font-bold whitespace-nowrap uppercase ring-1 ring-inset md:h-5 md:px-1.5',
+                s.badge,
+                className,
+            )}
+        >
             <span className={cn('size-2 rounded-[1px]', s.dot)} />
             {short ? s.short : s.label}
         </span>
@@ -493,7 +558,11 @@ export function Grid<T>({
                     ))}
                 </tbody>
             </table>
-            {footer && <div className="flex items-center justify-between border-t border-[#d7dade] bg-[#f3f4f6] px-3 py-1.5 text-[12px] text-zinc-600 dark:border-zinc-700 dark:bg-zinc-800">{footer}</div>}
+            {footer && (
+                <div className="flex items-center justify-between border-t border-[#d7dade] bg-[#f3f4f6] px-3 py-1.5 text-[12px] text-zinc-600 dark:border-zinc-700 dark:bg-zinc-800">
+                    {footer}
+                </div>
+            )}
         </div>
     );
 }
@@ -503,7 +572,10 @@ export function Since({ iso, status, className }: { iso?: string | null; status:
     const s = since(iso, status);
     if (!s.text || ['entregue', 'cancelada'].includes(status)) return null;
     return (
-        <span className={cn('text-[11px] whitespace-nowrap tabular-nums', s.stale ? 'font-bold text-[#b51f1f]' : 'text-zinc-500', className)} title="Tempo nesta etapa">
+        <span
+            className={cn('text-[11px] whitespace-nowrap tabular-nums', s.stale ? 'font-bold text-[#b51f1f]' : 'text-zinc-500', className)}
+            title="Tempo nesta etapa"
+        >
             {s.stale ? '⚠ ' : ''}
             {s.text}
         </span>

@@ -17,6 +17,10 @@ class SupplierController extends Controller
     {
         $q = trim($request->string('q')->toString());
 
+        // quanto ainda se deve a cada fornecedor (contas das compras em aberto)
+        $open = FinanceEntry::whereNull('finance_entries.paid_at')->join('purchases', 'purchases.id', '=', 'finance_entries.purchase_id')
+            ->selectRaw('purchases.supplier_id, sum(finance_entries.amount) as total')->groupBy('purchases.supplier_id')->pluck('total', 'supplier_id');
+
         $rows = Supplier::withCount('purchases')->withSum('purchases', 'total')
             ->when($q !== '', fn ($w) => $w->where(fn ($x) => $x->where('name', 'like', "%{$q}%")->orWhere('contact', 'like', "%{$q}%")->orWhere('document', 'like', '%'.Plate::digits($q).'%')))
             ->orderByDesc('active')->orderBy('name')->limit(200)->get()
@@ -24,6 +28,7 @@ class SupplierController extends Controller
                 ...$s->only(['id', 'name', 'document', 'phone', 'contact', 'email', 'notes', 'active']),
                 'purchases_count' => $s->purchases_count,
                 'purchases_total' => round((float) $s->purchases_sum_total, 2),
+                'open_total' => round((float) ($open[$s->id] ?? 0), 2),
             ]);
 
         return Inertia::render('pecas/fornecedores', ['rows' => $rows, 'filters' => ['q' => $q]]);

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\OsStatus;
 use App\Models\Purchase;
 use App\Models\ServiceOrder;
 use App\Models\Supplier;
@@ -27,21 +28,48 @@ class PurchaseController extends Controller
         $m = $request->string('mes')->toString();
         $start = preg_match('/^\d{4}-\d{2}$/', $m) ? Carbon::createFromFormat('Y-m-d', "$m-01")->startOfDay() : now()->startOfMonth();
         $supplier = $request->integer('fornecedor');
+        $q = trim($request->string('q')->toString());
 
         $rows = Purchase::with(['supplier:id,name', 'serviceOrder:id', 'items', 'entries'])
-            ->whereBetween('date', [$start->toDateString(), $start->copy()->endOfMonth()->toDateString()])
-            ->when($supplier, fn ($q) => $q->where('supplier_id', $supplier))
-            ->latest('date')->latest('id')->get()
+            // pesquisa (NF, peça ou nº da OS) procura em todos os meses
+            ->when($q === '', fn ($w) => $w->whereBetween('date', [$start->toDateString(), $start->copy()->endOfMonth()->toDateString()]))
+            ->when($q !== '', fn ($w) => $w->where(fn ($x) => $x->where('invoice', 'like', "%{$q}%")
+                ->orWhereHas('items', fn ($i) => $i->where('description', 'like', "%{$q}%"))
+                ->when(ctype_digit($q), fn ($y) => $y->orWhere('service_order_id', (int) $q))))
+            ->when($supplier, fn ($w) => $w->where('supplier_id', $supplier))
+            ->latest('date')->latest('id')->limit(300)->get()
             ->map->toRow();
 
         return Inertia::render('pecas/compras', [
             'rows' => $rows,
             'total' => round($rows->sum('total'), 2),
-            'filters' => ['mes' => $start->format('Y-m'), 'fornecedor' => $supplier ?: ''],
+            'filters' => ['mes' => $start->format('Y-m'), 'fornecedor' => $supplier ?: '', 'q' => $q],
             'suppliers' => Supplier::where('active', true)->orderBy('name')->get(['id', 'name']),
             'methods' => Finance::METHODS,
             'prefillOs' => $request->integer('os') ?: null,
+            'orders' => $this->openOrders(),
         ]);
+    }
+
+    /**
+     * OS que podem receber compra (carro na oficina), com as peças pedidas,
+     * para escolher na lista e já puxar as peças na nova compra.
+     */
+    private function openOrders(): array
+    {
+        return ServiceOrder::with(['items', 'client', 'vehicle'])
+            ->whereIn('status', [OsStatus::Recebido, OsStatus::Diagnostico, OsStatus::Orcamento, OsStatus::Aprovacao, OsStatus::Pecas, OsStatus::Execucao, OsStatus::Pronto])
+            ->orderByRaw("case when status = 'pecas' then 0 else 1 end")->latest('id')->limit(200)->get()
+            ->map(fn (ServiceOrder $os) => [
+                'id' => $os->id,
+                'number' => $os->number(),
+                'status' => $os->status->value,
+                'status_label' => $os->status->label(),
+                'client' => $os->client?->name,
+                'vehicle' => trim(($os->vehicle?->title() ?? '').' '.($os->vehicle?->plate ?? '')),
+                'parts' => $os->items->where('type', 'peca')->where('approval', '!=', 'recusado')
+                    ->map(fn ($i) => ['description' => $i->description, 'quantity' => $i->quantity])->values(),
+            ])->all();
     }
 
     public function store(Request $request): RedirectResponse
@@ -57,7 +85,8 @@ class PurchaseController extends Controller
 
         $d = $request->validate([
             'supplier_id' => ['required', Rule::exists('suppliers', 'id')],
-            'invoice' => ['nullable', 'string', 'max:40'],
+            // a mesma NF do mesmo fornecedor lançada duas vezes duplicaria a conta a pagar
+            'invoice' => ['nullable', 'string', 'max:40', Rule::unique('purchases', 'invoice')->where('supplier_id', $request->input('supplier_id'))],
             'date' => ['required', 'date'],
             'service_order_id' => ['nullable', 'integer', Rule::exists('service_orders', 'id')],
             'add_to_os' => ['boolean'],
@@ -75,6 +104,7 @@ class PurchaseController extends Controller
             'items.required' => 'Inclua pelo menos uma peça.',
             'items.*.description.required' => 'Descreva a peça.',
             'items.*.quantity.gt' => 'Quantidade precisa ser maior que zero.',
+            'invoice.unique' => 'Esta nota já foi lançada para este fornecedor.',
         ], ['supplier_id' => 'fornecedor', 'first_due' => 'vencimento', 'date' => 'data']);
 
         $user = $request->user();

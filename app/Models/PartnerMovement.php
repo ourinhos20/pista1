@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class PartnerMovement extends Model
 {
-    protected $fillable = ['partner_id', 'type', 'amount', 'date', 'description', 'created_by'];
+    protected $fillable = ['partner_id', 'finance_entry_id', 'type', 'amount', 'date', 'description', 'created_by'];
 
     protected function casts(): array
     {

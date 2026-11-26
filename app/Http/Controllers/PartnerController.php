@@ -48,6 +48,7 @@ class PartnerController extends Controller
                 'amount' => $mv->amount,
                 'date' => $mv->date->toDateString(),
                 'description' => $mv->description,
+                'from_entry' => (bool) $mv->finance_entry_id,
             ]),
             'partners' => Partner::orderBy('id')->get(['id', 'name', 'share', 'active', 'user_id']),
             'users' => User::where('role', 'master')->orderBy('name')->get(['id', 'name']),
@@ -72,6 +73,10 @@ class PartnerController extends Controller
 
     public function destroyMovement(PartnerMovement $movement): RedirectResponse
     {
+        // o que veio de um lançamento se desfaz no lançamento (excluir ou estornar)
+        if ($movement->finance_entry_id) {
+            return back()->with('error', 'Este movimento veio de um lançamento do financeiro. Exclua ou estorne o lançamento.');
+        }
         $movement->delete();
 
         return back()->with('success', 'Movimentação excluída.');
@@ -93,6 +98,11 @@ class PartnerController extends Controller
 
     private function partnerData(Request $request): array
     {
+        // aceita "33,33"
+        if (is_string($request->input('share'))) {
+            $request->merge(['share' => str_replace(',', '.', $request->input('share'))]);
+        }
+
         return $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'share' => ['required', 'numeric', 'between:0,100'],

@@ -70,7 +70,7 @@ class ServiceOrderController extends Controller
             $plate = Plate::normalize($q);
             $digits = Plate::digits($q);
             $query->where(function ($w) use ($q, $plate, $digits) {
-                $w->whereHas('client', fn ($c) => $c->where('name', 'like', "%{$q}%")->when($digits && strlen($digits) >= 4, fn ($x) => $x->orWhere('phone', 'like', "%{$digits}%")))
+                $w->whereHas('client', fn ($c) => $c->where('name', 'like', "%{$q}%")->when($digits && strlen($digits) >= 4, fn ($x) => $x->orWhere('phone', 'like', "%{$digits}%")->orWhere('document', 'like', "%{$digits}%")))
                     ->orWhereHas('vehicle', fn ($v) => $v->where('plate', 'like', "%{$plate}%")->orWhere('model', 'like', "%{$q}%"));
                 if (ctype_digit($q)) {
                     $w->orWhere('id', (int) $q);
