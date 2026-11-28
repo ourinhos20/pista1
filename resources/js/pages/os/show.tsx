@@ -66,7 +66,7 @@ const showError = (errors: Record<string, string>) => {
 };
 
 /* ---------------------------------------------------- vistoria de entrada */
-function Vistoria({ os, canEdit }: { os: OsFull; canEdit: boolean }) {
+function Vistoria({ os, canEdit, onDone }: { os: OsFull; canEdit: boolean; onDone?: () => void }) {
     const [editing, setEditing] = useState(!os.inspected_at && canEdit);
     const { data, setData, patch, processing, errors } = useForm({
         km_in: os.km_in ? String(os.km_in) : '',
@@ -138,12 +138,17 @@ function Vistoria({ os, canEdit }: { os: OsFull; canEdit: boolean }) {
             className="grid gap-4"
             onSubmit={(e) => {
                 e.preventDefault();
-                patch(route('os.vistoria', os.id), { preserveScroll: true, onSuccess: () => setEditing(false) });
+                patch(route('os.vistoria', os.id), {
+                    preserveScroll: true,
+                    onSuccess: () => {
+                        setEditing(false);
+                        onDone?.();
+                    },
+                });
             }}
         >
             <p className="text-[13px] text-zinc-600">
-                <b>Primeiro passo, antes do diagnóstico:</b> registre como o carro chegou. Isso protege a oficina se aparecer um risco depois. Tire
-                fotos das avarias na aba <b>Fotos</b>.
+                <b>Primeiro passo, antes do diagnóstico:</b> registre como o carro chegou. Isso protege a oficina se aparecer um risco depois.
             </p>
             <div className="grid gap-3 sm:grid-cols-[180px_1fr_220px]">
                 <Field label="Km *" error={err.km_in}>
@@ -172,7 +177,12 @@ function Vistoria({ os, canEdit }: { os: OsFull; canEdit: boolean }) {
                     </div>
                 </Field>
                 <Field label="Chassi" error={err.chassis}>
-                    <Input value={data.chassis} onChange={(e) => setData('chassis', e.target.value.toUpperCase())} maxLength={17} className="font-mono uppercase" />
+                    <Input
+                        value={data.chassis}
+                        onChange={(e) => setData('chassis', e.target.value.toUpperCase())}
+                        maxLength={17}
+                        className="font-mono uppercase"
+                    />
                 </Field>
             </div>
             <Field label="Itens no veículo">
@@ -195,6 +205,11 @@ function Vistoria({ os, canEdit }: { os: OsFull; canEdit: boolean }) {
                     <CarDiagramEditor value={data.damages} onChange={(v) => setData('damages', v)} />
                 </div>
             </Field>
+            {/* foto da avaria é opcional e pode ser tirada aqui mesmo */}
+            <div className="flex flex-wrap items-center gap-2 text-[12px] text-zinc-600">
+                <PhotoUpload osId={os.id} className="w-full sm:w-auto" />
+                <span>Foto das avarias (opcional){os.photos.length ? ` · ${os.photos.length} foto(s)` : ''}</span>
+            </div>
             <div className="flex flex-wrap gap-2">
                 <button
                     type="submit"
@@ -338,31 +353,84 @@ function CadastroForm({ os, checkin, onDone }: { os: OsFull; checkin: boolean; o
     );
 }
 
+/** Botão "próximo passo" no fim de cada etapa da sequência do mecânico. */
+function NextStep({
+    label,
+    onClick,
+    disabled,
+    hint,
+    className,
+}: {
+    label: string;
+    onClick: () => void;
+    disabled?: boolean;
+    hint?: string;
+    className?: string;
+}) {
+    return (
+        <div className={cn('flex flex-wrap items-center justify-end gap-3 border-t border-dashed border-[#c9cdd3] pt-3', className)}>
+            {hint && <span className="text-[12px] text-zinc-600">{hint}</span>}
+            <button
+                type="button"
+                onClick={onClick}
+                disabled={disabled}
+                className="inline-flex h-12 items-center gap-2 rounded-[3px] bg-[#d42a2a] px-5 text-[15px] font-semibold text-white disabled:opacity-60 md:h-9 md:text-[13px]"
+            >
+                <ArrowRight className="size-4" /> {label}
+            </button>
+        </div>
+    );
+}
+
 /* --------------------------------------------------------------- etapas */
 function Etapas({ status }: { status: OsStatus }) {
     const cur = FLOW.indexOf(status);
+    const nextS = cur >= 0 ? FLOW[cur + 1] : undefined;
     return (
-        <ol className="flex overflow-x-auto rounded-[4px] border border-[#c9cdd3] bg-white text-[11px] font-semibold dark:bg-zinc-900">
-            {FLOW.map((s, i) => (
-                <li
-                    key={s}
-                    className={cn(
-                        'flex min-w-28 flex-1 items-center gap-1.5 border-r border-[#e3e5e8] px-2 py-1.5 whitespace-nowrap last:border-r-0',
-                        i === cur ? 'bg-zinc-900 text-white' : i < cur ? 'text-zinc-700 dark:text-zinc-300' : 'text-zinc-400',
-                    )}
-                >
-                    <span
+        <>
+            {cur >= 0 && (
+                <div className="grid gap-1.5 md:hidden">
+                    <div className="flex justify-between gap-2 text-[12px] font-semibold text-zinc-600 dark:text-zinc-400">
+                        <span>
+                            Etapa {cur + 1} de {FLOW.length} · {STATUS[status].short}
+                        </span>
+                        {nextS && <span>Próxima: {STATUS[nextS].short}</span>}
+                    </div>
+                    <div className="flex gap-[3px]" aria-hidden="true">
+                        {FLOW.map((s, i) => (
+                            <span
+                                key={s}
+                                className={cn(
+                                    'h-1.5 flex-1 rounded-full',
+                                    i < cur ? 'bg-zinc-900 dark:bg-zinc-200' : i === cur ? 'bg-[#d42a2a]' : 'bg-zinc-300 dark:bg-zinc-700',
+                                )}
+                            />
+                        ))}
+                    </div>
+                </div>
+            )}
+            <ol className="hidden overflow-x-auto rounded-lg border border-[#d7dade] bg-white text-[11px] font-semibold md:flex dark:bg-zinc-900">
+                {FLOW.map((s, i) => (
+                    <li
+                        key={s}
                         className={cn(
-                            'grid size-4 place-items-center rounded-[2px] text-[10px]',
-                            i === cur ? 'bg-[#d42a2a]' : i < cur ? STATUS[s].dot + ' text-white' : 'border border-zinc-300',
+                            'flex min-w-28 flex-1 items-center gap-1.5 border-r border-[#e3e5e8] px-2 py-1.5 whitespace-nowrap last:border-r-0',
+                            i === cur ? 'bg-zinc-900 text-white' : i < cur ? 'text-zinc-700 dark:text-zinc-300' : 'text-zinc-400',
                         )}
                     >
-                        {i < cur ? '✓' : i + 1}
-                    </span>
-                    {STATUS[s].short ?? STATUS[s].label}
-                </li>
-            ))}
-        </ol>
+                        <span
+                            className={cn(
+                                'grid size-4 place-items-center rounded-[2px] text-[10px]',
+                                i === cur ? 'bg-[#d42a2a]' : i < cur ? STATUS[s].dot + ' text-white' : 'border border-zinc-300',
+                            )}
+                        >
+                            {i < cur ? '✓' : i + 1}
+                        </span>
+                        {STATUS[s].short ?? STATUS[s].label}
+                    </li>
+                ))}
+            </ol>
+        </>
     );
 }
 
@@ -422,7 +490,7 @@ function Revisao({ os }: { os: OsFull }) {
                     ))}
                 </span>
             </div>
-            <details className="rounded-[3px] border border-[#d7dade] bg-[#f6f7f8] px-3 py-1.5 text-[13px] md:text-[12px] dark:bg-zinc-800">
+            <details className="rounded-lg border border-[#e4e6ea] bg-[#f6f7f8] px-3 py-1.5 text-[13px] md:text-[12px] dark:bg-zinc-800">
                 <summary className="cursor-pointer font-semibold">Como marcar (OK, Atenção, Trocar)</summary>
                 <ul className="mt-1 grid gap-0.5">
                     {REVISION_VALUES.map((r) => (
@@ -437,14 +505,17 @@ function Revisao({ os }: { os: OsFull }) {
             </details>
             <div className="grid gap-3 lg:grid-cols-2 2xl:grid-cols-3">
                 {REVISION_GROUPS.map((g) => (
-                    <div key={g.title} className="overflow-hidden rounded-[4px] border border-[#c9cdd3]">
-                        <div className="flex h-10 items-center border-b border-[#d7dade] bg-[#eceef1] px-2.5 text-[11px] font-bold tracking-wide uppercase md:h-8 dark:bg-zinc-800">
-                            <span className="flex-1">{g.title}</span>
+                    <div
+                        key={g.title}
+                        className="overflow-hidden rounded-xl border border-[#e4e6ea] md:rounded-lg md:border-[#d7dade] dark:border-zinc-800"
+                    >
+                        <div className="flex h-12 items-center border-b border-[#eceef1] bg-[#f7f8f9] px-3.5 md:h-8 md:px-2.5 dark:border-zinc-800 dark:bg-zinc-800">
+                            <span className="flex-1 text-[15px] font-bold md:text-[11px] md:tracking-wide md:uppercase">{g.title}</span>
                             {g.items.some((it) => !values[it.key]) && (
                                 <button
                                     type="button"
                                     onClick={() => restOk(g.items.map((it) => it.key))}
-                                    className="h-8 rounded-[3px] border border-green-700 bg-white px-2.5 text-[12px] font-bold text-green-700 normal-case md:h-6 md:text-[11px] dark:bg-zinc-900"
+                                    className="h-9 rounded-lg border border-green-300 bg-green-50 px-3 text-[13px] font-bold text-green-800 md:h-6 md:rounded-md md:border-green-700 md:bg-white md:px-2.5 md:text-[11px] md:text-green-700 dark:bg-zinc-900"
                                 >
                                     Resto OK
                                 </button>
@@ -453,19 +524,19 @@ function Revisao({ os }: { os: OsFull }) {
                         {g.items.map((it) => (
                             <div
                                 key={it.key}
-                                className="flex items-center gap-2 border-b border-[#eceef1] px-2.5 py-1.5 last:border-b-0 even:bg-[#f8f9fa] dark:even:bg-zinc-900/60"
+                                className="flex items-center gap-1.5 border-b border-[#eceef1] py-2 pr-2.5 pl-3.5 last:border-b-0 md:gap-2 md:px-2.5 md:py-1.5 md:even:bg-[#f8f9fa] dark:border-zinc-800 dark:md:even:bg-zinc-900/60"
                             >
-                                <span className="min-w-0 flex-1 text-[15px] md:text-[13px]">{it.label}</span>
+                                <span className="min-w-0 flex-1 text-[15px] leading-tight font-medium md:text-[13px] md:font-normal">{it.label}</span>
                                 {REVISION_VALUES.map((r) => (
                                     <button
                                         key={r.value}
                                         type="button"
                                         onClick={() => set(it.key, r.value)}
                                         className={cn(
-                                            'h-10 w-14 rounded-[3px] border text-[12px] font-bold md:h-7 md:w-11 md:text-[11px]',
+                                            'h-11 w-[52px] rounded-lg border text-[12px] font-extrabold md:h-7 md:w-11 md:rounded-md md:text-[11px]',
                                             values[it.key] === r.value
                                                 ? r.cls
-                                                : 'border-[#c9cdd3] bg-white text-zinc-500 hover:bg-zinc-50 dark:bg-zinc-900',
+                                                : 'border-[#dfe2e6] bg-white text-zinc-500 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900',
                                         )}
                                         aria-pressed={values[it.key] === r.value}
                                     >
@@ -826,10 +897,17 @@ export default function OsShow({ os, history, mechanics, statuses, serviceTypes 
     const needsInspection = ['recebido', 'diagnostico'].includes(os.status) && !os.inspected_at;
     // o tipo de serviço define a ficha de trabalho: revisão/preventiva = checklist; defeito/outro = diagnóstico
     const work = workFor(os.service_type);
+    // sequência do mecânico enquanto o carro está com ele: 1 vistoria → 2 diagnóstico/checklist → 3 peças → 4 fotos
+    const sequence = isMechanic && ['recebido', 'diagnostico'].includes(os.status);
+    const workTab: Tab = work.checklist ? 'revisao' : 'diag';
+    const lockWork = sequence && !os.inspected_at;
+    const lockAfter = sequence && !os.work_done_at;
+    const n = (i: number, label: string) => (sequence ? `${i} · ${label}` : label);
     const [tab, setTab] = useState<Tab>(() => {
+        if (sequence) return !os.inspected_at ? 'vistoria' : !os.work_done_at ? workTab : 'itens';
         if (needsInspection && !sensitive) return 'vistoria';
         if (sensitive && ['orcamento', 'aprovacao', 'pecas', 'execucao'].includes(os.status)) return 'itens';
-        return work.checklist ? 'revisao' : 'diag';
+        return workTab;
     });
     // se o balcão trocar o tipo, a aba que sumiu dá lugar à que ficou
     useEffect(() => {
@@ -837,6 +915,25 @@ export default function OsShow({ os, history, mechanics, statuses, serviceTypes 
         if (tab === 'revisao' && !work.checklist) setTab('diag');
     }, [work.diag, work.checklist, tab]);
     const diag = useForm({ diagnosis: os.diagnosis ?? '', complaint: os.complaint ?? '' });
+    const goTab = (t: Tab) => {
+        setTab(t);
+        requestAnimationFrame(() => document.getElementById('os-abas')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    };
+    // etapa 2 concluída: libera peças e fotos
+    const concludeWork = () => {
+        setBusy(true);
+        router.patch(
+            route('os.work_done', os.id),
+            { diagnosis: diag.data.diagnosis },
+            {
+                preserveScroll: true,
+                onSuccess: () => goTab('itens'),
+                onError: showError,
+                onFinish: () => setBusy(false),
+            },
+        );
+    };
+    const workLabel = work.checklist && !work.diag ? 'Concluir checklist' : 'Concluir diagnóstico';
 
     const next = nextStep(os.status, auth.user.role);
     const v = os.vehicle;
@@ -862,6 +959,9 @@ export default function OsShow({ os, history, mechanics, statuses, serviceTypes 
                     requestAnimationFrame(() => document.getElementById('os-abas')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
                 },
             };
+        // diagnóstico/checklist ainda aberto: concluir antes de enviar
+        if (os.status === 'diagnostico' && !os.work_done_at)
+            return { label: workLabel, run: () => (tab === workTab ? concludeWork() : goTab(workTab)) };
         if (!next) return null;
         return { label: next.label, run: () => setStatus(next.to) };
     })();
@@ -965,12 +1065,11 @@ export default function OsShow({ os, history, mechanics, statuses, serviceTypes 
                             label="Aguardando peças"
                             onClick={() => setStatus('pecas')}
                             disabled={busy}
-                            className="hidden lg:inline-flex"
                         />
                     )}
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <button className="inline-flex h-11 items-center gap-1.5 rounded-[3px] border border-[#c9cdd3] bg-white px-3 text-[13px] font-semibold md:h-8 md:px-2.5 dark:bg-zinc-900">
+                            <button className="inline-flex h-11 items-center gap-1.5 rounded-xl border border-[#dfe2e6] bg-white px-3.5 text-[14px] font-semibold md:h-8 md:rounded-md md:border-[#c9cdd3] md:px-2.5 md:text-[13px] dark:border-zinc-700 dark:bg-zinc-900">
                                 <Printer className="size-4" /> Imprimir{' '}
                                 <kbd className="hidden rounded-[2px] border px-1 font-mono text-[10px] font-normal text-zinc-500 md:inline">F8</kbd>
                                 <ChevronDown className="size-3.5" />
@@ -979,9 +1078,7 @@ export default function OsShow({ os, history, mechanics, statuses, serviceTypes 
                         <DropdownMenuContent align="end" className="w-72 rounded-[4px] p-1">
                             {printTypes.map(([k, label]) => (
                                 <DropdownMenuItem key={k} asChild className="h-9 rounded-[3px] text-[13px]">
-                                    <a href={route('os.print', [os.id, k])}>
-                                        {label}
-                                    </a>
+                                    <a href={route('os.print', [os.id, k])}>{label}</a>
                                 </DropdownMenuItem>
                             ))}
                             {isMechanic && (
@@ -1007,7 +1104,6 @@ export default function OsShow({ os, history, mechanics, statuses, serviceTypes 
                             icon={<ShoppingCart />}
                             label="Comprar peças"
                             href={route('compras.index', { os: os.id })}
-                            className="hidden lg:inline-flex"
                         />
                     )}
                     {sensitive && os.public_url && ['orcamento', 'aprovacao', 'pecas', 'execucao'].includes(os.status) && (
@@ -1018,7 +1114,6 @@ export default function OsShow({ os, history, mechanics, statuses, serviceTypes 
                                 navigator.clipboard?.writeText(os.public_url!);
                                 alert('Link do orçamento copiado. Cole na conversa com o cliente.');
                             }}
-                            className="hidden xl:inline-flex"
                         />
                     )}
                     {sensitive && (
@@ -1043,8 +1138,12 @@ export default function OsShow({ os, history, mechanics, statuses, serviceTypes 
                             danger
                             icon={<Trash2 />}
                             label="Excluir"
-                            onClick={() => confirm(`Excluir a OS ${os.number}? Não pode ser desfeito.`) && router.delete(route('os.destroy', os.id))}
-                            className="hidden xl:inline-flex"
+                            onClick={() =>
+                                confirm(
+                                    `Excluir a OS ${os.number}? Não pode ser desfeito.` +
+                                        (os.payments?.length ? ' Os pagamentos já lançados continuam no financeiro, sem a OS.' : ''),
+                                ) && router.delete(route('os.destroy', os.id))
+                            }
                         />
                     )}
                 </>
@@ -1226,27 +1325,31 @@ export default function OsShow({ os, history, mechanics, statuses, serviceTypes 
                     </div>
                 </Block>
 
-                <div id="os-abas" className="bg-card scroll-mt-16 overflow-hidden rounded-[4px] border border-[#c9cdd3]">
-                    <div className="bg-[#f3f4f6] px-2 pt-2 dark:bg-zinc-800">
+                <div
+                    id="os-abas"
+                    className="bg-card scroll-mt-16 overflow-hidden rounded-xl border border-[#e4e6ea] md:rounded-lg md:border-[#d7dade] dark:border-zinc-800"
+                >
+                    <div className="px-1 md:bg-[#f7f8f9] md:px-2 dark:md:bg-zinc-800/60">
                         <Tabs<Tab>
                             value={tab}
                             onChange={setTab}
                             tabs={[
                                 {
                                     value: 'vistoria',
-                                    label: 'Vistoria de entrada',
+                                    label: n(1, 'Vistoria de entrada'),
                                     badge: os.inspected_at ? (
                                         <CircleCheck className="size-3.5 text-green-700" />
                                     ) : canInspect ? (
                                         <span className="rounded-[2px] bg-[#d42a2a] px-1 text-[10px] text-white">fazer</span>
                                     ) : null,
                                 },
-                                ...(work.diag ? [{ value: 'diag' as Tab, label: 'Relato e diagnóstico' }] : []),
+                                ...(work.diag ? [{ value: 'diag' as Tab, label: n(2, 'Relato e diagnóstico'), locked: lockWork }] : []),
                                 ...(work.checklist
                                     ? [
                                           {
                                               value: 'revisao' as Tab,
-                                              label: work.checklistTitle,
+                                              label: n(2, work.checklistTitle),
+                                              locked: lockWork,
                                               badge: Object.keys(os.revision ?? {}).length ? (
                                                   <span className="rounded-[2px] bg-zinc-200 px-1 text-[10px] dark:bg-zinc-700">
                                                       {Object.keys(os.revision).length}
@@ -1257,7 +1360,8 @@ export default function OsShow({ os, history, mechanics, statuses, serviceTypes 
                                     : []),
                                 {
                                     value: 'itens',
-                                    label: 'Peças e serviços',
+                                    label: n(3, 'Peças e serviços'),
+                                    locked: lockAfter,
                                     badge: os.items.length ? (
                                         <span
                                             className={cn(
@@ -1271,7 +1375,8 @@ export default function OsShow({ os, history, mechanics, statuses, serviceTypes 
                                 },
                                 {
                                     value: 'fotos',
-                                    label: 'Fotos',
+                                    label: n(4, 'Fotos'),
+                                    locked: lockAfter,
                                     badge: os.photos.length ? (
                                         <span className="rounded-[2px] bg-zinc-200 px-1 text-[10px] dark:bg-zinc-700">{os.photos.length}</span>
                                     ) : null,
@@ -1307,10 +1412,18 @@ export default function OsShow({ os, history, mechanics, statuses, serviceTypes 
                                         onChange={(e) => diag.setData('diagnosis', e.target.value)}
                                     />
                                 </Field>
-                                {diag.isDirty && (
+                                {diag.isDirty && os.work_done_at && (
                                     <div className="lg:col-span-2">
                                         <Tool primary icon={<Save />} label="Gravar" onClick={saveDiag} disabled={diag.processing} />
                                     </div>
+                                )}
+                                {!os.work_done_at && canInspect && (
+                                    <NextStep
+                                        onClick={concludeWork}
+                                        disabled={busy}
+                                        label={`${workLabel} e seguir para peças`}
+                                        className="lg:col-span-2"
+                                    />
                                 )}
                             </div>
                         )}
@@ -1332,7 +1445,7 @@ export default function OsShow({ os, history, mechanics, statuses, serviceTypes 
                                             value={diag.data.diagnosis}
                                             onChange={(e) => diag.setData('diagnosis', e.target.value)}
                                         />
-                                        {diag.isDirty && (
+                                        {diag.isDirty && os.work_done_at && (
                                             <div className="mt-2">
                                                 <Tool
                                                     primary
@@ -1344,6 +1457,9 @@ export default function OsShow({ os, history, mechanics, statuses, serviceTypes 
                                             </div>
                                         )}
                                     </Field>
+                                )}
+                                {!os.work_done_at && canInspect && (
+                                    <NextStep onClick={concludeWork} disabled={busy} label={`${workLabel} e seguir para peças`} />
                                 )}
                             </div>
                         )}
@@ -1440,6 +1556,13 @@ export default function OsShow({ os, history, mechanics, statuses, serviceTypes 
                                         </Block>
                                     </div>
                                 )}
+                                {sequence && os.work_done_at && (
+                                    <NextStep
+                                        onClick={() => goTab('fotos')}
+                                        label="Seguir para fotos"
+                                        hint="Fotos são opcionais. Se não precisar, toque em Enviar para o balcão."
+                                    />
+                                )}
                             </div>
                         )}
 
@@ -1448,15 +1571,18 @@ export default function OsShow({ os, history, mechanics, statuses, serviceTypes 
                                 <div className="flex flex-wrap items-center gap-3">
                                     <PhotoUpload osId={os.id} className="w-full sm:w-auto" />
                                     <p className="text-muted-foreground text-[12px]">
-                                        Peça danificada, vazamento, desgaste, painel com luz acesa…
+                                        Opcional.
                                         {sensitive && ' As fotos marcadas para o cliente aparecem no link do orçamento.'}
+                                        {sequence && ' Quando terminar, toque em Enviar para o balcão.'}
                                     </p>
                                 </div>
                                 <PhotoGallery photos={os.photos} osId={os.id} canManage={sensitive} canDeleteAll={sensitive} />
                             </div>
                         )}
 
-                        {tab === 'vistoria' && <Vistoria os={os} canEdit={canInspect} />}
+                        {tab === 'vistoria' && (
+                            <Vistoria os={os} canEdit={canInspect} onDone={() => sequence && !os.work_done_at && goTab(workTab)} />
+                        )}
 
                         {tab === 'historico' && (
                             <div className="grid gap-3">
@@ -1479,15 +1605,19 @@ export default function OsShow({ os, history, mechanics, statuses, serviceTypes 
             </div>
 
             {primary && (
-                <div className="no-print bg-background/95 fixed inset-x-0 bottom-0 z-30 border-t border-[#c9cdd3] p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] md:hidden">
-                    <button
-                        disabled={busy}
-                        onClick={primary.run}
-                        className="flex h-12 w-full items-center justify-center gap-2 rounded-[4px] bg-[#d42a2a] text-[16px] font-semibold text-white disabled:opacity-60"
-                    >
-                        <ArrowRight className="size-5" /> {primary.label}
-                    </button>
-                </div>
+                <>
+                    {/* espaço para a lista não ficar escondida atrás do botão fixo */}
+                    <div className="h-20 md:hidden" aria-hidden="true" />
+                    <div className="no-print fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-30 border-t border-[#e4e6ea] bg-white/95 px-4 py-2.5 shadow-[0_-4px_16px_rgba(15,16,18,0.06)] backdrop-blur md:hidden dark:border-zinc-800 dark:bg-zinc-950/95">
+                        <button
+                            disabled={busy}
+                            onClick={primary.run}
+                            className="flex h-[52px] w-full items-center justify-center gap-2 rounded-xl bg-[#d42a2a] text-[16px] font-bold text-white shadow-sm disabled:opacity-60"
+                        >
+                            <ArrowRight className="size-5" /> {primary.label}
+                        </button>
+                    </div>
+                </>
             )}
 
             <Dialog open={cadastro !== null} onOpenChange={(o) => !o && setCadastro(null)}>

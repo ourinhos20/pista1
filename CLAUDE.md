@@ -68,6 +68,8 @@ Publicação: `deploy/empacotar.ps1` gera o zip; passo a passo em `deploy/PUBLIC
 - O dono **não quer** "dashboard genérico com cara de IA": nada de cartões grandes, saudações ou gradientes.
 - Cores: preto `#0f1012`, branco e cinza, vermelho `#d42a2a` só para ações e alertas. Fonte Inter.
 - No celular do mecânico: botões grandes, ação principal no rodapé.
+- Navegação: computador = barra de menus no topo; **tablet** (768–1023 px) = botão **Menu** no topo que abre a lista completa; **celular** = barra no rodapé (Painel, Ordens, Agenda, Clientes, Mais).
+- **Sequência do mecânico** na OS (recebido/diagnóstico): 1 Vistoria → 2 Diagnóstico/Checklist ("Concluir" grava `work_done_at`) → 3 Peças → 4 Fotos (opcional). Abas seguintes ficam apagadas e bloqueadas; o envio ao balcão exige vistoria e etapa 2 concluídas.
 - **As fichas A4 precisam caber em uma folha.** Confira a altura do conteúdo de `.print-sheet`: deve ser ≤ ~1047 px com largura de 794 px.
 
 ## Segurança (já configurada — manter)

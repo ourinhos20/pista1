@@ -104,6 +104,7 @@ export interface OsCard {
     service_type: string | null;
     status_since: string | null;
     inspected: boolean;
+    work_done?: boolean;
     online_new: boolean;
 }
 
@@ -124,6 +125,7 @@ export interface OsFull extends OsCard {
     revision: Record<string, 'ok' | 'atencao' | 'trocar'>;
     checked_in_at: string | null;
     inspected_at: string | null;
+    work_done_at?: string | null;
     inspected_by: string | null;
     approved_at: string | null;
     rejected_at: string | null;

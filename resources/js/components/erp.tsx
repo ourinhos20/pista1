@@ -12,12 +12,25 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
-import { STATUS, since } from '@/lib/os';
+import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
+import { STATUS, money, since } from '@/lib/os';
 import { cn } from '@/lib/utils';
-import type { OsStatus, Role, SharedData } from '@/types';
+import type { OsCard, OsStatus, Role, SharedData } from '@/types';
 import { Link, router, usePage } from '@inertiajs/react';
-import { ChevronDown, LogOut, Menu, UserCog } from 'lucide-react';
+import {
+    AlertTriangle,
+    CalendarDays,
+    ChevronDown,
+    ClipboardList,
+    LayoutDashboard,
+    Lock,
+    LogOut,
+    Menu,
+    Search,
+    UserCog,
+    Users,
+    X,
+} from 'lucide-react';
 import { type ReactNode, useEffect, useState } from 'react';
 
 /* ------------------------------------------------------------------ menus */
@@ -107,14 +120,14 @@ function UserMenu() {
     const { auth } = usePage<SharedData>().props;
     return (
         <DropdownMenu>
-            <DropdownMenuTrigger className="flex h-full items-center gap-2 px-3 text-[13px] text-zinc-300 hover:bg-white/10 hover:text-white">
-                <span className="grid size-6 place-items-center rounded-[3px] bg-[#d42a2a] text-[11px] font-bold text-white">
+            <DropdownMenuTrigger className="flex h-full shrink-0 items-center gap-2 px-3 text-[13px] text-zinc-300 hover:bg-white/10 hover:text-white">
+                <span className="grid size-8 place-items-center rounded-lg bg-[#d42a2a] text-[14px] font-bold text-white md:size-6 md:rounded-md md:text-[11px]">
                     {auth.user.name.slice(0, 1)}
                 </span>
                 <span className="hidden max-w-32 truncate lg:inline">{auth.user.name}</span>
                 <ChevronDown className="size-3.5" />
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56 rounded-[4px]">
+            <DropdownMenuContent align="end" className="w-56 rounded-lg">
                 <DropdownMenuLabel className="text-[12px]">
                     {auth.user.name}
                     <span className="text-muted-foreground block font-normal">{ROLE_LABEL[auth.user.role]}</span>
@@ -135,7 +148,13 @@ function UserMenu() {
     );
 }
 
-function MenuBar() {
+/** Item ativo: a própria tela ou uma tela "filha" (ex.: /os/12 dentro de Ordens). */
+function isActive(current: string, href: string, dash: string) {
+    const base = href.split('?')[0];
+    return current === base || (base !== dash && current.startsWith(base + '/'));
+}
+
+function MenuBar({ onSearch, onMore }: { onSearch: () => void; onMore: () => void }) {
     const { auth, onlineNew: preNew } = usePage<SharedData>().props;
     const page = usePage();
     const current = page.url.split('?')[0];
@@ -146,68 +165,31 @@ function MenuBar() {
         ) : null;
     const home = path(auth.user.role === 'mecanico' ? 'mecanico.index' : 'dashboard');
     const dash = path('dashboard');
-    const [open, setOpen] = useState(false);
 
     return (
-        <div className="no-print sticky top-0 z-40 flex h-12 items-stretch bg-[#0f1012] text-white md:h-10">
-            {/* celular: menu lateral */}
-            <Sheet open={open} onOpenChange={setOpen}>
-                <SheetTrigger className="relative grid w-12 place-items-center hover:bg-white/10 md:hidden" aria-label="Abrir menu">
-                    <Menu className="size-5" />
-                    {preNew > 0 && <span className="absolute top-2.5 right-2.5 size-2.5 rounded-full bg-[#d42a2a]" />}
-                </SheetTrigger>
-                <SheetContent side="left" className="w-72 border-r-0 bg-[#0f1012] p-0 text-white">
-                    <SheetTitle className="sr-only">Menu</SheetTitle>
-                    <div className="border-b border-white/10 p-4">
-                        <img src="/images/pista1-logo.png" alt="Pista 1" className="h-10" />
-                    </div>
-                    <nav className="p-2">
-                        {groups.map((g) => (
-                            <div key={g.label} className="mb-2">
-                                <p className="px-3 py-2 text-[11px] font-bold tracking-wider text-zinc-500 uppercase">{g.label}</p>
-                                {g.items.map((i) =>
-                                    i.newTab ? (
-                                        <a
-                                            key={i.href}
-                                            href={i.href}
-                                            onClick={() => setOpen(false)}
-                                            className="flex h-12 items-center rounded-[4px] px-3 text-[15px] text-zinc-300"
-                                        >
-                                            {i.label}
-                                        </a>
-                                    ) : (
-                                        <Link
-                                            key={i.href}
-                                            href={i.href}
-                                            onClick={() => setOpen(false)}
-                                            className={cn(
-                                                'flex h-12 items-center rounded-[4px] px-3 text-[15px]',
-                                                current === i.href ? 'bg-white/10 font-semibold' : 'text-zinc-300',
-                                            )}
-                                        >
-                                            {i.label}
-                                            <Badge n={i.badge} />
-                                        </Link>
-                                    ),
-                                )}
-                            </div>
-                        ))}
-                    </nav>
-                </SheetContent>
-            </Sheet>
-
-            <Link href={home} className="flex items-center border-r border-white/10 px-3">
-                <img src="/images/pista1-logo.png" alt="Pista 1" className="h-7 md:h-6" />
+        <div className="no-print sticky top-0 z-40 flex h-14 items-stretch bg-[#0f1012] text-white md:h-10">
+            <Link href={home} className="flex shrink-0 items-center px-4 md:border-r md:border-white/10 md:px-3">
+                <img src="/images/pista1-logo.png" alt="Pista 1" className="h-8 md:h-6" />
             </Link>
 
-            <nav className="hidden items-stretch md:flex">
+            {/* tablet: a fileira de menus não cabe; um botão abre a lista completa */}
+            <button
+                type="button"
+                onClick={onMore}
+                className="hidden shrink-0 items-center gap-1.5 px-3 text-[13px] font-semibold text-zinc-200 hover:bg-white/10 md:flex lg:hidden"
+            >
+                <Menu className="size-4" /> Menu
+                <Badge n={preNew} />
+            </button>
+            <span className="hidden flex-1 md:block lg:hidden" />
+            <nav className="hidden min-w-0 flex-1 items-stretch overflow-x-auto [scrollbar-width:none] lg:flex [&::-webkit-scrollbar]:hidden">
                 {groups.map((g) => {
-                    const active = g.items.some((i) => !i.newTab && (current === i.href || (i.href !== dash && current.startsWith(i.href + '/'))));
+                    const active = g.items.some((i) => !i.newTab && isActive(current, i.href, dash));
                     return (
                         <DropdownMenu key={g.label}>
                             <DropdownMenuTrigger
                                 className={cn(
-                                    'flex items-center gap-1 px-3.5 text-[13px] font-medium outline-none hover:bg-white/10 data-[state=open]:bg-white/10',
+                                    'flex shrink-0 items-center gap-1 px-2.5 text-[13px] font-medium outline-none hover:bg-white/10 data-[state=open]:bg-white/10 lg:px-3.5',
                                     active ? 'text-white shadow-[inset_0_-3px_0_#d42a2a]' : 'text-zinc-300',
                                 )}
                             >
@@ -215,9 +197,9 @@ function MenuBar() {
                                 <Badge n={g.items.reduce((s, i) => s + (i.badge ?? 0), 0)} />
                                 <ChevronDown className="size-3 opacity-60" />
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="start" sideOffset={0} className="min-w-64 rounded-none rounded-b-[4px] p-1">
+                            <DropdownMenuContent align="start" sideOffset={0} className="min-w-64 rounded-none rounded-b-lg p-1">
                                 {g.items.map((i) => (
-                                    <DropdownMenuItem key={i.href} asChild className="h-9 rounded-[3px] text-[13px]">
+                                    <DropdownMenuItem key={i.href} asChild className="h-9 rounded-md text-[13px]">
                                         {i.newTab ? (
                                             <a href={i.href} className="flex w-full items-center">
                                                 <span className="text-muted-foreground w-14 font-mono text-[11px]">{i.code}</span>
@@ -230,7 +212,7 @@ function MenuBar() {
                                                 <span className="flex-1">{i.label}</span>
                                                 <Badge n={i.badge} />
                                                 {i.key && (
-                                                    <kbd className="text-muted-foreground ml-4 rounded-[2px] border px-1 font-mono text-[10px]">
+                                                    <kbd className="text-muted-foreground ml-4 rounded-[3px] border px-1 font-mono text-[10px]">
                                                         {i.key}
                                                     </kbd>
                                                 )}
@@ -244,11 +226,170 @@ function MenuBar() {
                 })}
             </nav>
 
-            <div className="ml-auto flex items-center px-2 md:px-3">
-                <PlateSearch compact />
+            <div className="hidden shrink-0 items-center px-2 md:flex lg:px-3">
+                <PlateSearch compact className="sm:w-32 lg:w-56" />
             </div>
+            {/* celular: a busca abre numa faixa larga logo abaixo */}
+            <button
+                type="button"
+                onClick={onSearch}
+                aria-label="Buscar placa"
+                className="ml-auto grid w-12 place-items-center text-zinc-200 hover:bg-white/10 md:hidden"
+            >
+                <Search className="size-[22px]" />
+            </button>
             <UserMenu />
         </div>
+    );
+}
+
+/** Busca por placa no celular: faixa larga embaixo do cabeçalho. */
+function MobileSearch({ onClose }: { onClose: () => void }) {
+    return (
+        <div className="no-print sticky top-14 z-30 flex items-center gap-2 bg-[#0f1012] px-3 pb-3 md:hidden">
+            <PlateSearch compact autoFocus inputId="plate-search-mobile" className="w-full sm:w-full" />
+            <button
+                type="button"
+                onClick={onClose}
+                aria-label="Fechar busca"
+                className="grid size-11 shrink-0 place-items-center rounded-lg text-zinc-300"
+            >
+                <X className="size-5" />
+            </button>
+        </div>
+    );
+}
+
+type NavItem = { label: string; icon: ReactNode; href?: string; onClick?: () => void; badge?: number };
+
+/** Barra de navegação no rodapé (só no celular): as telas do dia a dia ao alcance do polegar. */
+function BottomNav({ onSearch, onMore }: { onSearch: () => void; onMore: () => void }) {
+    const { auth, onlineNew: preNew } = usePage<SharedData>().props;
+    const current = usePage().url.split('?')[0];
+    const dash = path('dashboard');
+    const items: NavItem[] =
+        auth.user.role === 'mecanico'
+            ? [
+                  { label: 'Agenda', icon: <CalendarDays />, href: path('mecanico.index') },
+                  { label: 'Buscar placa', icon: <Search />, onClick: onSearch },
+                  { label: 'Mais', icon: <Menu />, onClick: onMore },
+              ]
+            : [
+                  { label: 'Painel', icon: <LayoutDashboard />, href: dash },
+                  { label: 'Ordens', icon: <ClipboardList />, href: path('os.index'), badge: preNew },
+                  { label: 'Agenda', icon: <CalendarDays />, href: path('mecanico.index') },
+                  { label: 'Clientes', icon: <Users />, href: path('clientes.index') },
+                  { label: 'Mais', icon: <Menu />, onClick: onMore },
+              ];
+
+    return (
+        <nav
+            aria-label="Navegação principal"
+            className="no-print fixed inset-x-0 bottom-0 z-40 flex border-t border-[#e4e6ea] bg-white/95 px-1.5 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden dark:border-zinc-800 dark:bg-zinc-950/95"
+        >
+            {items.map((i) => {
+                const active = !!i.href && isActive(current, i.href, dash);
+                const cls = cn(
+                    'relative flex h-16 flex-1 flex-col items-center justify-center gap-1 text-[11px] font-semibold [&_svg]:size-6',
+                    active ? 'text-zinc-900 dark:text-white [&_svg]:text-[#d42a2a]' : 'text-zinc-500',
+                );
+                const body = (
+                    <>
+                        {active && <span className="absolute top-0 h-[3px] w-7 rounded-b-[3px] bg-[#d42a2a]" />}
+                        <span className="relative">
+                            {i.icon}
+                            {!!i.badge && (
+                                <span className="absolute -top-1.5 -right-2.5 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-[#d42a2a] px-1 text-[10px] font-bold text-white ring-2 ring-white">
+                                    {i.badge}
+                                </span>
+                            )}
+                        </span>
+                        {i.label}
+                    </>
+                );
+                return i.href ? (
+                    <Link key={i.label} href={i.href} className={cls} aria-current={active ? 'page' : undefined}>
+                        {body}
+                    </Link>
+                ) : (
+                    <button key={i.label} type="button" onClick={i.onClick} className={cls}>
+                        {body}
+                    </button>
+                );
+            })}
+        </nav>
+    );
+}
+
+/** "Mais": todas as telas do menu, agrupadas, numa gaveta que sobe do rodapé. */
+function MoreSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
+    const { auth, onlineNew: preNew } = usePage<SharedData>().props;
+    const fullUrl = usePage().url;
+    const current = fullUrl.split('?')[0];
+    const groups = menusFor(auth.user.role, preNew);
+    const close = () => onOpenChange(false);
+    const row = 'flex min-h-12 items-center gap-3 border-t border-[#eceef1] px-4 text-[15px] font-semibold first:border-t-0 dark:border-zinc-800';
+
+    return (
+        <Sheet open={open} onOpenChange={onOpenChange}>
+            <SheetContent side="bottom" className="max-h-[88svh] overflow-y-auto rounded-t-2xl border-0 bg-[#f4f5f7] p-0 dark:bg-zinc-950">
+                <SheetTitle className="sr-only">Menu</SheetTitle>
+                <div className="mx-auto mt-2 h-1.5 w-10 rounded-full bg-zinc-300" />
+                <div className="grid gap-5 p-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+                    <div className="flex items-center gap-3 rounded-xl border border-[#e4e6ea] bg-white p-3.5 dark:border-zinc-800 dark:bg-zinc-900">
+                        <span className="grid size-11 place-items-center rounded-xl bg-[#d42a2a] text-lg font-extrabold text-white">
+                            {auth.user.name.slice(0, 1)}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                            <span className="block truncate text-[16px] font-bold">{auth.user.name}</span>
+                            <span className="text-muted-foreground block text-[13px]">{ROLE_LABEL[auth.user.role]}</span>
+                        </span>
+                    </div>
+                    {groups.map((g) => (
+                        <section key={g.label}>
+                            <h2 className="mb-2 ml-1 text-[12px] font-bold tracking-wider text-zinc-600 uppercase">{g.label}</h2>
+                            <div className="overflow-hidden rounded-xl border border-[#e4e6ea] bg-white dark:border-zinc-800 dark:bg-zinc-900">
+                                {g.items.map((i) => {
+                                    const inner = (
+                                        <>
+                                            <span className="flex-1">{i.label}</span>
+                                            {!!i.badge && (
+                                                <span className="grid h-[22px] min-w-[22px] place-items-center rounded-full bg-[#d42a2a] px-1.5 text-[12px] font-bold text-white">
+                                                    {i.badge}
+                                                </span>
+                                            )}
+                                            <span className="font-mono text-[11px] font-semibold text-zinc-500">{i.code}</span>
+                                        </>
+                                    );
+                                    return i.newTab ? (
+                                        <a key={i.href} href={i.href} onClick={close} className={row}>
+                                            {inner}
+                                        </a>
+                                    ) : (
+                                        <Link
+                                            key={i.href}
+                                            href={i.href}
+                                            onClick={close}
+                                            className={cn(row, (i.href.includes('?') ? fullUrl === i.href : current === i.href) && 'text-[#b51f1f]')}
+                                        >
+                                            {inner}
+                                        </Link>
+                                    );
+                                })}
+                            </div>
+                        </section>
+                    ))}
+                    <Link
+                        href={route('logout')}
+                        method="post"
+                        as="button"
+                        className="flex h-12 items-center justify-center gap-2 rounded-xl border border-[#e4e6ea] bg-white text-[15px] font-semibold text-[#b51f1f] dark:border-zinc-800 dark:bg-zinc-900"
+                    >
+                        <LogOut className="size-5" /> Sair do sistema
+                    </Link>
+                </div>
+            </SheetContent>
+        </Sheet>
     );
 }
 
@@ -286,22 +427,40 @@ function StatusBar() {
 export function ErpLayout({ title, code, toolbar, children }: { title: string; code?: string; toolbar?: ReactNode; children: ReactNode }) {
     const { auth } = usePage<SharedData>().props;
     useShortcuts(auth.user.role);
+    const [search, setSearch] = useState(false);
+    const [more, setMore] = useState(false);
 
     return (
         <div className="bg-background flex min-h-svh flex-col">
-            <MenuBar />
-            <div className="no-print sticky top-12 z-20 border-b border-[#c9cdd3] bg-[#f6f7f8] md:top-10">
-                <div className="flex min-h-11 flex-wrap items-center gap-x-4 gap-y-2 px-3 py-1.5 md:px-4">
+            <MenuBar onSearch={() => setSearch((s) => !s)} onMore={() => setMore(true)} />
+            {search && <MobileSearch onClose={() => setSearch(false)} />}
+            <div className="no-print md:sticky md:top-10 md:z-20 md:border-b md:border-[#d7dade] md:bg-[#f6f7f8] dark:md:border-zinc-800 dark:md:bg-zinc-900">
+                <div className="flex flex-col gap-3 px-4 pt-5 pb-3 md:min-h-11 md:flex-row md:flex-wrap md:items-center md:gap-x-4 md:gap-y-2 md:px-4 md:py-1.5">
                     <h1 className="flex min-w-0 items-center gap-2.5">
-                        <span className="h-5 w-1 shrink-0 bg-[#d42a2a]" />
+                        <span className="hidden h-5 w-1 shrink-0 rounded-full bg-[#d42a2a] md:block" />
                         {code && <span className="text-muted-foreground hidden font-mono text-[11px] md:inline">{code}</span>}
-                        <span className="truncate text-[15px] font-bold tracking-tight">{title}</span>
+                        <span className="text-[22px] leading-tight font-extrabold tracking-tight md:truncate md:text-[15px] md:font-bold">
+                            {title}
+                        </span>
                     </h1>
-                    {toolbar && <div className="ml-auto flex flex-wrap items-center gap-1.5">{toolbar}</div>}
+                    {toolbar && (
+                        // celular: as ferramentas ficam numa linha que desliza para o lado (nada de botões quebrando em várias linhas)
+                        <div className="-mx-4 flex items-center gap-2 overflow-x-auto px-4 pb-1 *:shrink-0 md:mx-0 md:ml-auto md:flex-wrap md:gap-1.5 md:overflow-visible md:px-0 md:pb-0">
+                            {toolbar}
+                        </div>
+                    )}
                 </div>
             </div>
-            <main className="flex-1 p-2 pb-24 md:p-3 md:pb-10">{children}</main>
+            <main className="flex-1 px-4 pt-1 pb-[calc(6rem+env(safe-area-inset-bottom))] md:p-3 md:pb-10">{children}</main>
             <StatusBar />
+            <BottomNav
+                onSearch={() => {
+                    setSearch(true);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                onMore={() => setMore(true)}
+            />
+            <MoreSheet open={more} onOpenChange={setMore} />
             <FlashToast />
         </div>
     );
@@ -324,12 +483,12 @@ type ToolProps = {
 
 export function Tool({ icon, label, fkey, href, onClick, primary, danger, disabled, external, className }: ToolProps) {
     const cls = cn(
-        'inline-flex h-11 items-center gap-1.5 rounded-[3px] border px-3 text-[13px] font-semibold whitespace-nowrap transition select-none md:h-8 md:px-2.5',
+        'inline-flex h-11 items-center gap-1.5 rounded-xl border px-3.5 text-[14px] font-semibold whitespace-nowrap transition select-none md:h-8 md:rounded-md md:px-2.5 md:text-[13px]',
         primary
-            ? 'border-[#b51f1f] bg-[#d42a2a] text-white hover:bg-[#c02424]'
+            ? 'border-[#c42525] bg-[#d42a2a] text-white shadow-sm hover:bg-[#c02424]'
             : danger
-              ? 'border-[#c9cdd3] bg-white text-[#b51f1f] hover:bg-red-50'
-              : 'border-[#c9cdd3] bg-white text-zinc-800 hover:bg-zinc-50 dark:bg-zinc-900 dark:text-zinc-100',
+              ? 'border-[#dfe2e6] bg-white text-[#b51f1f] hover:bg-red-50 md:border-[#c9cdd3]'
+              : 'border-[#dfe2e6] bg-white text-zinc-800 hover:bg-zinc-50 md:border-[#c9cdd3] dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100',
         disabled && 'pointer-events-none opacity-50',
         '[&_svg]:size-4',
         className,
@@ -385,14 +544,19 @@ export function Block({
     bodyClassName?: string;
 }) {
     return (
-        <section className={cn('bg-card @container overflow-hidden rounded-[4px] border border-[#c9cdd3] dark:border-zinc-700', className)}>
+        <section
+            className={cn(
+                'bg-card @container overflow-hidden rounded-xl border border-[#e4e6ea] shadow-[0_1px_2px_rgba(15,16,18,0.04)] md:rounded-lg md:border-[#d7dade] dark:border-zinc-800',
+                className,
+            )}
+        >
             {(title || actions) && (
-                <header className="flex min-h-9 items-center justify-between gap-2 border-b border-[#d7dade] bg-[#f3f4f6] px-3 dark:border-zinc-700 dark:bg-zinc-800">
-                    <h2 className="text-[12px] font-bold tracking-wide text-zinc-700 uppercase dark:text-zinc-200">{title}</h2>
+                <header className="flex min-h-11 items-center justify-between gap-2 border-b border-[#eceef1] px-4 md:min-h-9 md:bg-[#f7f8f9] md:px-3 dark:border-zinc-800 dark:md:bg-zinc-800/60">
+                    <h2 className="text-[12px] font-bold tracking-wider text-zinc-700 uppercase dark:text-zinc-200">{title}</h2>
                     {actions && <div className="flex items-center gap-1.5">{actions}</div>}
                 </header>
             )}
-            <div className={cn('p-3', bodyClassName)}>{children}</div>
+            <div className={cn('p-4 md:p-3', bodyClassName)}>{children}</div>
         </section>
     );
 }
@@ -412,7 +576,7 @@ export function ReadOnly({ children, className }: { children?: ReactNode; classN
     return (
         <div
             className={cn(
-                'flex min-h-11 min-w-0 items-center rounded-[3px] border border-[#d7dade] bg-[#f7f8f9] px-2.5 text-[15px] md:min-h-8 md:text-[13px] dark:border-zinc-700 dark:bg-zinc-800',
+                'flex min-h-11 min-w-0 items-center rounded-lg border border-[#e4e6ea] bg-[#f6f7f8] px-3 text-[15px] md:min-h-8 md:rounded-md md:border-[#d7dade] md:px-2.5 md:text-[13px] dark:border-zinc-700 dark:bg-zinc-800',
                 className,
             )}
         >
@@ -422,33 +586,40 @@ export function ReadOnly({ children, className }: { children?: ReactNode; classN
 }
 
 export const selectCls =
-    'h-11 w-full rounded-[3px] border border-input bg-card px-2 text-base md:h-8 md:text-[13px] focus-visible:border-[#d42a2a] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d42a2a]/20';
+    'h-11 w-full rounded-lg border border-input bg-card px-2.5 text-base md:h-8 md:rounded-md md:px-2 md:text-[13px] focus-visible:border-[#d42a2a] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d42a2a]/20';
 export const textareaCls =
-    'w-full rounded-[3px] border border-input bg-card px-2.5 py-2 text-base leading-relaxed md:text-[13px] focus-visible:border-[#d42a2a] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d42a2a]/20';
+    'w-full rounded-lg border border-input bg-card px-3 py-2 text-base leading-relaxed md:rounded-md md:px-2.5 md:text-[13px] focus-visible:border-[#d42a2a] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d42a2a]/20';
 
 export function Tabs<T extends string>({
     tabs,
     value,
     onChange,
 }: {
-    tabs: { value: T; label: string; badge?: ReactNode }[];
+    /** locked: etapa ainda não liberada (fica apagada e não abre) */
+    tabs: { value: T; label: string; badge?: ReactNode; locked?: boolean }[];
     value: T;
     onChange: (v: T) => void;
 }) {
     return (
-        <div className="flex overflow-x-auto border-b border-[#c9cdd3]">
+        <div className="flex gap-1 overflow-x-auto border-b border-[#e4e6ea] dark:border-zinc-800">
             {tabs.map((t) => (
                 <button
                     key={t.value}
                     type="button"
-                    onClick={() => onChange(t.value)}
+                    onClick={() => !t.locked && onChange(t.value)}
+                    disabled={t.locked}
+                    title={t.locked ? 'Conclua a etapa anterior para liberar' : undefined}
+                    aria-current={value === t.value ? 'true' : undefined}
                     className={cn(
-                        '-mb-px flex h-11 shrink-0 items-center gap-1.5 border border-transparent px-4 text-[13px] font-semibold md:h-9',
-                        value === t.value
-                            ? 'bg-card rounded-t-[4px] border-[#c9cdd3] border-b-white text-zinc-900 shadow-[inset_0_2px_0_#d42a2a] dark:border-b-zinc-900 dark:text-white'
-                            : 'text-zinc-600 hover:text-zinc-900',
+                        'relative flex h-12 shrink-0 items-center gap-1.5 px-3 text-[14px] font-semibold whitespace-nowrap md:h-9 md:text-[13px]',
+                        t.locked
+                            ? 'cursor-not-allowed text-zinc-400 opacity-40'
+                            : value === t.value
+                              ? 'text-zinc-900 after:absolute after:inset-x-2 after:bottom-0 after:h-[3px] after:rounded-t-[3px] after:bg-[#d42a2a] dark:text-white'
+                              : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white',
                     )}
                 >
+                    {t.locked && <Lock className="size-3.5" />}
                     {t.label}
                     {t.badge}
                 </button>
@@ -462,12 +633,12 @@ export function Situacao({ status, className, short = false }: { status: OsStatu
     return (
         <span
             className={cn(
-                'inline-flex h-6 items-center gap-1.5 rounded-[3px] px-2 text-[11px] font-bold whitespace-nowrap uppercase ring-1 ring-inset md:h-5 md:px-1.5',
+                'inline-flex h-6 items-center gap-1.5 rounded-full px-2.5 text-[12px] font-semibold whitespace-nowrap ring-1 ring-inset md:h-5 md:px-2 md:text-[11px]',
                 s.badge,
                 className,
             )}
         >
-            <span className={cn('size-2 rounded-[1px]', s.dot)} />
+            <span className={cn('size-1.5 rounded-full', s.dot)} />
             {short ? s.short : s.label}
         </span>
     );
@@ -485,6 +656,37 @@ export type Col<T> = {
 
 const hideCls = { sm: 'hidden sm:table-cell', md: 'hidden md:table-cell', lg: 'hidden lg:table-cell' };
 
+/**
+ * Linha da grade no celular quando a tela não define a sua: a 1ª coluna vira o título e as
+ * demais (só as que não estão marcadas para sumir em telas médias) viram pares "rótulo: valor".
+ */
+function AutoMobileRow<T>({ cols, row }: { cols: Col<T>[]; row: T }) {
+    const shown = cols.filter((c) => c.hide !== 'md' && c.hide !== 'lg');
+    const [head, ...rest] = shown;
+    const labeled = rest.filter((c) => c.label);
+    const actions = rest.filter((c) => !c.label);
+    return (
+        <div className="grid gap-2">
+            {head && <div className="text-[15px] font-semibold">{head.render(row)}</div>}
+            {labeled.length > 0 && (
+                <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+                    {labeled.map((c, i) => (
+                        <div key={i} className="min-w-0">
+                            <dt className="text-[11px] font-semibold tracking-wide text-zinc-500 uppercase">{c.label}</dt>
+                            <dd className={cn('min-w-0 truncate text-[14px]', c.align === 'right' && 'tabular-nums')}>{c.render(row)}</dd>
+                        </div>
+                    ))}
+                </dl>
+            )}
+            {actions.map((c, i) => (
+                <div key={i} className="flex flex-wrap gap-2">
+                    {c.render(row)}
+                </div>
+            ))}
+        </div>
+    );
+}
+
 export function Grid<T>({
     cols,
     rows,
@@ -492,6 +694,7 @@ export function Grid<T>({
     onRowClick,
     empty = 'Nenhum registro encontrado.',
     footer,
+    mobile,
 }: {
     cols: Col<T>[];
     rows: T[];
@@ -499,65 +702,85 @@ export function Grid<T>({
     onRowClick?: (r: T) => void;
     empty?: string;
     footer?: ReactNode;
+    /** Como cada linha aparece no celular (senão, monta sozinho a partir das colunas). */
+    mobile?: (r: T) => ReactNode;
 }) {
     return (
-        <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-[14px] md:text-[13px]">
-                <thead>
-                    <tr className="border-b border-[#c9cdd3] bg-[#eceef1] dark:border-zinc-700 dark:bg-zinc-800">
-                        {cols.map((c, i) => (
-                            <th
-                                key={i}
-                                className={cn(
-                                    'h-8 border-r border-[#d7dade] px-2.5 text-left text-[11px] font-bold tracking-wide whitespace-nowrap text-zinc-600 uppercase last:border-r-0 dark:border-zinc-700 dark:text-zinc-300',
-                                    c.align === 'right' && 'text-right',
-                                    c.align === 'center' && 'text-center',
-                                    c.hide && hideCls[c.hide],
-                                    c.className,
-                                )}
-                            >
-                                {c.label}
-                            </th>
-                        ))}
-                    </tr>
-                </thead>
-                <tbody>
-                    {rows.length === 0 && (
-                        <tr>
-                            <td colSpan={cols.length} className="text-muted-foreground px-3 py-8 text-center">
-                                {empty}
-                            </td>
-                        </tr>
-                    )}
-                    {rows.map((r) => (
-                        <tr
-                            key={rowKey(r)}
-                            onClick={onRowClick ? () => onRowClick(r) : undefined}
-                            className={cn(
-                                'border-b border-[#e3e5e8] even:bg-[#f8f9fa] dark:border-zinc-800 dark:even:bg-zinc-900/60',
-                                onRowClick && 'cursor-pointer hover:bg-[#fdecec] dark:hover:bg-red-950/30',
-                            )}
-                        >
+        <div>
+            {/* celular: lista no lugar da tabela espremida */}
+            <ul className="md:hidden">
+                {rows.length === 0 && <li className="text-muted-foreground px-4 py-8 text-center text-[15px]">{empty}</li>}
+                {rows.map((r) => (
+                    <li
+                        key={rowKey(r)}
+                        onClick={onRowClick ? () => onRowClick(r) : undefined}
+                        className={cn(
+                            'border-b border-[#eceef1] px-4 py-3 last:border-b-0 dark:border-zinc-800',
+                            onRowClick && 'cursor-pointer active:bg-zinc-50 dark:active:bg-zinc-800',
+                        )}
+                    >
+                        {mobile ? mobile(r) : <AutoMobileRow cols={cols} row={r} />}
+                    </li>
+                ))}
+            </ul>
+            <div className="hidden overflow-x-auto md:block">
+                <table className="w-full border-collapse text-[13px]">
+                    <thead>
+                        <tr className="border-b border-[#d7dade] bg-[#f3f4f6] dark:border-zinc-700 dark:bg-zinc-800">
                             {cols.map((c, i) => (
-                                <td
+                                <th
                                     key={i}
                                     className={cn(
-                                        'h-11 border-r border-[#eceef1] px-2.5 align-middle last:border-r-0 md:h-8 dark:border-zinc-800',
-                                        c.align === 'right' && 'text-right tabular-nums',
+                                        'h-8 border-r border-[#e3e5e8] px-2.5 text-left text-[11px] font-bold tracking-wide whitespace-nowrap text-zinc-600 uppercase last:border-r-0 dark:border-zinc-700 dark:text-zinc-300',
+                                        c.align === 'right' && 'text-right',
                                         c.align === 'center' && 'text-center',
                                         c.hide && hideCls[c.hide],
                                         c.className,
                                     )}
                                 >
-                                    {c.render(r)}
-                                </td>
+                                    {c.label}
+                                </th>
                             ))}
                         </tr>
-                    ))}
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        {rows.length === 0 && (
+                            <tr>
+                                <td colSpan={cols.length} className="text-muted-foreground px-3 py-8 text-center">
+                                    {empty}
+                                </td>
+                            </tr>
+                        )}
+                        {rows.map((r) => (
+                            <tr
+                                key={rowKey(r)}
+                                onClick={onRowClick ? () => onRowClick(r) : undefined}
+                                className={cn(
+                                    'border-b border-[#eceef1] even:bg-[#fafafb] dark:border-zinc-800 dark:even:bg-zinc-900/60',
+                                    onRowClick && 'cursor-pointer hover:bg-[#fdf0f0] dark:hover:bg-red-950/30',
+                                )}
+                            >
+                                {cols.map((c, i) => (
+                                    <td
+                                        key={i}
+                                        className={cn(
+                                            'h-9 border-r border-[#f0f1f3] px-2.5 align-middle last:border-r-0 dark:border-zinc-800',
+                                            c.align === 'right' && 'text-right tabular-nums',
+                                            c.align === 'center' && 'text-center',
+                                            c.hide && hideCls[c.hide],
+                                            c.className,
+                                        )}
+                                    >
+                                        {c.render(r)}
+                                    </td>
+                                ))}
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
             {footer && (
-                <div className="flex items-center justify-between border-t border-[#d7dade] bg-[#f3f4f6] px-3 py-1.5 text-[12px] text-zinc-600 dark:border-zinc-700 dark:bg-zinc-800">
+                <div className="flex items-center justify-between gap-2 border-t border-[#eceef1] bg-[#fafafb] px-4 py-2 text-[12px] text-zinc-600 md:px-3 md:py-1.5 dark:border-zinc-700 dark:bg-zinc-800">
                     {footer}
                 </div>
             )}
@@ -571,10 +794,14 @@ export function Since({ iso, status, className }: { iso?: string | null; status:
     if (!s.text || ['entregue', 'cancelada'].includes(status)) return null;
     return (
         <span
-            className={cn('text-[11px] whitespace-nowrap tabular-nums', s.stale ? 'font-bold text-[#b51f1f]' : 'text-zinc-500', className)}
+            className={cn(
+                'inline-flex items-center gap-1 text-[12px] whitespace-nowrap tabular-nums md:text-[11px]',
+                s.stale ? 'font-bold text-[#b51f1f]' : 'text-zinc-500',
+                className,
+            )}
             title="Tempo nesta etapa"
         >
-            {s.stale ? '⚠ ' : ''}
+            {s.stale && <AlertTriangle className="size-3.5 shrink-0" aria-label="parado demais" />}
             {s.text}
         </span>
     );
@@ -583,23 +810,58 @@ export function Since({ iso, status, className }: { iso?: string | null; status:
 export function OriginTag({ origin }: { origin: string }) {
     if (origin === 'balcao') return null;
     return (
-        <span className="rounded-[2px] bg-emerald-600 px-1 py-px text-[10px] font-bold text-white uppercase" title="Agendamento feito pelo cliente">
+        <span
+            className="rounded-[5px] bg-emerald-50 px-1.5 py-px text-[10px] font-extrabold tracking-wide text-emerald-800 uppercase ring-1 ring-emerald-200 ring-inset"
+            title="Agendamento feito pelo cliente"
+        >
             {origin === 'bot' ? 'bot' : 'site'}
         </span>
     );
 }
 
-/** Placa em fonte mono, estilo etiqueta. */
+/** Placa em fonte mono, com a faixa azul do padrão Mercosul. */
 export function Placa({ value, big = false }: { value?: string | null; big?: boolean }) {
     const v = value && /^[A-Z]{3}\d{4}$/.test(value) ? `${value.slice(0, 3)}-${value.slice(3)}` : value;
     return (
         <span
             className={cn(
-                'inline-flex items-center rounded-[3px] border border-zinc-800 bg-white font-mono font-bold tracking-wider text-zinc-900 dark:border-zinc-300',
-                big ? 'h-9 px-2.5 text-[20px]' : 'h-6 px-1.5 text-[12px] md:h-5',
+                'inline-flex shrink-0 flex-col overflow-hidden border-zinc-900 bg-white align-middle font-mono leading-none font-bold tracking-wider text-zinc-900 dark:border-zinc-300',
+                big ? 'rounded-md border-2' : 'rounded-[5px] border-[1.5px]',
             )}
         >
-            {v || '—'}
+            <span className={cn('bg-[#1f4fa3]', big ? 'h-1.5' : 'h-[3px]')} />
+            <span className={big ? 'px-2.5 py-1 text-[20px]' : 'px-1.5 py-[3px] text-[12px]'}>{v || '—'}</span>
         </span>
+    );
+}
+
+/**
+ * Linha de OS para as listas do celular: placa, nº e etiquetas em cima; carro e cliente;
+ * à direita a etapa, o valor (quando houver) e há quanto tempo está parada.
+ */
+export function OsMobileRow({ os, when }: { os: OsCard; when?: ReactNode }) {
+    return (
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1">
+            <span className="flex min-w-0 items-center gap-2">
+                {os.vehicle?.plate ? <Placa value={os.vehicle.plate} /> : <span className="text-[12px] font-semibold text-zinc-500">sem placa</span>}
+                <b className="text-[12px] text-zinc-600 tabular-nums">{os.number}</b>
+                <OriginTag origin={os.origin} />
+                {os.online_new && <span className="rounded-[5px] bg-[#d42a2a] px-1.5 py-px text-[10px] font-extrabold text-white">NOVO</span>}
+            </span>
+            <span className="justify-self-end">
+                <Situacao status={os.status} short />
+            </span>
+            <span className="min-w-0">
+                <span className="block truncate text-[15px] font-bold">{os.vehicle?.title || 'Veículo'}</span>
+                <span className="block truncate text-[13px] text-zinc-600 dark:text-zinc-400">
+                    {os.client?.name}
+                    {os.mechanic ? ` · ${os.mechanic.name}` : ''}
+                </span>
+            </span>
+            <span className="flex flex-col items-end gap-0.5">
+                {!!os.total && <span className="text-[14px] font-bold tabular-nums">{money(os.total)}</span>}
+                {when ?? <Since iso={os.status_since} status={os.status} />}
+            </span>
+        </div>
     );
 }

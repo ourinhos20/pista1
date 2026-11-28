@@ -19,10 +19,10 @@ export function FlashToast() {
     if (!msg) return null;
 
     return (
-        <div className="no-print pointer-events-none fixed inset-x-0 bottom-24 z-[60] flex justify-center px-4 md:top-5 md:bottom-auto">
+        <div className="no-print pointer-events-none fixed inset-x-0 top-[4.5rem] z-[60] flex justify-center px-4 md:top-5">
             <div
                 role="status"
-                className="animate-in fade-in slide-in-from-bottom-2 md:slide-in-from-top-2 pointer-events-auto flex items-center gap-2 rounded-full bg-zinc-900 px-5 py-3 text-[15px] font-medium text-white shadow-2xl dark:bg-zinc-100 dark:text-zinc-900"
+                className="animate-in fade-in slide-in-from-top-2 pointer-events-auto flex items-center gap-2 rounded-full bg-zinc-900 px-5 py-3 text-[15px] font-medium text-white shadow-2xl dark:bg-zinc-100 dark:text-zinc-900"
             >
                 {msg.error ? <CircleAlert className="size-5 text-red-400" /> : <CircleCheck className="size-5 text-green-400 dark:text-green-600" />}
                 {msg.text}

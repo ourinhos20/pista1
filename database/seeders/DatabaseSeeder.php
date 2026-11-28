@@ -76,6 +76,8 @@ class DatabaseSeeder extends Seeder
                 'client_id' => $v->client_id, 'vehicle_id' => $v->id, 'mechanic_id' => $mech?->id, 'created_by' => $balcao->id,
                 'status' => $status, 'complaint' => $complaint, 'origin' => 'balcao', 'service_type' => 'defeito',
                 'checked_in_at' => $inShop ? now()->subHours(4) : null,
+                // diagnóstico concluído em toda OS que já passou da etapa do mecânico
+                'work_done_at' => in_array($status, [OsStatus::Aguardando, OsStatus::Recebido, OsStatus::Diagnostico], true) ? null : now()->subHours(3),
                 ...($inspected ? [
                     'km_in' => $v->km, 'fuel_level' => 2, 'inspected_at' => now()->subHours(4), 'inspected_by' => $mech?->id,
                     'damages' => [['x' => 22, 'y' => 18, 'type' => 'risco', 'note' => 'Para-choque dianteiro']],

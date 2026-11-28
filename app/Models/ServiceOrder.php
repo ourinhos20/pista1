@@ -15,7 +15,7 @@ class ServiceOrder extends Model
         'fuel_level', 'complaint', 'diagnosis', 'notes', 'damages', 'checklist', 'revision', 'discount',
         'down_payment', 'payment_method', 'approved_at', 'delivered_at',
         'approval_name', 'approval_note', 'approval_ip', 'rejected_at',
-        'origin', 'service_type', 'checked_in_at', 'inspected_at', 'inspected_by', 'online_seen_at',
+        'origin', 'service_type', 'checked_in_at', 'inspected_at', 'inspected_by', 'work_done_at', 'online_seen_at',
     ];
 
     protected $hidden = ['public_token'];
@@ -51,6 +51,7 @@ class ServiceOrder extends Model
             'status_changed_at' => 'datetime',
             'checked_in_at' => 'datetime',
             'inspected_at' => 'datetime',
+            'work_done_at' => 'datetime',
             'online_seen_at' => 'datetime',
             'damages' => 'array',
             'checklist' => 'array',

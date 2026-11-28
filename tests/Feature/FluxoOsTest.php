@@ -146,8 +146,33 @@ class FluxoOsTest extends TestCase
         // o mecânico anota o chassi na vistoria
         $this->assertSame('9BWZZZ377VT004251', $os->vehicle->fresh()->chassis);
 
+        // vistoria feita, mas o checklist ainda não foi concluído
+        $this->patch($this->p("/os/{$os->id}/status"), ['status' => 'orcamento'])->assertSessionHasErrors('status');
+        $this->patch($this->p("/os/{$os->id}/concluir"))->assertSessionHasErrors('work'); // revisão sem nada marcado
+        $this->patch($this->p("/os/{$os->id}/revisao"), ['revision' => ['oleo_motor' => 'trocar']]);
+        $this->patch($this->p("/os/{$os->id}/concluir"))->assertSessionHasNoErrors();
+        $this->assertNotNull($os->fresh()->work_done_at);
+
         $this->patch($this->p("/os/{$os->id}/status"), ['status' => 'orcamento'])->assertSessionHasNoErrors();
         $this->assertSame(OsStatus::Orcamento, $os->fresh()->status);
+    }
+
+    public function test_sequencia_do_mecanico_defeito_pede_diagnostico_escrito(): void
+    {
+        $os = ServiceOrder::where('status', OsStatus::Recebido)->first();
+        $os->update(['service_type' => 'defeito', 'diagnosis' => null]);
+        $this->actingAs($this->carlos);
+
+        // sem vistoria não conclui nada
+        $this->patch($this->p("/os/{$os->id}/concluir"), ['diagnosis' => 'x'])->assertSessionHasErrors('work');
+        $this->patch($this->p("/os/{$os->id}/vistoria"), ['km_in' => 200000, 'fuel_level' => 1]);
+
+        $this->patch($this->p("/os/{$os->id}/concluir"), ['diagnosis' => ''])->assertSessionHasErrors('work');
+        $this->patch($this->p("/os/{$os->id}/concluir"), ['diagnosis' => 'Bobina do 2º cilindro falhando.'])->assertSessionHasNoErrors();
+        $this->assertSame('Bobina do 2º cilindro falhando.', $os->fresh()->diagnosis);
+
+        // a tela recebe a etapa concluída (libera peças e fotos)
+        $this->get($this->p("/os/{$os->id}"))->assertInertia(fn (Assert $page) => $page->where('os.work_done_at', fn ($v) => $v !== null));
     }
 
     public function test_agendado_ainda_nao_tem_vistoria(): void
@@ -239,6 +264,25 @@ class FluxoOsTest extends TestCase
         $this->get($this->p('/fichas/qualquer'))->assertNotFound();
 
         $this->actingAs($this->balcao)->get($this->p('/fichas/cliente'))->assertOk();
+    }
+
+    public function test_socio_exclui_os_com_pagamento_compra_e_fotos(): void
+    {
+        $master = User::where('email', 'socio1@pista1.test')->first();
+        $os = ServiceOrder::where('status', OsStatus::Pronto)->first();
+        $this->actingAs($this->balcao)->post($this->p("/os/{$os->id}/pagamentos"), ['amount' => '50,00', 'payment_method' => 'pix', 'received' => true]);
+        $os->attachments()->create(['path' => 'f/x.jpg', 'thumb_path' => 'f/x_mini.jpg']);
+        $sup = Supplier::first() ?? Supplier::create(['name' => 'Fornecedor Teste']);
+        $this->post($this->p('/compras'), [
+            'supplier_id' => $sup->id, 'date' => now()->format('Y-m-d'), 'service_order_id' => $os->id, 'first_due' => now()->format('Y-m-d'),
+            'items' => [['description' => 'Filtro', 'quantity' => '1', 'unit_cost' => '20']], 'payment_method' => 'pix', 'installments' => 1, 'paid' => true,
+        ]);
+
+        $this->delete($this->p("/os/{$os->id}"))->assertForbidden(); // balcão não exclui
+        $this->actingAs($master)->delete($this->p("/os/{$os->id}"))->assertRedirect($this->p('/os'));
+        $this->assertNull(ServiceOrder::find($os->id));
+        // o dinheiro recebido continua no financeiro
+        $this->assertSame(1, \App\Models\FinanceEntry::where('type', 'entrada')->where('description', 'like', "OS {$os->number()}%")->count());
     }
 
     /* ------------------------------------------------------ catálogo FIPE */

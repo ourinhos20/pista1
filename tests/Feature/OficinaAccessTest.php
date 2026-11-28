@@ -84,6 +84,9 @@ class OficinaAccessTest extends TestCase
 
         $this->patch($this->p("/os/{$this->osRafael->id}/revisao"), ['revision' => ['oleo_motor' => 'qualquer']])->assertSessionHasErrors();
 
+        // etapa 2 da sequência: conclui o checklist/diagnóstico antes de enviar
+        $this->patch($this->p("/os/{$this->osRafael->id}/status"), ['status' => 'orcamento'])->assertSessionHasErrors('status');
+        $this->patch($this->p("/os/{$this->osRafael->id}/concluir"), ['diagnosis' => 'Óleo vencido.'])->assertSessionHasNoErrors();
         $this->patch($this->p("/os/{$this->osRafael->id}/status"), ['status' => 'orcamento'])->assertSessionHasNoErrors();
         $this->assertSame(OsStatus::Orcamento, $this->osRafael->fresh()->status);
     }

@@ -60,6 +60,7 @@ Route::prefix(config('oficina.panel_path'))->group(function () {
         Route::patch('os/{os}/diagnostico', [ServiceOrderController::class, 'diagnosis'])->name('os.diagnosis');
         Route::patch('os/{os}/revisao', [ServiceOrderController::class, 'revision'])->name('os.revision');
         Route::patch('os/{os}/vistoria', [ServiceOrderController::class, 'vistoria'])->name('os.vistoria');
+        Route::patch('os/{os}/concluir', [ServiceOrderController::class, 'workDone'])->name('os.work_done');
         Route::post('os/{os}/assumir', [ServiceOrderController::class, 'assume'])->name('os.assume');
         Route::post('os/{os}/itens', [ServiceOrderItemController::class, 'store'])->name('os.items.store');
         Route::get('os/{os}/imprimir/{tipo}', [ServiceOrderController::class, 'print'])->name('os.print');

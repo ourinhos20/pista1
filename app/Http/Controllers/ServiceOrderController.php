@@ -260,6 +260,48 @@ class ServiceOrderController extends Controller
     }
 
     /** Diagnóstico: mecânico e balcão. */
+    /**
+     * Etapa 2 da sequência do mecânico: conclui o diagnóstico ou o checklist
+     * e libera peças e fotos. Pede a vistoria feita e algo preenchido.
+     */
+    public function workDone(Request $request, ServiceOrder $os): RedirectResponse
+    {
+        $user = $request->user();
+        self::guard($os, $user);
+        $data = $request->validate(['diagnosis' => ['nullable', 'string', 'max:10000']]);
+        if (array_key_exists('diagnosis', $data)) {
+            $os->diagnosis = $data['diagnosis'];
+        }
+
+        $checklist = in_array($os->service_type, ['revisao', 'preventiva'], true);
+        $diag = in_array($os->service_type, ['defeito', 'outro'], true);
+        $hasDiag = trim((string) $os->diagnosis) !== '';
+        $hasChecklist = count($os->revision ?? []) > 0;
+        $fail = fn (string $msg) => throw ValidationException::withMessages(['work' => $msg]);
+
+        if (! $os->inspected_at) {
+            $fail('Faça a vistoria de entrada primeiro.');
+        }
+        if ($diag && ! $hasDiag) {
+            $fail('Escreva o diagnóstico: o que foi encontrado e o que precisa fazer.');
+        }
+        if ($checklist && ! $hasChecklist) {
+            $fail('Marque os itens do checklist (use "Resto OK" nos grupos sem problema).');
+        }
+        if (! $checklist && ! $diag && ! $hasDiag && ! $hasChecklist) {
+            $fail('Preencha o diagnóstico ou o checklist.');
+        }
+
+        $first = ! $os->work_done_at;
+        $os->work_done_at ??= now();
+        $os->save();
+        if ($first) {
+            $os->logEvent($user, $checklist ? 'Checklist concluído' : 'Diagnóstico concluído');
+        }
+
+        return back()->with('success', 'Concluído. Agora lance as peças e serviços necessários.');
+    }
+
     public function diagnosis(Request $request, ServiceOrder $os): RedirectResponse
     {
         self::guard($os, $request->user());
@@ -294,6 +336,9 @@ class ServiceOrderController extends Controller
             }
             if ($new === OsStatus::Orcamento && ! $os->inspected_at) {
                 $fail('Faça a vistoria de entrada antes de enviar para o balcão.');
+            }
+            if ($new === OsStatus::Orcamento && ! $os->work_done_at) {
+                $fail('Conclua o diagnóstico (ou o checklist) antes de enviar para o balcão.');
             }
             if ($new === OsStatus::Aprovacao) {
                 $active = $os->items->where('approval', '!=', 'recusado');
