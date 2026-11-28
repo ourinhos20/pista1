@@ -1,5 +1,7 @@
+import { ask } from '@/components/ask-dialog';
 import { Block, Field, Grid, Tool, selectCls, type Col } from '@/components/erp';
 import { EntryForm, PayForm } from '@/components/finance-entry-form';
+import { useBulkDelete } from '@/components/os-bulk';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
@@ -21,14 +23,22 @@ export default function Lancamentos({ entries, totals, filters, ...options }: Pr
     const [f, setF] = useState(filters);
     const [dialog, setDialog] = useState<{ type: EntryType; entry?: FinanceRow } | null>(null);
     const [paying, setPaying] = useState<FinanceRow | null>(null);
+    // marcar vários lançamentos e excluir de uma vez
+    const { selection, bar } = useBulkDelete('financeiro.entries.destroy_many', {
+        title: 'Excluir lançamentos',
+        one: 'o lançamento selecionado',
+        many: (n) => `os ${n} lançamentos selecionados`,
+        note: 'Contas de compras e pagamentos de OS também saem do financeiro.',
+    });
     const apply = (patch: Partial<typeof filters>) => {
         const next = { ...f, ...patch };
         setF(next);
         router.get(route('financeiro.entries'), next, { preserveState: true, preserveScroll: true, replace: true });
     };
     const pay = (r: FinanceRow) => setPaying(r);
-    const unpay = (r: FinanceRow) =>
-        confirm('Estornar a baixa deste lançamento?') && router.patch(route('financeiro.entries.unpay', r.id), {}, { preserveScroll: true });
+    const unpay = async (r: FinanceRow) =>
+        (await ask('Estornar a baixa deste lançamento?', { okLabel: 'Estornar' })) &&
+        router.patch(route('financeiro.entries.unpay', r.id), {}, { preserveScroll: true });
 
     const cols: Col<FinanceRow>[] = [
         {
@@ -227,11 +237,12 @@ export default function Lancamentos({ entries, totals, filters, ...options }: Pr
                         cols={cols}
                         rows={entries}
                         rowKey={(r) => r.id}
+                        selection={selection}
                         onRowClick={(r) => setDialog({ type: r.type, entry: r })}
                         empty="Nenhum lançamento com esses filtros."
                         footer={
                             <>
-                                <span>{entries.length} lançamento(s) · clique para alterar</span>
+                                <span>{entries.length} lançamento(s) · clique para alterar · marque as caixinhas para excluir vários</span>
                                 <span className="flex gap-4 tabular-nums">
                                     <span>
                                         Entradas: <b className="text-green-800">{money(totals.in)}</b>
@@ -276,6 +287,7 @@ export default function Lancamentos({ entries, totals, filters, ...options }: Pr
                     {paying && <PayForm key={paying.id} entry={paying} methods={methods} onDone={() => setPaying(null)} />}
                 </DialogContent>
             </Dialog>
+            {bar}
         </AppLayout>
     );
 }

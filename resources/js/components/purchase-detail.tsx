@@ -1,3 +1,4 @@
+import { ask } from '@/components/ask-dialog';
 import { Tool } from '@/components/erp';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { dateBr } from '@/lib/finance';
@@ -28,7 +29,11 @@ export function PaidTag({ r }: { r: PurchaseRow }) {
         <span
             className={cn(
                 'rounded-[3px] px-1.5 py-0.5 text-[11px] font-bold uppercase ring-1 ring-inset',
-                r.paid ? 'bg-green-50 text-green-800 ring-green-300' : overdue ? 'bg-red-50 text-red-800 ring-red-300' : 'bg-amber-50 text-amber-900 ring-amber-300',
+                r.paid
+                    ? 'bg-green-50 text-green-800 ring-green-300'
+                    : overdue
+                      ? 'bg-red-50 text-red-800 ring-red-300'
+                      : 'bg-amber-50 text-amber-900 ring-amber-300',
             )}
         >
             {r.paid ? 'Pago' : overdue ? 'Vencido' : 'A pagar'}
@@ -83,7 +88,9 @@ export function PurchaseDetailDialog({ row, onClose }: { row: PurchaseRow | null
                             {row.entries.map((e, k) => (
                                 <p key={k} className="flex justify-between border-b border-[#eceef1] py-1">
                                     <span>Vence {dateBr(e.due_date)}</span>
-                                    <span className={e.paid_at ? 'text-green-700' : 'text-amber-700'}>{e.paid_at ? `Pago ${dateBr(e.paid_at)}` : 'Em aberto'}</span>
+                                    <span className={e.paid_at ? 'text-green-700' : 'text-amber-700'}>
+                                        {e.paid_at ? `Pago ${dateBr(e.paid_at)}` : 'Em aberto'}
+                                    </span>
                                     <b className="tabular-nums">{money(e.amount)}</b>
                                 </p>
                             ))}
@@ -94,7 +101,10 @@ export function PurchaseDetailDialog({ row, onClose }: { row: PurchaseRow | null
                                 danger
                                 icon={<Trash2 />}
                                 label="Excluir compra"
-                                onClick={() => confirm('Excluir esta compra e as contas a pagar dela?') && router.delete(route('compras.destroy', row.id), { preserveScroll: true, onSuccess: onClose })}
+                                onClick={async () =>
+                                    (await ask('Excluir esta compra e as contas a pagar dela?', { danger: true, okLabel: 'Excluir' })) &&
+                                    router.delete(route('compras.destroy', row.id), { preserveScroll: true, onSuccess: onClose })
+                                }
                             />
                         </div>
                     </div>

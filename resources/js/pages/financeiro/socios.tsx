@@ -1,3 +1,4 @@
+import { ask } from '@/components/ask-dialog';
 import { Block, Field, Grid, Tool, selectCls, type Col } from '@/components/erp';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -205,8 +206,8 @@ export default function Socios({ month, balance, result, movements, partners, us
                 r.from_entry ? null : (
                     <button
                         title="Excluir"
-                        onClick={() =>
-                            confirm('Excluir esta movimentação?') &&
+                        onClick={async () =>
+                            (await ask('Excluir esta movimentação?', { danger: true, okLabel: 'Excluir' })) &&
                             router.delete(route('financeiro.movements.destroy', r.id), { preserveScroll: true })
                         }
                         className="grid size-9 place-items-center rounded-[3px] text-zinc-500 hover:bg-red-50 hover:text-red-700 md:size-7"

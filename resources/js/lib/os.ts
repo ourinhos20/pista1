@@ -226,3 +226,7 @@ export function workFor(type: string | null | undefined) {
         print: checklist && !diag ? 'revisao' : 'diagnostico',
     };
 }
+
+/** Agendado cuja hora já passou há mais de 1 hora e o cliente não chegou. */
+export const lateBooking = (os: { status: string; scheduled_at: string | null }) =>
+    os.status === 'aguardando' && !!os.scheduled_at && new Date(os.scheduled_at).getTime() < Date.now() - 60 * 60 * 1000;

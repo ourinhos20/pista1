@@ -2,6 +2,7 @@
  * Componentes de interface no estilo ERP (barra de menus, barra de título,
  * barra de ferramentas com teclas de atalho, grades de dados e formulários densos).
  */
+import { AskDialogHost } from '@/components/ask-dialog';
 import { FlashToast } from '@/components/flash-toast';
 import { PlateSearch } from '@/components/plate-search';
 import {
@@ -13,7 +14,7 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
-import { STATUS, money, since } from '@/lib/os';
+import { STATUS, since } from '@/lib/os';
 import { cn } from '@/lib/utils';
 import type { OsCard, OsStatus, Role, SharedData } from '@/types';
 import { Link, router, usePage } from '@inertiajs/react';
@@ -22,7 +23,6 @@ import {
     CalendarDays,
     ChevronDown,
     ClipboardList,
-    LayoutDashboard,
     Lock,
     LogOut,
     Menu,
@@ -64,8 +64,7 @@ export function menusFor(role: Role, preNew = 0): MenuGroup[] {
         {
             label: 'Atendimento',
             items: [
-                item('Painel de atendimento', 'dashboard', 'ATD001', 'F1'),
-                item('Ordens de serviço', 'os.index', 'ATD020', 'F4'),
+                item('Ordens de serviço', 'os.index', 'ATD020', 'F1'),
                 { label: 'Agendamentos online', href: path('os.index') + '?origem=online&status=aguardando', code: 'ATD005', badge: preNew },
             ],
         },
@@ -99,6 +98,7 @@ function useShortcuts(role: Role) {
         const map: Record<string, string> = {};
         menusFor(role).forEach((g) => g.items.forEach((i) => i.key && (map[i.key] = i.href)));
         if (role !== 'mecanico') map.F2 = path('os.create');
+        if (role !== 'mecanico') map.F4 = path('os.index');
         const onKey = (e: KeyboardEvent) => {
             if (e.key === 'F3') {
                 e.preventDefault();
@@ -275,7 +275,6 @@ function BottomNav({ onSearch, onMore }: { onSearch: () => void; onMore: () => v
                   { label: 'Mais', icon: <Menu />, onClick: onMore },
               ]
             : [
-                  { label: 'Painel', icon: <LayoutDashboard />, href: dash },
                   { label: 'Ordens', icon: <ClipboardList />, href: path('os.index'), badge: preNew },
                   { label: 'Agenda', icon: <CalendarDays />, href: path('mecanico.index') },
                   { label: 'Clientes', icon: <Users />, href: path('clientes.index') },
@@ -403,7 +402,7 @@ function StatusBar() {
     const keys =
         auth.user.role === 'mecanico'
             ? 'F3 Buscar placa · F9 Agenda'
-            : `F1 Painel · F2 Nova OS · F3 Buscar placa · F4 Ordens · F6 Clientes${auth.user.role === 'master' ? ' · F7 Financeiro' : ''} · F9 Agenda`;
+            : `F1 Ordens · F2 Nova OS · F3 Buscar placa · F6 Clientes${auth.user.role === 'master' ? ' · F7 Financeiro' : ''} · F9 Agenda`;
 
     return (
         <footer className="no-print fixed inset-x-0 bottom-0 z-30 hidden h-6 items-center gap-0 border-t border-black bg-[#1a1b1e] text-[11px] text-zinc-400 md:flex">
@@ -462,6 +461,7 @@ export function ErpLayout({ title, code, toolbar, children }: { title: string; c
             />
             <MoreSheet open={more} onOpenChange={setMore} />
             <FlashToast />
+            <AskDialogHost />
         </div>
     );
 }
@@ -687,6 +687,8 @@ function AutoMobileRow<T>({ cols, row }: { cols: Col<T>[]; row: T }) {
     );
 }
 
+export type Selection = { selected: Array<string | number>; onChange: (keys: Array<string | number>) => void };
+
 export function Grid<T>({
     cols,
     rows,
@@ -695,6 +697,7 @@ export function Grid<T>({
     empty = 'Nenhum registro encontrado.',
     footer,
     mobile,
+    selection,
 }: {
     cols: Col<T>[];
     rows: T[];
@@ -704,7 +707,26 @@ export function Grid<T>({
     footer?: ReactNode;
     /** Como cada linha aparece no celular (senão, monta sozinho a partir das colunas). */
     mobile?: (r: T) => ReactNode;
+    /** Caixinhas para marcar várias linhas (ex.: excluir várias OS de uma vez). */
+    selection?: Selection;
 }) {
+    const keys = rows.map(rowKey);
+    const isSel = (k: string | number) => !!selection?.selected.includes(k);
+    const allSel = keys.length > 0 && keys.every(isSel);
+    const toggle = (k: string | number) => selection?.onChange(isSel(k) ? selection.selected.filter((x) => x !== k) : [...selection.selected, k]);
+    const toggleAll = () =>
+        selection?.onChange(allSel ? selection.selected.filter((x) => !keys.includes(x)) : [...new Set([...selection.selected, ...keys])]);
+    const box = (k: string | number) => (
+        <input
+            type="checkbox"
+            aria-label="Selecionar"
+            checked={isSel(k)}
+            onChange={() => toggle(k)}
+            onClick={(e) => e.stopPropagation()}
+            className="size-5 cursor-pointer accent-[#d42a2a] md:size-4"
+        />
+    );
+
     return (
         <div>
             {/* celular: lista no lugar da tabela espremida */}
@@ -717,9 +739,12 @@ export function Grid<T>({
                         className={cn(
                             'border-b border-[#eceef1] px-4 py-3 last:border-b-0 dark:border-zinc-800',
                             onRowClick && 'cursor-pointer active:bg-zinc-50 dark:active:bg-zinc-800',
+                            selection && 'flex items-start gap-3',
+                            isSel(rowKey(r)) && 'bg-red-50/60 dark:bg-red-950/20',
                         )}
                     >
-                        {mobile ? mobile(r) : <AutoMobileRow cols={cols} row={r} />}
+                        {selection && <span className="pt-1">{box(rowKey(r))}</span>}
+                        <div className="min-w-0 flex-1">{mobile ? mobile(r) : <AutoMobileRow cols={cols} row={r} />}</div>
                     </li>
                 ))}
             </ul>
@@ -727,6 +752,17 @@ export function Grid<T>({
                 <table className="w-full border-collapse text-[13px]">
                     <thead>
                         <tr className="border-b border-[#d7dade] bg-[#f3f4f6] dark:border-zinc-700 dark:bg-zinc-800">
+                            {selection && (
+                                <th className="h-8 w-9 border-r border-[#e3e5e8] px-2.5 dark:border-zinc-700">
+                                    <input
+                                        type="checkbox"
+                                        aria-label="Selecionar todas"
+                                        checked={allSel}
+                                        onChange={toggleAll}
+                                        className="size-4 cursor-pointer align-middle accent-[#d42a2a]"
+                                    />
+                                </th>
+                            )}
                             {cols.map((c, i) => (
                                 <th
                                     key={i}
@@ -746,7 +782,7 @@ export function Grid<T>({
                     <tbody>
                         {rows.length === 0 && (
                             <tr>
-                                <td colSpan={cols.length} className="text-muted-foreground px-3 py-8 text-center">
+                                <td colSpan={cols.length + (selection ? 1 : 0)} className="text-muted-foreground px-3 py-8 text-center">
                                     {empty}
                                 </td>
                             </tr>
@@ -758,8 +794,17 @@ export function Grid<T>({
                                 className={cn(
                                     'border-b border-[#eceef1] even:bg-[#fafafb] dark:border-zinc-800 dark:even:bg-zinc-900/60',
                                     onRowClick && 'cursor-pointer hover:bg-[#fdf0f0] dark:hover:bg-red-950/30',
+                                    isSel(rowKey(r)) && 'bg-red-50/70 even:bg-red-50/70 dark:bg-red-950/30',
                                 )}
                             >
+                                {selection && (
+                                    <td
+                                        className="h-9 border-r border-[#f0f1f3] px-2.5 align-middle dark:border-zinc-800"
+                                        onClick={(e) => e.stopPropagation()}
+                                    >
+                                        {box(rowKey(r))}
+                                    </td>
+                                )}
                                 {cols.map((c, i) => (
                                     <td
                                         key={i}
@@ -859,7 +904,6 @@ export function OsMobileRow({ os, when }: { os: OsCard; when?: ReactNode }) {
                 </span>
             </span>
             <span className="flex flex-col items-end gap-0.5">
-                {!!os.total && <span className="text-[14px] font-bold tabular-nums">{money(os.total)}</span>}
                 {when ?? <Since iso={os.status_since} status={os.status} />}
             </span>
         </div>

@@ -28,6 +28,11 @@ Publicação: `deploy/empacotar.ps1` gera o zip; passo a passo em `deploy/PUBLIC
 - `resources/js/components/erp.tsx`: componentes visuais (Block, Grid, Field, ReadOnly, Tool, Tabs, Situacao, Placa) e o menu.
 - `resources/js/pages/print/*`: fichas A4 impressas. O menu **Fichas** do topo abre as mesmas fichas em branco (`/fichas/{tipo}`); a via do cliente em branco é só do balcão/master. As fichas abrem **na mesma aba** e o botão **Voltar** retorna à tela anterior (não usar nova aba nem `window.close`).
 - Menu: **Nova OS não fica no menu** (é o botão + Nova OS na tela Ordens de serviço, ou F2).
+- **Tela inicial** (balcão/sócio) = **Ordens de serviço** com os **Agendados para hoje** no topo (`/dashboard` só redireciona; mecânico vai para a Agenda). **Nada de faturamento ou valores na tela inicial** nem nas listas de OS: valores só dentro da OS e no Financeiro.
+- **Uma tela (`resources/js/pages`) nunca importa outra tela**: o empacotador deixa a importada de fora e ela dá erro 500. Formulários compartilhados ficam em `resources/js/components` (`client-form`, `vehicle-form`, `supplier-form`). Há teste para isso.
+- **Nunca usar `confirm()`/`alert()` do navegador** (alguns navegadores/apps bloqueiam e a ação não acontece). Usar `ask()`/`tell()` de `resources/js/components/ask-dialog.tsx`.
+- **Excluir em lote:** listas de OS (e o painel), clientes, fornecedores e lançamentos do financeiro têm caixinhas para o sócio marcar e excluir (`useBulkDelete` em `resources/js/components/os-bulk.tsx`; `<Grid selection>`). Cliente com OS e fornecedor com compra não são excluídos.
+- Ações da barra de ferramentas não podem sumir em telas menores (só no celular, quando há outro caminho: barra de baixo ou botão flutuante).
 - `config/oficina.php`: dados da oficina (telefone, endereço, termos de garantia) e o `panel_path`.
 
 ## Regras de negócio (decididas pelo dono — não mudar sem ele pedir)
@@ -67,9 +72,10 @@ Publicação: `deploy/empacotar.ps1` gera o zip; passo a passo em `deploy/PUBLIC
 - Estilo **ERP**, como Consinco/Bluesoft: barra de menus, código da tela (ATD001, FIN010…), barra de ferramentas com teclas F, grades densas, barra de status.
 - O dono **não quer** "dashboard genérico com cara de IA": nada de cartões grandes, saudações ou gradientes.
 - Cores: preto `#0f1012`, branco e cinza, vermelho `#d42a2a` só para ações e alertas. Fonte Inter.
+- **Modo claro é o padrão** (`resources/js/hooks/use-appearance.tsx`, chave `pista1-aparencia`). Escuro só se a pessoa escolher em Minha conta › Aparência.
 - No celular do mecânico: botões grandes, ação principal no rodapé.
-- Navegação: computador = barra de menus no topo; **tablet** (768–1023 px) = botão **Menu** no topo que abre a lista completa; **celular** = barra no rodapé (Painel, Ordens, Agenda, Clientes, Mais).
-- **Sequência do mecânico** na OS (recebido/diagnóstico): 1 Vistoria → 2 Diagnóstico/Checklist ("Concluir" grava `work_done_at`) → 3 Peças → 4 Fotos (opcional). Abas seguintes ficam apagadas e bloqueadas; o envio ao balcão exige vistoria e etapa 2 concluídas.
+- Navegação: computador = barra de menus no topo; **tablet** (768–1023 px) = botão **Menu** no topo que abre a lista completa; **celular** = barra no rodapé (Ordens, Agenda, Clientes, Mais).
+- **Sequência** na OS (recebido/diagnóstico, para todos os perfis): 1 Vistoria → 2 Diagnóstico/Checklist ("Concluir" grava `work_done_at`) → 3 Peças → 4 Fotos (opcional). Abas seguintes ficam apagadas e bloqueadas; o envio ao balcão exige vistoria e etapa 2 concluídas.
 - **As fichas A4 precisam caber em uma folha.** Confira a altura do conteúdo de `.print-sheet`: deve ser ≤ ~1047 px com largura de 794 px.
 
 ## Segurança (já configurada — manter)

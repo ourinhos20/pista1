@@ -1,7 +1,8 @@
 import { Block, Field, Grid, OriginTag, OsMobileRow, Placa, Since, Situacao, Tool, selectCls, type Col } from '@/components/erp';
+import { useOsBulkDelete } from '@/components/os-bulk';
 import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
-import { SERVICE_TYPE, STATUS, date, money, time } from '@/lib/os';
+import { SERVICE_TYPE, STATUS, date, lateBooking, time } from '@/lib/os';
 import { cn } from '@/lib/utils';
 import type { OsCard, OsStatus } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
@@ -37,7 +38,9 @@ const chips: { label: string; status: string; origem: string; dot?: string }[] =
     { label: 'Todas', status: 'todas', origem: '' },
 ];
 
-export default function OsIndex({ orders, filters }: { orders: OsCard[]; filters: Filters }) {
+export default function OsIndex({ orders, filters, today = [] }: { orders: OsCard[]; filters: Filters; today?: OsCard[] }) {
+    // sócio marca várias OS e exclui de uma vez
+    const { selection, bar } = useOsBulkDelete();
     const [q, setQ] = useState(filters.q);
     const [status, setStatus] = useState(filters.status);
     const [origem, setOrigem] = useState(filters.origem ?? '');
@@ -58,7 +61,15 @@ export default function OsIndex({ orders, filters }: { orders: OsCard[]; filters
         },
         {
             label: 'Agendado',
-            render: (r) => (r.scheduled_at ? `${date(r.scheduled_at)} ${time(r.scheduled_at)}` : '—'),
+            render: (r) =>
+                r.scheduled_at ? (
+                    <span className={cn('tabular-nums', lateBooking(r) && 'font-semibold text-[#b51f1f]')}>
+                        {date(r.scheduled_at)} {time(r.scheduled_at)}
+                        {lateBooking(r) && <span className="ml-1 text-[10px] uppercase">atrasado</span>}
+                    </span>
+                ) : (
+                    '—'
+                ),
             hide: 'lg',
             className: 'w-36',
         },
@@ -80,7 +91,6 @@ export default function OsIndex({ orders, filters }: { orders: OsCard[]; filters
                 </span>
             ),
         },
-        { label: 'Valor', render: (r) => (r.total ? money(r.total) : '—'), align: 'right', hide: 'sm' },
     ];
 
     return (
@@ -91,6 +101,49 @@ export default function OsIndex({ orders, filters }: { orders: OsCard[]; filters
         >
             <Head title="Ordens de serviço" />
             <div className="grid gap-3">
+                {/* agenda do dia no topo da tela inicial (some durante a pesquisa) */}
+                {!filters.q && today.length === 0 && (
+                    <p className="rounded-lg border border-[#e4e6ea] bg-white px-3 py-2 text-[13px] text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900">
+                        <b className="text-zinc-800 dark:text-zinc-200">Agendados para hoje:</b> nenhum.
+                    </p>
+                )}
+                {!filters.q && today.length > 0 && (
+                    <Block title={`Agendados para hoje · ${today.length}`} bodyClassName="p-0">
+                        <Grid
+                            cols={[
+                                {
+                                    label: 'Hora',
+                                    render: (r: OsCard) => <b className="tabular-nums">{time(r.scheduled_at) || '—'}</b>,
+                                    className: 'w-16',
+                                },
+                                {
+                                    label: 'Placa',
+                                    render: (r: OsCard) =>
+                                        r.vehicle?.plate ? (
+                                            <Placa value={r.vehicle.plate} />
+                                        ) : (
+                                            <span className="text-[12px] text-zinc-400">sem placa</span>
+                                        ),
+                                    className: 'w-24',
+                                },
+                                { label: 'Veículo', render: (r: OsCard) => r.vehicle?.title || '—' },
+                                { label: 'Cliente', render: (r: OsCard) => r.client?.name, hide: 'md' },
+                                {
+                                    label: 'Tipo',
+                                    render: (r: OsCard) => (r.service_type ? SERVICE_TYPE[r.service_type] : '—'),
+                                    hide: 'lg',
+                                    className: 'w-36',
+                                },
+                                { label: 'Relato', render: (r: OsCard) => <span className="line-clamp-1">{r.complaint}</span>, hide: 'lg' },
+                            ]}
+                            rows={today}
+                            rowKey={(r) => r.id}
+                            onRowClick={(r) => router.visit(route('os.show', r.id))}
+                            mobile={(r) => <OsMobileRow os={r} when={<b className="text-[14px] tabular-nums">{time(r.scheduled_at) || '—'}</b>} />}
+                            empty="Nenhum agendamento para hoje."
+                        />
+                    </Block>
+                )}
                 {/* celular: busca larga e filtros em botões que deslizam para o lado */}
                 <div className="grid gap-3 md:hidden">
                     <form
@@ -188,12 +241,13 @@ export default function OsIndex({ orders, filters }: { orders: OsCard[]; filters
                     </form>
                 </Block>
 
-                <Block title="Resultado" bodyClassName="p-0">
+                <Block title="Ordens de serviço" bodyClassName="p-0">
                     <Grid
                         cols={cols}
                         rows={orders}
                         rowKey={(r) => r.id}
                         onRowClick={(r) => router.visit(route('os.show', r.id))}
+                        selection={selection}
                         mobile={(r) => (
                             <OsMobileRow
                                 os={r}
@@ -210,20 +264,25 @@ export default function OsIndex({ orders, filters }: { orders: OsCard[]; filters
                         footer={
                             <>
                                 <span>{orders.length} registro(s)</span>
-                                <span className="hidden md:inline">Clique na linha para abrir a OS</span>
+                                <span className="hidden md:inline">
+                                    Clique na linha para abrir a OS{selection ? ' · marque as caixinhas para excluir várias' : ''}
+                                </span>
                             </>
                         }
                     />
                 </Block>
             </div>
 
+            {bar}
             {/* celular: Nova OS ao alcance do polegar, acima da barra de navegação */}
-            <Link
-                href={route('os.create')}
-                className="no-print fixed right-4 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-30 flex h-14 items-center gap-2 rounded-2xl bg-[#d42a2a] pr-5 pl-4 text-[16px] font-bold text-white shadow-[0_8px_20px_rgba(212,42,42,0.32)] md:hidden"
-            >
-                <Plus className="size-[22px]" /> Nova OS
-            </Link>
+            {!bar && (
+                <Link
+                    href={route('os.create')}
+                    className="no-print fixed right-4 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-30 flex h-14 items-center gap-2 rounded-2xl bg-[#d42a2a] pr-5 pl-4 text-[16px] font-bold text-white shadow-[0_8px_20px_rgba(212,42,42,0.32)] md:hidden"
+                >
+                    <Plus className="size-[22px]" /> Nova OS
+                </Link>
+            )}
         </AppLayout>
     );
 }

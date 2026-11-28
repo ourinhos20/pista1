@@ -91,6 +91,23 @@ class SupplierController extends Controller
         return back()->with('success', "Fornecedor {$s->name} cadastrado.");
     }
 
+    /** Exclui fornecedores marcados. Quem já tem compra fica (dá para desativar no cadastro). */
+    public function destroyMany(Request $request): RedirectResponse
+    {
+        $ids = $request->validate(['ids' => ['required', 'array', 'min:1', 'max:200'], 'ids.*' => ['integer']])['ids'];
+        $rows = Supplier::withCount('purchases')->whereIn('id', $ids)->get();
+        $kept = $rows->where('purchases_count', '>', 0);
+        $gone = $rows->where('purchases_count', 0);
+        $gone->each->delete();
+
+        $msg = $gone->count() === 1 ? '1 fornecedor excluído.' : "{$gone->count()} fornecedores excluídos.";
+        if ($kept->isNotEmpty()) {
+            $msg .= ' Não excluí '.$kept->pluck('name')->implode(', ').': tem compras registradas (desative no cadastro).';
+        }
+
+        return back()->with($kept->isNotEmpty() && $gone->isEmpty() ? 'error' : 'success', $msg);
+    }
+
     public function update(Request $request, Supplier $supplier): RedirectResponse
     {
         $supplier->update($this->validated($request));

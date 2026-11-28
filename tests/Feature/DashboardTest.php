@@ -19,6 +19,7 @@ class DashboardTest extends TestCase
     {
         $this->actingAs($user = User::factory()->create());
 
-        $this->get($this->p('/dashboard'))->assertOk();
+        // a tela inicial do balcão/sócio é a lista de OS (sem faturamento)
+        $this->get($this->p('/dashboard'))->assertRedirect($this->p('/os'));
     }
 }

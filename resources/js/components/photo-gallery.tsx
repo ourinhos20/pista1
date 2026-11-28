@@ -1,3 +1,4 @@
+import { ask } from '@/components/ask-dialog';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { date } from '@/lib/os';
 import { compressImage } from '@/lib/photos';
@@ -40,7 +41,17 @@ export function PhotoUpload({ osId, className }: { osId: number; className?: str
     );
 }
 
-export function PhotoGallery({ photos, osId, canManage, canDeleteAll }: { photos: Photo[]; osId?: number; canManage?: boolean; canDeleteAll?: boolean }) {
+export function PhotoGallery({
+    photos,
+    osId,
+    canManage,
+    canDeleteAll,
+}: {
+    photos: Photo[];
+    osId?: number;
+    canManage?: boolean;
+    canDeleteAll?: boolean;
+}) {
     const [open, setOpen] = useState<number | null>(null);
     const current = open !== null ? photos[open] : null;
 
@@ -53,19 +64,37 @@ export function PhotoGallery({ photos, osId, canManage, canDeleteAll }: { photos
         );
     }
 
-    const toggleClient = (p: Photo) => osId && router.patch(route('os.photos.update', [osId, p.id]), { show_to_client: !p.show_to_client }, { preserveScroll: true });
-    const remove = (p: Photo) => osId && confirm('Excluir esta foto?') && router.delete(route('os.photos.destroy', [osId, p.id]), { preserveScroll: true, onSuccess: () => setOpen(null) });
+    const toggleClient = (p: Photo) =>
+        osId && router.patch(route('os.photos.update', [osId, p.id]), { show_to_client: !p.show_to_client }, { preserveScroll: true });
+    const remove = async (p: Photo) =>
+        osId &&
+        (await ask('Excluir esta foto?', { danger: true, okLabel: 'Excluir' })) &&
+        router.delete(route('os.photos.destroy', [osId, p.id]), { preserveScroll: true, onSuccess: () => setOpen(null) });
 
     return (
         <>
             <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
                 {photos.map((p, i) => (
-                    <button key={p.id} type="button" onClick={() => setOpen(i)} className="group relative overflow-hidden rounded-[3px] border border-[#c9cdd3] bg-zinc-100">
-                        <img src={p.thumb} alt={p.caption ?? 'Foto'} loading="lazy" className="aspect-square w-full object-cover transition group-hover:scale-105" />
+                    <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => setOpen(i)}
+                        className="group relative overflow-hidden rounded-[3px] border border-[#c9cdd3] bg-zinc-100"
+                    >
+                        <img
+                            src={p.thumb}
+                            alt={p.caption ?? 'Foto'}
+                            loading="lazy"
+                            className="aspect-square w-full object-cover transition group-hover:scale-105"
+                        />
                         {canManage && !p.show_to_client && (
                             <span className="absolute top-1 left-1 rounded-[2px] bg-black/70 px-1 text-[10px] font-semibold text-white">interna</span>
                         )}
-                        {p.caption && <span className="absolute inset-x-0 bottom-0 truncate bg-black/60 px-1.5 py-0.5 text-left text-[11px] text-white">{p.caption}</span>}
+                        {p.caption && (
+                            <span className="absolute inset-x-0 bottom-0 truncate bg-black/60 px-1.5 py-0.5 text-left text-[11px] text-white">
+                                {p.caption}
+                            </span>
+                        )}
                     </button>
                 ))}
             </div>
@@ -78,12 +107,20 @@ export function PhotoGallery({ photos, osId, canManage, canDeleteAll }: { photos
                             <div className="relative bg-black">
                                 <img src={current.url} alt={current.caption ?? 'Foto'} className="mx-auto max-h-[75svh] w-auto object-contain" />
                                 {open! > 0 && (
-                                    <button aria-label="Anterior" onClick={() => setOpen(open! - 1)} className="absolute top-1/2 left-1 grid size-11 -translate-y-1/2 place-items-center rounded-full bg-black/60 text-white">
+                                    <button
+                                        aria-label="Anterior"
+                                        onClick={() => setOpen(open! - 1)}
+                                        className="absolute top-1/2 left-1 grid size-11 -translate-y-1/2 place-items-center rounded-full bg-black/60 text-white"
+                                    >
                                         <ChevronLeft />
                                     </button>
                                 )}
                                 {open! < photos.length - 1 && (
-                                    <button aria-label="Próxima" onClick={() => setOpen(open! + 1)} className="absolute top-1/2 right-1 grid size-11 -translate-y-1/2 place-items-center rounded-full bg-black/60 text-white">
+                                    <button
+                                        aria-label="Próxima"
+                                        onClick={() => setOpen(open! + 1)}
+                                        className="absolute top-1/2 right-1 grid size-11 -translate-y-1/2 place-items-center rounded-full bg-black/60 text-white"
+                                    >
                                         <ChevronRight />
                                     </button>
                                 )}
@@ -95,13 +132,19 @@ export function PhotoGallery({ photos, osId, canManage, canDeleteAll }: { photos
                                 </span>
                                 <span className="ml-auto flex gap-1.5">
                                     {canManage && (
-                                        <button onClick={() => toggleClient(current)} className="inline-flex h-9 items-center gap-1.5 rounded-[3px] border border-[#c9cdd3] px-2.5 font-semibold">
+                                        <button
+                                            onClick={() => toggleClient(current)}
+                                            className="inline-flex h-9 items-center gap-1.5 rounded-[3px] border border-[#c9cdd3] px-2.5 font-semibold"
+                                        >
                                             {current.show_to_client ? <Eye className="size-4" /> : <EyeOff className="size-4" />}
                                             {current.show_to_client ? 'Cliente vê no orçamento' : 'Só interna'}
                                         </button>
                                     )}
                                     {(canDeleteAll || current.mine) && osId && (
-                                        <button onClick={() => remove(current)} className="inline-flex h-9 items-center gap-1.5 rounded-[3px] border border-[#c9cdd3] px-2.5 font-semibold text-[#b51f1f]">
+                                        <button
+                                            onClick={() => remove(current)}
+                                            className="inline-flex h-9 items-center gap-1.5 rounded-[3px] border border-[#c9cdd3] px-2.5 font-semibold text-[#b51f1f]"
+                                        >
                                             <Trash2 className="size-4" /> Excluir
                                         </button>
                                     )}

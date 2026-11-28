@@ -101,6 +101,23 @@ class ClientController extends Controller
         ]);
     }
 
+    /** Exclui clientes marcados (e os carros deles). Quem já tem OS fica: o histórico não pode sumir. */
+    public function destroyMany(Request $request): RedirectResponse
+    {
+        $ids = $request->validate(['ids' => ['required', 'array', 'min:1', 'max:200'], 'ids.*' => ['integer']])['ids'];
+        $clients = Client::withCount('serviceOrders')->whereIn('id', $ids)->get();
+        $kept = $clients->where('service_orders_count', '>', 0);
+        $gone = $clients->where('service_orders_count', 0);
+        $gone->each->delete();
+
+        $msg = $gone->count() === 1 ? '1 cliente excluído.' : "{$gone->count()} clientes excluídos.";
+        if ($kept->isNotEmpty()) {
+            $msg .= ' Não excluí '.$kept->pluck('name')->implode(', ').': tem ordem de serviço (exclua as OS antes).';
+        }
+
+        return back()->with($kept->isNotEmpty() && $gone->isEmpty() ? 'error' : 'success', $msg);
+    }
+
     public function update(Request $request, Client $client): RedirectResponse
     {
         $client->update($this->validated($request));

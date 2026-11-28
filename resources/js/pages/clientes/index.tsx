@@ -1,72 +1,25 @@
-import { Block, Field, Grid, Placa, Tool, textareaCls, type Col } from '@/components/erp';
+import { ClientForm } from '@/components/client-form';
+import { Block, Field, Grid, Placa, Tool, type Col } from '@/components/erp';
+import { useBulkDelete } from '@/components/os-bulk';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
 import { documentFmt, phone } from '@/lib/os';
 import type { ClientData } from '@/types';
-import { Head, router, useForm } from '@inertiajs/react';
-import { Save, Search, UserPlus } from 'lucide-react';
+import { Head, router } from '@inertiajs/react';
+import { Search, UserPlus } from 'lucide-react';
 import { useState } from 'react';
 
 type Row = ClientData & { vehicles: { id: number; plate: string; brand: string | null; model: string | null }[]; service_orders_count: number };
 
-export function ClientForm({ client, onDone }: { client?: ClientData; onDone?: () => void }) {
-    const { data, setData, post, put, processing, errors } = useForm({
-        name: client?.name ?? '',
-        phone: client?.phone ?? '',
-        document: client?.document ?? '',
-        email: client?.email ?? '',
-        address: client?.address ?? '',
-        city: client?.city ?? '',
-        notes: client?.notes ?? '',
-    });
-    return (
-        <form
-            className="grid gap-3"
-            onSubmit={(e) => {
-                e.preventDefault();
-                const opts = { preserveScroll: true, onSuccess: () => onDone?.() };
-                if (client) put(route('clientes.update', client.id), opts);
-                else post(route('clientes.store'), opts);
-            }}
-        >
-            <div className="grid gap-3 sm:grid-cols-6">
-                <Field label="Nome *" className="sm:col-span-6" error={errors.name}>
-                    <Input value={data.name} onChange={(e) => setData('name', e.target.value)} autoFocus />
-                </Field>
-                <Field label="WhatsApp" className="sm:col-span-2" error={errors.phone}>
-                    <Input inputMode="tel" value={data.phone} onChange={(e) => setData('phone', e.target.value)} />
-                </Field>
-                <Field label="CPF / CNPJ" className="sm:col-span-2" error={errors.document}>
-                    <Input inputMode="numeric" value={data.document} onChange={(e) => setData('document', e.target.value)} />
-                </Field>
-                <Field label="E-mail" className="sm:col-span-2" error={errors.email}>
-                    <Input type="email" value={data.email} onChange={(e) => setData('email', e.target.value)} />
-                </Field>
-                <Field label="Endereço" className="sm:col-span-4">
-                    <Input value={data.address} onChange={(e) => setData('address', e.target.value)} />
-                </Field>
-                <Field label="Cidade" className="sm:col-span-2">
-                    <Input value={data.city} onChange={(e) => setData('city', e.target.value)} />
-                </Field>
-                <Field label="Observações" className="sm:col-span-6">
-                    <textarea rows={2} className={textareaCls} value={data.notes} onChange={(e) => setData('notes', e.target.value)} />
-                </Field>
-            </div>
-            <div className="flex justify-end">
-                <button
-                    type="submit"
-                    disabled={processing}
-                    className="inline-flex h-11 items-center gap-1.5 rounded-[3px] border border-[#b51f1f] bg-[#d42a2a] px-4 text-[13px] font-semibold text-white md:h-8"
-                >
-                    <Save className="size-4" /> {client ? 'Gravar alterações' : 'Gravar cliente'}
-                </button>
-            </div>
-        </form>
-    );
-}
-
 export default function Clientes({ clients, filters }: { clients: Row[]; filters: { q: string } }) {
+    // sócio marca vários e exclui de uma vez
+    const { selection, bar } = useBulkDelete('clientes.destroy_many', {
+        title: 'Excluir clientes',
+        one: 'o cliente selecionado',
+        many: (n) => `os ${n} clientes selecionados`,
+        note: 'Os carros deles também saem. Quem já tem OS não é excluído.',
+    });
     const [q, setQ] = useState(filters.q);
     const [open, setOpen] = useState(false);
 
@@ -121,6 +74,7 @@ export default function Clientes({ clients, filters }: { clients: Row[]; filters
                         cols={cols}
                         rows={clients}
                         rowKey={(r) => r.id}
+                        selection={selection}
                         onRowClick={(r) => router.visit(route('clientes.show', r.id))}
                         footer={<span>{clients.length} registro(s)</span>}
                     />
@@ -135,6 +89,7 @@ export default function Clientes({ clients, filters }: { clients: Row[]; filters
                     <ClientForm onDone={() => setOpen(false)} />
                 </DialogContent>
             </Dialog>
+            {bar}
         </AppLayout>
     );
 }

@@ -197,4 +197,23 @@ class FinanceTest extends TestCase
         $this->actingAs($this->master)->put($this->p("/financeiro/socios/{$p->id}"), ['name' => $p->name, 'share' => '33,34', 'active' => true])->assertSessionHasNoErrors();
         $this->assertEqualsWithDelta(33.34, (float) $p->fresh()->share, 0.001);
     }
+
+    public function test_exclui_varios_lancamentos_de_uma_vez(): void
+    {
+        $p1 = Partner::where('name', 'Sócio 1')->first();
+        $this->actingAs($this->master)->post($this->p('/financeiro/lancamentos'), [
+            'type' => 'saida', 'category' => 'outras_despesas', 'description' => 'Lote A', 'amount' => '10', 'due_date' => today()->toDateString(),
+            'paid' => true, 'paid_at' => today()->toDateString(), 'partner_id' => $p1->id,
+        ]);
+        $this->post($this->p('/financeiro/lancamentos'), [
+            'type' => 'saida', 'category' => 'outras_despesas', 'description' => 'Lote B', 'amount' => '20', 'due_date' => today()->toDateString(),
+        ]);
+        $ids = FinanceEntry::whereIn('description', ['Lote A', 'Lote B'])->pluck('id')->all();
+
+        $this->actingAs($this->balcao)->delete($this->p('/financeiro/lancamentos'), ['ids' => $ids])->assertForbidden();
+        $this->actingAs($this->master)->delete($this->p('/financeiro/lancamentos'), ['ids' => $ids])->assertSessionHas('success', '2 lançamentos excluídos.');
+        $this->assertSame(0, FinanceEntry::whereIn('id', $ids)->count());
+        // o aporte do sócio que veio do lançamento também saiu
+        $this->assertSame(0, PartnerMovement::whereIn('finance_entry_id', $ids)->count());
+    }
 }

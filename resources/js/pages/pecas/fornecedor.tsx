@@ -1,5 +1,6 @@
 import { Block, Field, Grid, ReadOnly, Tool, selectCls, type Col } from '@/components/erp';
 import { PaidTag, PurchaseDetailDialog, type PurchaseRow } from '@/components/purchase-detail';
+import { SupplierForm } from '@/components/supplier-form';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
@@ -9,7 +10,6 @@ import { cn } from '@/lib/utils';
 import { Head, router } from '@inertiajs/react';
 import { ArrowLeft, ChevronLeft, ChevronRight, MessageCircle, Pencil, ShoppingCart } from 'lucide-react';
 import { useState } from 'react';
-import { SupplierForm } from './fornecedores';
 
 type Supplier = {
     id: number;

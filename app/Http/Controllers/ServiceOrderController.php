@@ -10,6 +10,7 @@ use App\Support\OsPresenter;
 use App\Support\Plate;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -78,9 +79,15 @@ class ServiceOrderController extends Controller
             });
         }
 
+        // agenda do dia: quem marcou para hoje e ainda não chegou (fica no topo da tela inicial)
+        $today = ServiceOrder::with(['client', 'vehicle', 'mechanic'])->where('status', OsStatus::Aguardando)
+            ->whereDate('scheduled_at', today())->orderBy('scheduled_at')->get()
+            ->map(fn ($os) => OsPresenter::card($os, $user));
+
         return Inertia::render('os/index', [
             'orders' => $query->limit(100)->get()->map(fn ($os) => OsPresenter::card($os, $user)),
             'filters' => ['status' => $status ?: 'abertas', 'q' => $q, 'origem' => $origem],
+            'today' => $today,
         ]);
     }
 
@@ -382,6 +389,21 @@ class ServiceOrderController extends Controller
         $os->logEvent($user, 'Mecânico assumiu a OS');
 
         return back()->with('success', 'OS assumida.');
+    }
+
+    /** Exclui várias OS marcadas na lista (só sócios). */
+    public function destroyMany(Request $request): RedirectResponse
+    {
+        $ids = $request->validate(['ids' => ['required', 'array', 'min:1', 'max:200'], 'ids.*' => ['integer']])['ids'];
+        $n = 0;
+        DB::transaction(function () use ($ids, &$n) {
+            foreach (ServiceOrder::whereIn('id', $ids)->get() as $os) {
+                $os->delete();
+                $n++;
+            }
+        });
+
+        return back()->with('success', $n === 1 ? '1 OS excluída.' : "{$n} OS excluídas.");
     }
 
     public function destroy(ServiceOrder $os): RedirectResponse

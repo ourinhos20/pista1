@@ -16,7 +16,8 @@ function when(iso: string | null) {
     const tomorrow = new Date();
     tomorrow.setDate(today.getDate() + 1);
     const day = d.toDateString() === today.toDateString() ? 'Hoje' : d.toDateString() === tomorrow.toDateString() ? 'Amanhã' : date(iso);
-    return `${day} ${time(iso)}`;
+    const late = d.getTime() < Date.now() - 60 * 60 * 1000;
+    return `${day} ${time(iso)}${late ? ' · atrasado' : ''}`;
 }
 
 /** Cartão para o celular do mecânico. */

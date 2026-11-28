@@ -104,7 +104,7 @@ class PhotosAgendarBudgetTest extends TestCase
 
         // aparece como novo para o balcão até alguém abrir a OS
         $novos = ServiceOrder::whereIn('origin', ['site', 'bot'])->whereNull('online_seen_at')->where('status', OsStatus::Aguardando)->count();
-        $this->actingAs($this->balcao)->get($this->p('/dashboard'))->assertOk()->assertInertia(fn ($page) => $page->where('onlineNew', $novos)->has('online', $novos));
+        $this->actingAs($this->balcao)->get($this->p('/os'))->assertOk()->assertInertia(fn ($page) => $page->where('onlineNew', $novos));
         $this->get($this->p("/os/{$os->id}"))->assertOk();
         $this->assertNotNull($os->fresh()->online_seen_at);
     }

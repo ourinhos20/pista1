@@ -1,3 +1,4 @@
+import { ask, tell } from '@/components/ask-dialog';
 import { CarDiagramEditor, CarDiagramSvg, DamageLegend } from '@/components/car-diagram';
 import { Block, Field, Grid, OriginTag, Placa, ReadOnly, Since, Situacao, Tabs, Tool, selectCls, textareaCls, type Col } from '@/components/erp';
 import { PhotoGallery, PhotoUpload } from '@/components/photo-gallery';
@@ -62,7 +63,7 @@ type Tab = 'vistoria' | 'diag' | 'revisao' | 'itens' | 'fotos' | 'historico';
 /** Mostra o motivo quando o servidor recusa mudar de etapa (ex.: falta vistoria). */
 const showError = (errors: Record<string, string>) => {
     const msg = Object.values(errors)[0];
-    if (msg) alert(msg);
+    if (msg) tell(msg);
 };
 
 /* ---------------------------------------------------- vistoria de entrada */
@@ -635,8 +636,8 @@ function ItemRow({ item, osId }: { item: OsItem; osId: number }) {
                     type="button"
                     aria-label="Remover item"
                     className="grid size-9 place-items-center rounded-[3px] text-zinc-500 hover:bg-red-50 hover:text-red-700 md:size-7"
-                    onClick={() =>
-                        confirm(`Remover "${item.description}"?`) &&
+                    onClick={async () =>
+                        (await ask(`Remover "${item.description}"?`, { danger: true, okLabel: 'Remover' })) &&
                         router.delete(route('os.items.destroy', [osId, item.id]), { preserveScroll: true })
                     }
                 >
@@ -806,8 +807,8 @@ function Pagamentos({ os }: { os: OsFull }) {
                                         type="button"
                                         title="Excluir pagamento"
                                         className="text-zinc-400 hover:text-red-700"
-                                        onClick={() =>
-                                            confirm('Excluir este pagamento?') &&
+                                        onClick={async () =>
+                                            (await ask('Excluir este pagamento?', { danger: true, okLabel: 'Excluir' })) &&
                                             router.delete(route('os.payments.destroy', [os.id, p.id]), { preserveScroll: true })
                                         }
                                     >
@@ -897,8 +898,9 @@ export default function OsShow({ os, history, mechanics, statuses, serviceTypes 
     const needsInspection = ['recebido', 'diagnostico'].includes(os.status) && !os.inspected_at;
     // o tipo de serviço define a ficha de trabalho: revisão/preventiva = checklist; defeito/outro = diagnóstico
     const work = workFor(os.service_type);
-    // sequência do mecânico enquanto o carro está com ele: 1 vistoria → 2 diagnóstico/checklist → 3 peças → 4 fotos
-    const sequence = isMechanic && ['recebido', 'diagnostico'].includes(os.status);
+    // sequência enquanto o carro está com o mecânico (vale para todos os perfis):
+    // 1 vistoria → 2 diagnóstico/checklist → 3 peças → 4 fotos (opcional)
+    const sequence = ['recebido', 'diagnostico'].includes(os.status);
     const workTab: Tab = work.checklist ? 'revisao' : 'diag';
     const lockWork = sequence && !os.inspected_at;
     const lockAfter = sequence && !os.work_done_at;
@@ -962,6 +964,23 @@ export default function OsShow({ os, history, mechanics, statuses, serviceTypes 
         // diagnóstico/checklist ainda aberto: concluir antes de enviar
         if (os.status === 'diagnostico' && !os.work_done_at)
             return { label: workLabel, run: () => (tab === workTab ? concludeWork() : goTab(workTab)) };
+        if (os.status === 'orcamento' && sensitive && (active.length === 0 || pendingPrice))
+            return {
+                label: 'Lançar valores',
+                run: () => {
+                    goTab('itens');
+                    // cursor no primeiro valor em branco
+                    setTimeout(
+                        () =>
+                            (
+                                document.querySelector(
+                                    '#os-abas input[aria-label="Valor unitário"].border-amber-400, #os-abas input[aria-label="Valor unitário"]',
+                                ) as HTMLInputElement | null
+                            )?.focus(),
+                        350,
+                    );
+                },
+            };
         if (!next) return null;
         return { label: next.label, run: () => setStatus(next.to) };
     })();
@@ -1060,12 +1079,7 @@ export default function OsShow({ os, history, mechanics, statuses, serviceTypes 
                         <Tool icon={<PackageSearch />} label="Aguardar peças" onClick={() => setStatus('pecas')} disabled={busy} />
                     )}
                     {sensitive && os.status === 'execucao' && (
-                        <Tool
-                            icon={<PackageSearch />}
-                            label="Aguardando peças"
-                            onClick={() => setStatus('pecas')}
-                            disabled={busy}
-                        />
+                        <Tool icon={<PackageSearch />} label="Aguardando peças" onClick={() => setStatus('pecas')} disabled={busy} />
                     )}
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -1100,11 +1114,7 @@ export default function OsShow({ os, history, mechanics, statuses, serviceTypes 
                     )}
                     {waExtra && <Tool icon={<MessageCircle className="text-amber-600" />} label="Enviar item complementar" href={waExtra} external />}
                     {sensitive && !['entregue', 'cancelada', 'aguardando'].includes(os.status) && (
-                        <Tool
-                            icon={<ShoppingCart />}
-                            label="Comprar peças"
-                            href={route('compras.index', { os: os.id })}
-                        />
+                        <Tool icon={<ShoppingCart />} label="Comprar peças" href={route('compras.index', { os: os.id })} />
                     )}
                     {sensitive && os.public_url && ['orcamento', 'aprovacao', 'pecas', 'execucao'].includes(os.status) && (
                         <Tool
@@ -1112,7 +1122,7 @@ export default function OsShow({ os, history, mechanics, statuses, serviceTypes 
                             label="Copiar link"
                             onClick={() => {
                                 navigator.clipboard?.writeText(os.public_url!);
-                                alert('Link do orçamento copiado. Cole na conversa com o cliente.');
+                                tell('Link do orçamento copiado. Cole na conversa com o cliente.', 'Link copiado');
                             }}
                         />
                     )}
@@ -1138,11 +1148,12 @@ export default function OsShow({ os, history, mechanics, statuses, serviceTypes 
                             danger
                             icon={<Trash2 />}
                             label="Excluir"
-                            onClick={() =>
-                                confirm(
+                            onClick={async () =>
+                                (await ask(
                                     `Excluir a OS ${os.number}? Não pode ser desfeito.` +
-                                        (os.payments?.length ? ' Os pagamentos já lançados continuam no financeiro, sem a OS.' : ''),
-                                ) && router.delete(route('os.destroy', os.id))
+                                        (os.payments?.length ? '\nOs pagamentos já lançados continuam no financeiro, sem a OS.' : ''),
+                                    { title: 'Excluir ordem de serviço', danger: true, okLabel: 'Excluir OS' },
+                                )) && router.delete(route('os.destroy', os.id))
                             }
                         />
                     )}

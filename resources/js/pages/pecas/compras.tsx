@@ -1,5 +1,6 @@
 import { Block, Field, Grid, Tool, selectCls, textareaCls, type Col } from '@/components/erp';
 import { PaidTag, PurchaseDetailDialog, type PurchaseRow } from '@/components/purchase-detail';
+import { SupplierForm } from '@/components/supplier-form';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
@@ -8,7 +9,6 @@ import { money } from '@/lib/os';
 import { Head, router, useForm } from '@inertiajs/react';
 import { Plus, Save, Search, ShoppingCart, Trash2, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { SupplierForm } from './fornecedores';
 
 type Row = PurchaseRow;
 type Sup = { id: number; name: string };

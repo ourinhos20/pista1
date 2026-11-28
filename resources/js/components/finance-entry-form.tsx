@@ -1,3 +1,4 @@
+import { ask } from '@/components/ask-dialog';
 import { Field, selectCls, textareaCls } from '@/components/erp';
 import { Input } from '@/components/ui/input';
 import { type EntryOptions, type EntryType, type FinanceRow, moneyInput, todayIso } from '@/lib/finance';
@@ -239,12 +240,13 @@ export function EntryForm({
                     <button
                         type="button"
                         className="inline-flex h-11 items-center gap-1.5 rounded-[3px] border border-[#c9cdd3] bg-white px-3 text-[13px] font-semibold text-[#b51f1f] md:h-8"
-                        onClick={() =>
-                            confirm(
+                        onClick={async () =>
+                            (await ask(
                                 entry.purchase_id
                                     ? 'Este lançamento veio de uma compra de peças. Excluir só a conta a pagar (a compra continua registrada)?'
                                     : 'Excluir este lançamento?',
-                            ) && router.delete(route('financeiro.entries.destroy', entry.id), { preserveScroll: true, onSuccess: onDone })
+                                { danger: true, okLabel: 'Excluir' },
+                            )) && router.delete(route('financeiro.entries.destroy', entry.id), { preserveScroll: true, onSuccess: onDone })
                         }
                     >
                         <Trash2 className="size-4" /> Excluir

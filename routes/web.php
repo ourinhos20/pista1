@@ -105,6 +105,9 @@ Route::prefix(config('oficina.panel_path'))->group(function () {
 
         // Somente master (sócios)
         Route::middleware('role:master')->group(function () {
+            Route::delete('os', [ServiceOrderController::class, 'destroyMany'])->name('os.destroy_many');
+            Route::delete('clientes', [ClientController::class, 'destroyMany'])->name('clientes.destroy_many');
+            Route::delete('fornecedores', [SupplierController::class, 'destroyMany'])->name('fornecedores.destroy_many');
             Route::delete('os/{os}', [ServiceOrderController::class, 'destroy'])->name('os.destroy');
             Route::get('usuarios', [UserController::class, 'index'])->name('usuarios.index');
             Route::post('usuarios', [UserController::class, 'store'])->name('usuarios.store');
@@ -117,6 +120,7 @@ Route::prefix(config('oficina.panel_path'))->group(function () {
             Route::put('financeiro/lancamentos/{entry}', [FinanceController::class, 'update'])->name('financeiro.entries.update');
             Route::patch('financeiro/lancamentos/{entry}/baixa', [FinanceController::class, 'pay'])->name('financeiro.entries.pay');
             Route::patch('financeiro/lancamentos/{entry}/estorno', [FinanceController::class, 'unpay'])->name('financeiro.entries.unpay');
+            Route::delete('financeiro/lancamentos', [FinanceController::class, 'destroyMany'])->name('financeiro.entries.destroy_many');
             Route::delete('financeiro/lancamentos/{entry}', [FinanceController::class, 'destroy'])->name('financeiro.entries.destroy');
 
             Route::get('financeiro/socios', [PartnerController::class, 'index'])->name('financeiro.partners');

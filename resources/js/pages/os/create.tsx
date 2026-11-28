@@ -142,6 +142,23 @@ export default function NovaOs({ mechanics, prefill, serviceTypes }: Props) {
         setData((d) => ({ ...d, client_id: null, vehicle_id: null }));
     };
 
+    // veio da ficha do cliente/veículo ou da busca de placa: se a placa já é de um cliente, já escolhe o cliente e o carro
+    useEffect(() => {
+        const placa = (prefill.placa ?? '').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+        if (placa.length < 7) return;
+        fetch(route('clientes.lookup', { q: placa }), { headers: { Accept: 'application/json' } })
+            .then((r) => r.json())
+            .then((found: Found[]) => {
+                const owner = found.find((c) => c.vehicles.some((v) => v.plate === placa));
+                if (!owner) return;
+                setClient(owner);
+                const car = owner.vehicles.find((v) => v.plate === placa)!;
+                setData((d) => ({ ...d, client_id: owner.id, vehicle_id: car.id, name: '', phone: '' }));
+            })
+            .catch(() => {});
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
     const submit = () => {
         transform((d) => ({
             ...d,
@@ -172,7 +189,7 @@ export default function NovaOs({ mechanics, prefill, serviceTypes }: Props) {
             toolbar={
                 <>
                     <Tool primary icon={<Save />} label="Gravar OS" fkey="F10" onClick={() => form.current?.requestSubmit()} disabled={processing} />
-                    <Tool icon={<X />} label="Cancelar" href={route('dashboard')} />
+                    <Tool icon={<X />} label="Cancelar" href={route('os.index')} />
                 </>
             }
         >

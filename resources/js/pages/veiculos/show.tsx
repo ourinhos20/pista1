@@ -1,12 +1,12 @@
 import { Block, Field, Grid, Placa, ReadOnly, Situacao, Tool, type Col } from '@/components/erp';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { VehicleForm } from '@/components/vehicle-form';
 import AppLayout from '@/layouts/app-layout';
 import { date, km, money } from '@/lib/os';
 import type { ClientData, OsCard, SharedData, VehicleData } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
 import { FilePlus2, Pencil } from 'lucide-react';
 import { useState } from 'react';
-import { VehicleForm } from '../clientes/show';
 
 type Entry = OsCard & { date: string; diagnosis: string | null; items: { type: string; description: string; quantity: number }[] };
 

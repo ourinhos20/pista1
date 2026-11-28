@@ -239,17 +239,22 @@ class FluxoOsTest extends TestCase
         $this->assertTrue($os->fresh()->status_changed_at->greaterThan(now()->subMinute()));
     }
 
-    public function test_painel_mostra_etapas_e_a_espera_mais_antiga(): void
+    public function test_tela_inicial_e_a_lista_de_os_com_agendados_de_hoje_e_sem_valores(): void
     {
         $master = User::where('email', 'socio1@pista1.test')->first();
+        $hoje = ServiceOrder::where('status', OsStatus::Aguardando)->whereDate('scheduled_at', today())->count();
         foreach ([$this->balcao, $master] as $u) {
-            $this->actingAs($u)->get($this->p('/dashboard'))->assertOk()
+            $this->actingAs($u)->get($this->p('/dashboard'))->assertRedirect($this->p('/os'));
+            $this->get($this->p('/os'))->assertOk()
                 ->assertInertia(fn (Assert $page) => $page
-                    ->component('dashboard')
-                    ->where('counts.recebido', 1)
-                    ->has('oldest.recebido')
+                    ->component('os/index')
+                    ->has('today', $hoje)
+                    ->missing('counts')
+                    ->missing('month') // faturamento só no Financeiro
                 );
         }
+        // mecânico continua indo para a agenda
+        $this->actingAs($this->carlos)->get($this->p('/dashboard'))->assertRedirect($this->p('/mecanico'));
     }
 
     public function test_fichas_em_branco_para_imprimir(): void
@@ -283,6 +288,46 @@ class FluxoOsTest extends TestCase
         $this->assertNull(ServiceOrder::find($os->id));
         // o dinheiro recebido continua no financeiro
         $this->assertSame(1, \App\Models\FinanceEntry::where('type', 'entrada')->where('description', 'like', "OS {$os->number()}%")->count());
+    }
+
+    public function test_socio_exclui_varias_os_de_uma_vez(): void
+    {
+        $ids = ServiceOrder::where('status', OsStatus::Aguardando)->pluck('id')->all();
+        $this->assertGreaterThan(1, count($ids));
+
+        $this->actingAs($this->balcao)->delete($this->p('/os'), ['ids' => $ids])->assertForbidden();
+
+        $master = User::where('email', 'socio1@pista1.test')->first();
+        $this->actingAs($master)->delete($this->p('/os'), ['ids' => $ids])->assertSessionHas('success', count($ids).' OS excluídas.');
+        $this->assertSame(0, ServiceOrder::whereIn('id', $ids)->count());
+    }
+
+    public function test_socio_exclui_clientes_e_fornecedores_sem_historico(): void
+    {
+        $master = User::where('email', 'socio1@pista1.test')->first();
+        $novo = Client::create(['name' => 'Cadastro Errado', 'phone' => '11900000000']);
+        $novo->vehicles()->create(['plate' => 'ERR0R00', 'model' => 'Teste']);
+        $comOs = ServiceOrder::first()->client;
+
+        $this->actingAs($this->balcao)->delete($this->p('/clientes'), ['ids' => [$novo->id]])->assertForbidden();
+        $this->actingAs($master)->delete($this->p('/clientes'), ['ids' => [$novo->id, $comOs->id]])->assertSessionHas('success');
+        $this->assertNull(Client::find($novo->id));
+        $this->assertNull(Vehicle::where('plate', 'ERR0R00')->first()); // o carro sai junto
+        $this->assertNotNull(Client::find($comOs->id)); // quem tem OS fica
+
+        $sup = Supplier::create(['name' => 'Fornecedor Errado']);
+        $this->delete($this->p('/fornecedores'), ['ids' => [$sup->id]])->assertSessionHas('success', '1 fornecedor excluído.');
+        $this->assertNull(Supplier::find($sup->id));
+    }
+
+    public function test_fichas_de_cliente_e_veiculo_abrem(): void
+    {
+        $os = ServiceOrder::with(['client', 'vehicle'])->first();
+        $this->actingAs($this->balcao);
+        $this->get($this->p("/clientes/{$os->client_id}"))->assertOk();
+        $this->get($this->p("/veiculos/{$os->vehicle_id}"))->assertOk();
+        $this->get($this->p('/fornecedores'))->assertOk();
+        $this->get($this->p('/compras'))->assertOk();
     }
 
     /* ------------------------------------------------------ catálogo FIPE */

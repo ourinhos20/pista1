@@ -255,6 +255,22 @@ class FinanceController extends Controller
         return back()->with('success', 'Baixa estornada.');
     }
 
+    /** Exclui vários lançamentos marcados na lista (desfaz o aporte/retirada de sócio ligado a eles). */
+    public function destroyMany(Request $request): RedirectResponse
+    {
+        $ids = $request->validate(['ids' => ['required', 'array', 'min:1', 'max:500'], 'ids.*' => ['integer']])['ids'];
+        $n = 0;
+        \Illuminate\Support\Facades\DB::transaction(function () use ($ids, &$n) {
+            foreach (FinanceEntry::whereIn('id', $ids)->get() as $entry) {
+                $entry->partnerMovement()->delete();
+                $entry->delete();
+                $n++;
+            }
+        });
+
+        return back()->with('success', $n === 1 ? '1 lançamento excluído.' : "{$n} lançamentos excluídos.");
+    }
+
     public function destroy(FinanceEntry $entry): RedirectResponse
     {
         $entry->partnerMovement()->delete();
